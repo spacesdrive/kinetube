@@ -1,0 +1,37 @@
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Build output ──────────────────────────────────────────────────────────────
+frontend/dist/
+frontend/dist-ssr/
+
+# ── Auto-downloaded binaries (re-downloaded on first run) ─────────────────────
+backend/downloads/*.exe
+backend/downloads/*.zip
+
+# ── Downloaded media files ────────────────────────────────────────────────────
+backend/downloads/*.mp4
+backend/downloads/*.webm
+backend/downloads/*.mkv
+backend/downloads/*.mp3
+backend/downloads/*.m4a
+backend/downloads/*.opus
+backend/downloads/*.ogg
+
+# ── Environment / secrets ─────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.sw?

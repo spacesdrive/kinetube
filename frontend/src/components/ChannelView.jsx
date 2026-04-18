@@ -7,12 +7,12 @@ import {
   Play,
   Eye,
   Calendar,
-  Clock,
   Search,
-  Users,
   Video,
   Zap,
   ChevronDown,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 
 const VIDEO_QUALITIES = ['best', '2160p', '1440p', '1080p', '720p', '480p', '360p'];
@@ -40,7 +40,7 @@ function formatDate(uploadDate) {
   return s;
 }
 
-function VideoCard({ video, selected, onToggle, onDownload, ffmpegAvailable }) {
+function VideoCard({ video, selected, transcribe, onToggle, onTranscribeToggle, onDownload }) {
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [dlQuality, setDlQuality] = useState('best');
 
@@ -96,11 +96,25 @@ function VideoCard({ video, selected, onToggle, onDownload, ffmpegAvailable }) {
         </div>
       </div>
 
-      {/* Individual download button */}
+      {/* Actions */}
       <div
-        className="flex-shrink-0 self-center"
+        className="flex-shrink-0 self-center flex items-center gap-1"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Per-video transcribe toggle */}
+        <button
+          onClick={() => onTranscribeToggle(video.id)}
+          className={`p-2 rounded-xl transition-colors ${
+            transcribe
+              ? 'bg-purple-100 text-purple-600 hover:bg-purple-200'
+              : 'bg-gray-100 text-gray-300 hover:bg-gray-200 hover:text-gray-500'
+          }`}
+          title={transcribe ? 'Transcription enabled — click to disable' : 'Click to transcribe this video after download'}
+        >
+          {transcribe ? <Mic size={14} /> : <MicOff size={14} />}
+        </button>
+
+        {/* Individual download button */}
         <div className="relative">
           <button
             onClick={() => setShowDownloadMenu((v) => !v)}
@@ -112,23 +126,16 @@ function VideoCard({ video, selected, onToggle, onDownload, ffmpegAvailable }) {
 
           {showDownloadMenu && (
             <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowDownloadMenu(false)}
-              />
+              <div className="fixed inset-0 z-10" onClick={() => setShowDownloadMenu(false)} />
               <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-2xl shadow-xl border border-gray-100 p-3 w-52">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Quality
-                </p>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Quality</p>
                 <div className="space-y-1 mb-3">
                   {VIDEO_QUALITIES.map((q) => (
                     <button
                       key={q}
                       onClick={() => setDlQuality(q)}
                       className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        dlQuality === q
-                          ? 'bg-blue-600 text-white'
-                          : 'hover:bg-gray-100 text-gray-700'
+                        dlQuality === q ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'
                       }`}
                     >
                       {QUALITY_LABELS[q]}
@@ -139,16 +146,16 @@ function VideoCard({ video, selected, onToggle, onDownload, ffmpegAvailable }) {
                   <button
                     onClick={() => {
                       setShowDownloadMenu(false);
-                      onDownload({ videos: [video], quality: dlQuality, audioOnly: false });
+                      onDownload({ videos: [{ ...video, transcribe }], quality: dlQuality, audioOnly: false });
                     }}
                     className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
                   >
-                    <Play size={12} /> Download Video
+                    <Play size={12} /> Download Video{transcribe ? ' + Transcript' : ''}
                   </button>
                   <button
                     onClick={() => {
                       setShowDownloadMenu(false);
-                      onDownload({ videos: [video], quality: 'best', audioOnly: true });
+                      onDownload({ videos: [{ ...video, transcribe: false }], quality: 'best', audioOnly: true });
                     }}
                     className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
                   >
@@ -166,6 +173,7 @@ function VideoCard({ video, selected, onToggle, onDownload, ffmpegAvailable }) {
 
 export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
   const [selected, setSelected] = useState(new Set());
+  const [transcribeIds, setTranscribeIds] = useState(new Set());
   const [search, setSearch] = useState('');
   const [bulkQuality, setBulkQuality] = useState('best');
   const [showQualityPicker, setShowQualityPicker] = useState(false);
@@ -181,6 +189,15 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
 
   const toggleVideo = (id) => {
     setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleTranscribe = (id) => {
+    setTranscribeIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -207,13 +224,16 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
   const selectedVideos = info.entries.filter((v) => selected.has(v.id));
   const downloadTarget = selectedVideos.length > 0 ? selectedVideos : filtered;
   const downloadCount = downloadTarget.length;
+  const transcribeCount = downloadTarget.filter((v) => transcribeIds.has(v.id)).length;
+
+  const withTranscribeFlag = (vids) => vids.map((v) => ({ ...v, transcribe: transcribeIds.has(v.id) }));
 
   const handleBulkVideoDownload = () => {
-    onDownload({ videos: downloadTarget, quality: bulkQuality, audioOnly: false });
+    onDownload({ videos: withTranscribeFlag(downloadTarget), quality: bulkQuality, audioOnly: false });
   };
 
   const handleBulkAudioDownload = () => {
-    onDownload({ videos: downloadTarget, quality: 'best', audioOnly: true });
+    onDownload({ videos: downloadTarget.map((v) => ({ ...v, transcribe: false })), quality: 'best', audioOnly: true });
   };
 
   const isChannelShorts = info.type === 'channel_shorts';
@@ -224,9 +244,10 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
         {info.avatar && (
           <img
-            src={info.avatar}
+            src={`/api/proxy/img?url=${encodeURIComponent(info.avatar)}`}
             alt={info.channelName}
             className="w-14 h-14 rounded-full object-cover flex-shrink-0 bg-gray-100"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
         )}
         <div className="flex-1 min-w-0">
@@ -234,13 +255,11 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
           <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
             {isChannelShorts ? (
               <span className="flex items-center gap-1">
-                <Zap size={14} className="text-amber-500" />
-                Shorts channel
+                <Zap size={14} className="text-amber-500" /> Shorts channel
               </span>
             ) : (
               <span className="flex items-center gap-1">
-                <Video size={14} />
-                Videos
+                <Video size={14} /> Videos
               </span>
             )}
             <span className="flex items-center gap-1">
@@ -254,7 +273,6 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
       {/* Bulk actions */}
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4">
         <div className="flex flex-wrap items-center gap-3">
-          {/* Select all */}
           <button
             onClick={toggleAll}
             className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-blue-600 transition-colors px-3 py-2 rounded-xl hover:bg-blue-50"
@@ -264,8 +282,12 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
           </button>
 
           {someSelected && (
-            <span className="text-sm text-blue-600 font-medium">
-              {selectedVideos.length} selected
+            <span className="text-sm text-blue-600 font-medium">{selectedVideos.length} selected</span>
+          )}
+
+          {transcribeCount > 0 && (
+            <span className="flex items-center gap-1.5 text-sm text-purple-600 font-medium">
+              <Mic size={13} /> {transcribeCount} to transcribe
             </span>
           )}
 
@@ -300,7 +322,6 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
             )}
           </div>
 
-          {/* Download video */}
           <button
             onClick={handleBulkVideoDownload}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
@@ -309,7 +330,6 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
             Download {downloadCount} Video{downloadCount !== 1 ? 's' : ''}
           </button>
 
-          {/* Download audio */}
           <button
             onClick={handleBulkAudioDownload}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
@@ -332,6 +352,10 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
         />
       </div>
 
+      <p className="text-xs text-gray-400 px-1 flex items-center gap-1">
+        <MicOff size={11} /> Click the mic icon on a video to include a text transcript when it downloads.
+      </p>
+
       {/* Video list */}
       <div className="space-y-2">
         {filtered.length === 0 ? (
@@ -345,7 +369,9 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
               key={video.id}
               video={video}
               selected={selected.has(video.id)}
+              transcribe={transcribeIds.has(video.id)}
               onToggle={toggleVideo}
+              onTranscribeToggle={toggleTranscribe}
               onDownload={onDownload}
               ffmpegAvailable={ffmpegAvailable}
             />

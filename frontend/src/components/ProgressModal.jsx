@@ -74,7 +74,7 @@ function StepBadge({ phase, isMultiFile }) {
   );
 }
 
-function SingleDownload({ item, onClose, onCancel }) {
+function SingleDownload({ item, onClose, onCancel, onTranscribe, transcribing, transcribeResult }) {
   const {
     title,
     percent = 0,
@@ -91,6 +91,7 @@ function SingleDownload({ item, onClose, onCancel }) {
     phaseLabel,
     phase,
     isMultiFile,
+    filePath,
   } = item;
 
   return (
@@ -168,6 +169,68 @@ function SingleDownload({ item, onClose, onCancel }) {
           }`}
         >
           {message}
+        </div>
+      )}
+
+      {/* Transcription panel — only after a successful single download */}
+      {done && success && filePath && (
+        <div className="space-y-3 border-t border-gray-100 pt-4">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Transcription</p>
+
+          {/* Transcribing in progress (auto-triggered if toggle was on before download) */}
+          {transcribing && (
+            <div className="flex items-center gap-2.5 bg-blue-50 rounded-xl px-3 py-2.5 text-sm text-blue-700">
+              <Spinner size={14} className="text-blue-500" />
+              <span className="font-medium">Transcribing…</span>
+            </div>
+          )}
+
+          {/* Manual trigger — shown when not already transcribing and no result yet */}
+          {!transcribing && !transcribeResult?.text && !transcribeResult?.error && (
+            <button
+              type="button"
+              onClick={() => onTranscribe?.(filePath)}
+              className="w-full py-2 rounded-xl font-semibold text-sm bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+            >
+              Transcribe this file
+            </button>
+          )}
+
+          {/* Result */}
+          {transcribeResult && transcribeResult.error && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5 text-xs text-red-700">
+              <XCircle size={13} className="flex-shrink-0 mt-0.5" />
+              <span>{transcribeResult.error}</span>
+            </div>
+          )}
+
+          {transcribeResult && transcribeResult.text && (
+            <div className="space-y-2">
+              <textarea
+                readOnly
+                value={transcribeResult.text}
+                rows={6}
+                className="w-full text-xs text-gray-700 bg-gray-50 border border-gray-200 rounded-xl p-3 resize-none outline-none font-mono leading-relaxed"
+              />
+              <div className="flex items-center justify-between text-xs text-gray-400">
+                <span>{transcribeResult.text.split(/\s+/).filter(Boolean).length} words</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const blob = new Blob([transcribeResult.text], { type: 'text/plain' });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = (transcribeResult.outputTxt?.split(/[\\/]/).pop()) || 'transcript.txt';
+                    a.click();
+                    URL.revokeObjectURL(a.href);
+                  }}
+                  className="font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  Save .txt
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -288,6 +351,14 @@ function BulkDownload({ items, onClose, onCancel }) {
                 <div className="w-3 h-3 rounded-full border-2 border-gray-300" />
               )}
             </span>
+            {/* Platform dot for mixed-mode downloads */}
+            {item.platform && (
+              <span
+                className="flex-shrink-0 w-1.5 h-1.5 rounded-full"
+                style={{ background: item.platform === 'instagram' ? '#ec4899' : '#ef4444' }}
+                title={item.platform === 'instagram' ? 'Instagram' : 'YouTube'}
+              />
+            )}
             <span
               className={`truncate flex-1 ${
                 item === current
@@ -326,7 +397,7 @@ function BulkDownload({ items, onClose, onCancel }) {
 }
 
 // ── Modal wrapper ─────────────────────────────────────────────────────────────
-export default function ProgressModal({ download, onClose, onCancel }) {
+export default function ProgressModal({ download, onClose, onCancel, onTranscribe, transcribing, transcribeResult }) {
   if (!download) return null;
 
   const isBulk = Array.isArray(download.items);
@@ -350,7 +421,14 @@ export default function ProgressModal({ download, onClose, onCancel }) {
         {isBulk ? (
           <BulkDownload items={download.items} onClose={onClose} onCancel={onCancel} />
         ) : (
-          <SingleDownload item={download} onClose={onClose} onCancel={onCancel} />
+          <SingleDownload
+            item={download}
+            onClose={onClose}
+            onCancel={onCancel}
+            onTranscribe={onTranscribe}
+            transcribing={transcribing}
+            transcribeResult={transcribeResult}
+          />
         )}
       </div>
     </div>

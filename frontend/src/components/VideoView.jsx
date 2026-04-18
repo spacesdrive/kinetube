@@ -38,10 +38,28 @@ function formatDate(uploadDate) {
   return s;
 }
 
+// Inline toggle for the transcription option
+function Toggle({ checked, onChange }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className={`relative flex-shrink-0 rounded-full transition-colors duration-200 ${checked ? 'bg-blue-500' : 'bg-gray-200'}`}
+      style={{ minWidth: '2.5rem', height: '1.375rem' }}
+    >
+      <span
+        className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
+        style={{ transform: checked ? 'translateX(1.125rem)' : 'translateX(0)' }}
+      />
+    </button>
+  );
+}
+
 export default function VideoView({ info, ffmpegAvailable, onDownload }) {
   const [tab, setTab] = useState('video'); // 'video' | 'audio'
   const [videoQuality, setVideoQuality] = useState('best');
   const [audioQuality, setAudioQuality] = useState('best_audio');
+  const [transcribe, setTranscribe] = useState(false);
 
   const handleVideoDownload = () => {
     onDownload({
@@ -49,6 +67,7 @@ export default function VideoView({ info, ffmpegAvailable, onDownload }) {
       quality: videoQuality,
       audioOnly: false,
       title: info.title,
+      transcribe,
     });
   };
 
@@ -58,6 +77,7 @@ export default function VideoView({ info, ffmpegAvailable, onDownload }) {
       quality: 'best',
       audioOnly: true,
       title: info.title,
+      transcribe,
     });
   };
 
@@ -210,6 +230,15 @@ export default function VideoView({ info, ffmpegAvailable, onDownload }) {
                 <Download size={18} />
                 Download Video — {QUALITY_LABELS[videoQuality]}
               </button>
+
+              {/* Transcription toggle */}
+              <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Transcribe after download</p>
+                  <p className="text-xs text-gray-400">Generate a text transcript using Whisper AI</p>
+                </div>
+                <Toggle checked={transcribe} onChange={setTranscribe} />
+              </div>
             </div>
           )}
 
@@ -242,6 +271,15 @@ export default function VideoView({ info, ffmpegAvailable, onDownload }) {
                 <Music size={18} />
                 Download Audio (MP3)
               </button>
+
+              {/* Transcription toggle */}
+              <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Transcribe after download</p>
+                  <p className="text-xs text-gray-400">Generate a text transcript using Whisper AI</p>
+                </div>
+                <Toggle checked={transcribe} onChange={setTranscribe} />
+              </div>
             </div>
           )}
         </div>

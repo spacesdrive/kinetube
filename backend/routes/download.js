@@ -10,13 +10,13 @@ const DEFAULT_DOWNLOADS_DIR = path.join(__dirname, '..', 'downloads');
 if (!fs.existsSync(DEFAULT_DOWNLOADS_DIR)) fs.mkdirSync(DEFAULT_DOWNLOADS_DIR, { recursive: true });
 
 const QUALITY_FORMATS = {
-  best:    'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
+  best: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
   '2160p': 'bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/best',
   '1440p': 'bestvideo[height<=1440][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1440]+bestaudio/best',
   '1080p': 'bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=1080]+bestaudio/best',
-  '720p':  'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best',
-  '480p':  'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best',
-  '360p':  'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=360]+bestaudio/best',
+  '720p': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=720]+bestaudio/best',
+  '480p': 'bestvideo[height<=480][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=480]+bestaudio/best',
+  '360p': 'bestvideo[height<=360][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=360]+bestaudio/best',
 };
 const AUDIO_FORMAT = 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio';
 
@@ -142,10 +142,19 @@ router.get('/download', (req, res) => {
     // Large retry value tells EventSource not to reconnect immediately.
     if (!res.writableEnded) res.write('retry: 3600000\n\n');
     if (code === 0) {
+      // For merged downloads (video+audio → .mp4) yt-dlp writes the final file
+      // to a path derived from the first Destination but with .mp4 extension.
+      let finalPath = firstDestPath;
+      if (isMultiFile && firstDestPath) {
+        finalPath = firstDestPath.replace(/\.[^.]+$/, '.mp4');
+      } else if (isAudioOnly && firstDestPath) {
+        finalPath = firstDestPath.replace(/\.[^.]+$/, '.mp3');
+      }
       send('done', {
         success: true,
         message: 'Download complete. File saved to the downloads folder.',
         filename: videoTitle,
+        filePath: finalPath,
       });
     } else {
       send('done', { success: false, message: 'Download failed. Check the server console for details.' });
@@ -194,6 +203,7 @@ router.get('/download', (req, res) => {
   const proc = spawn(YTDLP_EXE_PATH, args, { windowsHide: true });
 
   let videoTitle = '';
+  let firstDestPath = '';   // actual filesystem path of the first output file
   // destCount tracks how many Destination: lines appeared (1=video, 2=audio for split)
   let destCount = 0;
   // isMultiFile becomes true when we see a 2nd Destination line
@@ -202,9 +212,9 @@ router.get('/download', (req, res) => {
   let phase = isAudioOnly ? 'audio' : 'video';
 
   const phaseLabel = () =>
-    phase === 'video'  ? 'Downloading video...'
-    : phase === 'audio' ? 'Downloading audio...'
-    : 'Converting...';
+    phase === 'video' ? 'Downloading video...'
+      : phase === 'audio' ? 'Downloading audio...'
+        : 'Converting...';
 
   proc.stdout.on('data', (chunk) => {
     const lines = chunk.toString().split('\n');
@@ -233,6 +243,7 @@ router.get('/download', (req, res) => {
       if (destM) {
         destCount++;
         if (destCount === 1) {
+          firstDestPath = destM[1];
           videoTitle = cleanTitle(destM[1]);
           phase = isAudioOnly ? 'audio' : 'video';
         } else {

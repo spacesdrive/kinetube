@@ -169,6 +169,38 @@ function getVideoInfo(ytdlpPath, url) {
   });
 }
 
+// yt-dlp returns both avatar (square) and banner (very wide) thumbnails in the same array.
+// Banners: yt3.googleusercontent.com or width >> height (e.g. 2560×340).
+// Avatars: yt3.ggpht.com, square (e.g. 900×900), URL contains =sNNN param.
+function pickChannelAvatar(thumbnails) {
+  if (!thumbnails || thumbnails.length === 0) return null;
+
+  // Resolve effective resolution: use pixel area when dimensions known,
+  // otherwise parse =sNNN from the YouTube image-serving URL.
+  const resolution = (t) => {
+    if (t.width && t.height) return t.width * t.height;
+    const m = (t.url || '').match(/[=?&]s(\d+)/);
+    return m ? parseInt(m[1], 10) ** 2 : 0;
+  };
+
+  // Step 1: filter out obvious banners
+  const notBanner = thumbnails.filter((t) => {
+    if (!t.url) return false;
+    // Explicit dimensions: reject if very wide (banner)
+    if (t.width && t.height && t.height / t.width < 0.5) return false;
+    // URL pattern: googleusercontent with crop param = banner
+    if (t.url.includes('googleusercontent.com') && t.url.includes('fcrop64')) return false;
+    return true;
+  });
+
+  // Step 2: prefer yt3.ggpht.com (canonical YouTube avatar CDN)
+  const ggpht = notBanner.filter((t) => t.url.includes('yt3.ggpht.com'));
+  const pool  = ggpht.length > 0 ? ggpht : (notBanner.length > 0 ? notBanner : thumbnails);
+
+  // Step 3: pick highest resolution
+  return pool.reduce((best, t) => resolution(t) > resolution(best) ? t : best).url || null;
+}
+
 function getChannelInfo(ytdlpPath, channelUrl) {
   return new Promise((resolve, reject) => {
     const proc = spawn(ytdlpPath, [
@@ -214,10 +246,7 @@ function getChannelInfo(ytdlpPath, channelUrl) {
         channelName: data.channel || data.uploader || data.title || 'Unknown Channel',
         channelId: data.channel_id || data.id,
         channelUrl: data.channel_url || channelUrl,
-        avatar:
-          data.thumbnails && data.thumbnails.length > 0
-            ? data.thumbnails[data.thumbnails.length - 1].url
-            : null,
+        avatar: pickChannelAvatar(data.thumbnails),
         videoCount: entries.length,
         entries,
       });

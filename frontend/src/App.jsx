@@ -1,12 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link2, Search, X, ArrowLeft, ShieldCheck, Zap, MonitorPlay } from 'lucide-react';
+import { Link2, Search, X, ArrowLeft, ShieldCheck, Zap, MonitorPlay, Layers } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Spinner } from '@/components/ui/spinner';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
+import { cn } from '@/lib/utils';
+import { AppSidebar } from './components/AppSidebar';
 import YtdlpAlert from './components/YtdlpAlert';
 import VideoView from './components/VideoView';
 import ChannelView from './components/ChannelView';
 import ProgressModal from './components/ProgressModal';
 import DownloadSettings from './components/DownloadSettings';
 import SetupScreen from './components/SetupScreen';
-import Navbar from './components/Navbar';
 import InstagramLoginModal from './components/instagram/InstagramLoginModal';
 import InstagramPostView from './components/instagram/InstagramPostView';
 import InstagramProfileView from './components/instagram/InstagramProfileView';
@@ -273,17 +282,18 @@ export default function App() {
   const [loading, setLoading]               = useState(false);
   const [result, setResult]                 = useState(null);
   const [activeDownload, setActiveDownload] = useState(null);
-  const [downloadSettings, setDownloadSettings] = useState({
-    outputDir: '',
-    prefix: '',
-    suffix: '',
-    useNumbering: false,
-    startNumber: 1,
-    useCustomFilename: false,
-    customFilenameTemplate: '%(title)s',
+  const [downloadSettings, setDownloadSettings] = useState(() => {
+    const saved = loadSettings().downloads;
+    return {
+      outputDir:              saved.outputDir              ?? '',
+      prefix:                 saved.prefix                 ?? '',
+      suffix:                 saved.suffix                 ?? '',
+      useNumbering:           saved.useNumbering           ?? false,
+      startNumber:            1,
+      useCustomFilename:      saved.useCustomFilename      ?? false,
+      customFilenameTemplate: saved.customFilenameTemplate ?? '%(title)s',
+    };
   });
-  // ── Persisted settings ────────────────────────────────────────────────────
-  const appSettings = loadSettings();
 
   // ── Transcription state ───────────────────────────────────────────────────
   const [transcribing, setTranscribing]         = useState(false);
@@ -327,6 +337,19 @@ export default function App() {
   // instaloader.exe is no longer required — Python + instaloader library handles
   // everything. Just fetch saved accounts whenever the Instagram tab is opened.
   const handlePlatformChange = useCallback((newPlatform) => {
+    // Re-sync download settings whenever the user leaves the Settings page
+    if (platform === 'settings' && newPlatform !== 'settings') {
+      const saved = loadSettings().downloads;
+      setDownloadSettings((prev) => ({
+        ...prev,
+        outputDir:              saved.outputDir              ?? '',
+        prefix:                 saved.prefix                 ?? '',
+        suffix:                 saved.suffix                 ?? '',
+        useNumbering:           saved.useNumbering           ?? false,
+        useCustomFilename:      saved.useCustomFilename      ?? false,
+        customFilenameTemplate: saved.customFilenameTemplate ?? '%(title)s',
+      }));
+    }
     setPlatform(newPlatform);
     if (newPlatform === 'transcribe' || newPlatform === 'settings') {
       setResult(null);
@@ -1053,386 +1076,263 @@ export default function App() {
   if (!setupChecked) return null;
   if (needsSetup) return <SetupScreen onComplete={handleSetupComplete} />;
 
+  // ── Page title for the header breadcrumb ──────────────────────────────────
+  const PAGE_LABELS = {
+    youtube:    'YouTube',
+    instagram:  'Instagram',
+    transcribe: 'Transcribe',
+    settings:   'Settings',
+  };
+
+  const isDownloadPage = platform === 'youtube' || platform === 'instagram';
+
   return (
-    <div className="min-h-screen bg-[#f8fafe] font-sans flex flex-col relative overflow-x-hidden">
-      {/* Background glow */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-blue-100/40 rounded-full blur-[100px] pointer-events-none" />
+    <SidebarProvider>
+      <AppSidebar
+        platform={platform}
+        onPlatformChange={handlePlatformChange}
+        igAccounts={igAccounts}
+        activeIgAccount={activeIgAccount}
+        onIgAccountSelect={setActiveIgAccount}
+        onIgAccountRemove={handleIgAccountRemove}
+        onIgAddAccount={() => setShowLoginModal(true)}
+      />
 
-      {/* Header */}
-      <header className="w-full max-w-7xl mx-auto px-6 py-5 flex items-center justify-between relative z-10">
-        <button
-          onClick={handleClear}
-          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-        >
-          <img src="/favicon.png" alt="KineTube Logo" className="w-9 h-9 object-contain" />
-          <span className="text-2xl font-bold text-blue-600 tracking-tight">KineTube</span>
-        </button>
+      <SidebarInset>
+        {/* ── Top header bar ── */}
+        <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+          <SidebarTrigger className="-ml-1" />
 
-        <Navbar
-          platform={platform}
-          onPlatformChange={handlePlatformChange}
-          onSettingsClick={() => handlePlatformChange('settings')}
-        />
+          {/* Page title */}
+          <span className="text-sm font-semibold text-foreground">
+            {PAGE_LABELS[platform] ?? 'KineTube'}
+          </span>
 
-        {result ? (
-          <button
-            onClick={handleClear}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors px-3 py-1.5 rounded-xl hover:bg-gray-100"
-          >
-            <ArrowLeft size={15} /> New search
-          </button>
-        ) : (
-          <div className="w-24" />
-        )}
-      </header>
+          {/* Spacer */}
+          <div className="flex-1" />
 
-      {/* Main content */}
-      <main className="flex-1 flex flex-col items-center px-4 pb-12 relative z-10">
+          {/* New search button (shown when a result is loaded) */}
+          {result && (
+            <Button variant="ghost" size="sm" onClick={handleClear} className="gap-1.5 text-muted-foreground">
+              <ArrowLeft size={14} /> New search
+            </Button>
+          )}
 
-        {/* ── Full-page routes ── */}
-        {platform === 'transcribe' && <TranscribePage />}
-        {platform === 'settings'   && <SettingsPage   />}
-
-        {/* ── Download pages (YouTube / Instagram) ── */}
-        {(platform === 'youtube' || platform === 'instagram') && <>
-
-        {/* ── Batch mode ── */}
-        {batchMode && (
-          <div className="w-full max-w-3xl mx-auto mt-6 mb-2 animate-fade-slide-up" style={{ animationFillMode: 'both' }}>
-            <div className="bg-white border border-gray-100 rounded-3xl shadow-sm p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h2 className="text-base font-bold text-gray-800">Batch Download</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Paste multiple YouTube or Instagram URLs, one per line</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setBatchMode(false); setBatchResults([]); setBatchText(''); }}
-                  className="p-1.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <textarea
-                value={batchText}
-                onChange={(e) => setBatchText(e.target.value)}
-                placeholder={`https://www.youtube.com/watch?v=...\nhttps://www.instagram.com/reel/...\nhttps://www.youtube.com/@channel/videos`}
-                rows={5}
-                className="w-full text-sm bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 outline-none focus:border-blue-400 focus:bg-white transition-colors resize-none font-mono placeholder-gray-300"
-              />
-
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-xs text-gray-400">
-                  {(() => {
-                    const n = dedupeUrls(parseBatchUrls(batchText)).length;
-                    return n > 0 ? `${n} URL${n !== 1 ? 's' : ''} detected` : 'No valid URLs yet';
-                  })()}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => handleBatchProcess(batchText)}
-                  disabled={batchProcessing || parseBatchUrls(batchText).length === 0}
-                  className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 disabled:pointer-events-none text-white font-semibold text-sm shadow-sm transition-colors"
-                >
-                  {batchProcessing ? (
-                    <>
-                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                      </svg>
-                      Processing…
-                    </>
-                  ) : (
-                    'Process All'
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {batchResults.length > 0 && (
-              <BatchResultsView
-                results={batchResults}
-                onSelectionChange={handleBatchSelectionChange}
-                onDownload={handleBatchDownload}
-                onReset={() => { setBatchResults([]); setBatchText(''); }}
-              />
-            )}
-          </div>
-        )}
-
-        {/* ── Hero section ── */}
-        {!result && !batchMode && (
-          <div className="text-center max-w-4xl mx-auto w-full mt-8 mb-8">
-            {platform === 'instagram' ? (
-              <>
-                <h1 className="text-5xl md:text-6xl font-extrabold text-[#1a1c23] tracking-tight mb-4 leading-tight">
-                  Download Instagram <br />
-                  <span className="bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent">Reels &amp; Posts</span>
-                </h1>
-                <p className="text-[#6b7280] text-lg md:text-xl max-w-2xl mx-auto mb-10 font-medium">
-                  Save reels, posts, and stories. Log in to access private content.
-                </p>
-              </>
-            ) : (
-              <>
-                <h1 className="text-5xl md:text-6xl font-extrabold text-[#1a1c23] tracking-tight mb-4 leading-tight">
-                  Download YouTube Videos <br />
-                  <span className="text-blue-600">in High Definition</span>
-                </h1>
-                <p className="text-[#6b7280] text-lg md:text-xl max-w-2xl mx-auto mb-10 font-medium">
-                  Fast, free, and secure. Save videos, channels, and audio from YouTube.
-                </p>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* ── yt-dlp alert ── */}
-        {ytdlpStatus && !ytdlpStatus.isUpToDate && (
-          <div className="w-full max-w-3xl mx-auto mb-6">
-            <YtdlpAlert status={ytdlpStatus} />
-          </div>
-        )}
-
-        {/* ── URL input ── */}
-        <div className={`w-full max-w-3xl mx-auto ${result ? 'mb-4' : 'mb-0'} ${batchMode ? 'hidden' : ''}`}>
-          <form onSubmit={handleSubmit} className="relative group">
-            <div className="absolute -inset-1 bg-gradient-to-r from-blue-100 to-blue-50 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
-            <div
-              className={`relative flex items-center bg-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.06)] p-2 pr-2 border transition-colors ${urlError ? 'border-red-300' : 'border-gray-100'
-                }`}
+          {/* Batch mode toggle */}
+          {isDownloadPage && !result && (
+            <Button
+              variant={batchMode ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => { if (batchMode) { setBatchMode(false); setBatchResults([]); setBatchText(''); } else setBatchMode(true); }}
+              className="gap-1.5 text-muted-foreground"
             >
-              <div className="pl-5 text-gray-400 flex-shrink-0">
-                <Link2 size={22} />
-              </div>
-              <input
-                type="text"
-                value={url}
-                onChange={(e) => { setUrl(e.target.value); setUrlError(''); }}
-                onPaste={(e) => {
-                  const pasted = e.clipboardData.getData('text');
-                  const isIg = /instagram\.com/i.test(pasted);
-                  if (isIg && platform !== 'instagram') {
-                    // Auto-switch to Instagram tab and set cleaned URL
-                    handlePlatformChange('instagram');
-                    e.preventDefault();
-                    setUrl(cleanInstagramUrl(pasted));
-                    setUrlError('');
-                    return;
-                  }
-                  const cleaner = isIg ? cleanInstagramUrl : cleanYouTubeUrl;
-                  const cleaned = cleaner(pasted);
-                  if (cleaned !== pasted) {
-                    e.preventDefault();
-                    setUrl(cleaned);
-                    setUrlError('');
-                  }
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                placeholder={platform === 'instagram'
-                  ? 'Paste Instagram URL — reel, post, story, or profile...'
-                  : 'Paste YouTube URL — video, channel, or shorts...'}
-                className="flex-1 bg-transparent border-none outline-none px-4 py-4 text-gray-700 text-lg placeholder-gray-400 min-w-0"
-              />
-              {url && (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="flex-shrink-0 p-2 mr-1 rounded-full hover:bg-gray-100 text-gray-400 transition-colors"
-                >
-                  <X size={16} />
-                </button>
-              )}
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-shrink-0 flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-4 px-8 rounded-full transition-colors whitespace-nowrap text-lg shadow-md"
-              >
-                {loading ? (
-                  <>
-                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                    </svg>
-                    Fetching...
-                  </>
-                ) : (
-                  <>
-                    <Search size={18} />
-                    Fetch
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-
-          {urlError && (
-            <p className="mt-3 text-sm text-red-600 font-medium text-center px-4">{urlError}</p>
+              <Layers size={14} />
+              {batchMode ? 'Exit Batch' : 'Batch'}
+            </Button>
           )}
+        </header>
 
-          {/* ── Instagram profile fetch progress ── */}
-          {loading && platform === 'instagram' && igFetchProgress && (
-            <div className="mt-4 mx-2 bg-white border border-purple-100 rounded-2xl px-5 py-4 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <svg className="animate-spin w-4 h-4 text-purple-500 flex-shrink-0" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
-                    <path className="opacity-80" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  <span className="text-sm font-semibold text-gray-700">
-                    {igFetchProgress.channelName ? `@${igFetchProgress.channelName}` : 'Fetching profile…'}
-                  </span>
-                </div>
-                <span className="text-sm font-semibold text-purple-600 tabular-nums">
-                  {igFetchProgress.fetched}
-                  {igFetchProgress.total ? ` / ${igFetchProgress.total}` : ''} posts
-                </span>
-              </div>
-              {igFetchProgress.total ? (
-                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-300"
-                    style={{ width: `${Math.min(100, (igFetchProgress.fetched / igFetchProgress.total) * 100).toFixed(1)}%` }}
-                  />
-                </div>
-              ) : (
-                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse" style={{ width: '40%' }} />
-                </div>
-              )}
-              <p className="text-xs text-gray-400 mt-1.5">
-                {igFetchProgress.total
-                  ? `${Math.min(100, Math.round((igFetchProgress.fetched / igFetchProgress.total) * 100))}% complete`
-                  : 'Fetching post list…'}
-              </p>
-            </div>
-          )}
+        {/* ── Page content ── */}
+        <div className="flex flex-1 flex-col overflow-auto">
+          <div className="flex flex-col items-center w-full px-4 pb-12 pt-2">
 
-          {/* Batch mode entry point */}
-          {!result && !batchMode && (
-            <div className="text-center mt-3">
-              <button
-                type="button"
-                onClick={() => setBatchMode(true)}
-                className="text-xs text-gray-400 hover:text-blue-600 transition-colors underline underline-offset-2 decoration-dotted"
-              >
-                Batch download multiple URLs at once
-              </button>
-            </div>
-          )}
-        </div>
+            {/* ── Full-page routes ── */}
+            {platform === 'transcribe' && <TranscribePage />}
+            {platform === 'settings'   && <SettingsPage />}
 
-        {/* ── Instagram account bar ── */}
-        {platform === 'instagram' && !batchMode && (
-          <div className="w-full max-w-3xl mx-auto mt-3 min-h-[32px]">
-            {igSetupLoading ? (
-              <div className="flex items-center gap-2 text-sm text-gray-500 px-2">
-                <svg className="animate-spin w-4 h-4 text-purple-500" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                Setting up Instagram downloader…
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 flex-wrap px-1">
-                {igAccounts.map((a) => (
-                  <div
-                    key={a.username}
-                    onClick={() => setActiveIgAccount(a.username)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer select-none ${
-                      activeIgAccount === a.username
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white border-transparent shadow-sm'
-                        : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300'
-                    }`}
-                  >
-                    @{a.username}
-                    <button
-                      type="button"
-                      onClick={(ev) => { ev.stopPropagation(); handleIgAccountRemove(a.username); }}
-                      className="ml-0.5 opacity-70 hover:opacity-100 transition-opacity"
-                    >
-                      <X size={11} />
-                    </button>
+            {/* ── Download pages (YouTube / Instagram) ── */}
+            {isDownloadPage && (
+              <>
+                {/* ── Batch mode panel ── */}
+                {batchMode && (
+                  <div className="w-full max-w-3xl mx-auto mt-6 mb-2 animate-fade-slide-up" style={{ animationFillMode: 'both' }}>
+                    <Card>
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Batch Download</CardTitle>
+                        <p className="text-xs text-muted-foreground">Paste multiple YouTube or Instagram URLs, one per line</p>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <Textarea
+                          value={batchText}
+                          onChange={(e) => setBatchText(e.target.value)}
+                          placeholder={`https://www.youtube.com/watch?v=...\nhttps://www.instagram.com/reel/...\nhttps://www.youtube.com/@channel/videos`}
+                          rows={5}
+                          className="font-mono text-sm resize-none"
+                        />
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">
+                            {(() => { const n = dedupeUrls(parseBatchUrls(batchText)).length; return n > 0 ? `${n} URL${n !== 1 ? 's' : ''} detected` : 'No valid URLs yet'; })()}
+                          </span>
+                          <Button
+                            type="button"
+                            onClick={() => handleBatchProcess(batchText)}
+                            disabled={batchProcessing || parseBatchUrls(batchText).length === 0}
+                            size="sm"
+                          >
+                            {batchProcessing ? <><Spinner size={14} className="mr-2" />Processing…</> : 'Process All'}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    {batchResults.length > 0 && (
+                      <BatchResultsView
+                        results={batchResults}
+                        onSelectionChange={handleBatchSelectionChange}
+                        onDownload={handleBatchDownload}
+                        onReset={() => { setBatchResults([]); setBatchText(''); }}
+                      />
+                    )}
                   </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setShowLoginModal(true)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 border border-purple-200 transition-colors"
-                >
-                  + Add account
-                </button>
-              </div>
+                )}
+
+                {/* ── Hero ── */}
+                {!result && !batchMode && (
+                  <div className="text-center max-w-2xl mx-auto w-full mt-10 mb-8">
+                    {platform === 'instagram' ? (
+                      <>
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tight mb-3 leading-tight">
+                          Download Instagram{' '}
+                          <span className="bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent">Reels &amp; Posts</span>
+                        </h1>
+                        <p className="text-muted-foreground text-base md:text-lg max-w-xl mx-auto mb-8">
+                          Save reels, posts, and stories. Log in via the sidebar to access private content.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <h1 className="text-4xl md:text-5xl font-extrabold text-foreground tracking-tight mb-3 leading-tight">
+                          Download YouTube{' '}
+                          <span className="text-blue-600">in High Definition</span>
+                        </h1>
+                        <p className="text-muted-foreground text-base md:text-lg max-w-xl mx-auto mb-8">
+                          Fast, free, and runs entirely on your computer. No data leaves your machine.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* ── yt-dlp alert ── */}
+                {ytdlpStatus && !ytdlpStatus.isUpToDate && (
+                  <div className="w-full max-w-3xl mx-auto mb-4">
+                    <YtdlpAlert status={ytdlpStatus} />
+                  </div>
+                )}
+
+                {/* ── URL input ── */}
+                {!batchMode && (
+                  <div className={cn('w-full max-w-3xl mx-auto', result ? 'mb-4' : 'mb-0')}>
+                    <form onSubmit={handleSubmit} className="relative group">
+                      <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/10 to-blue-500/5 rounded-full blur opacity-50 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
+                      <div
+                        className={cn(
+                          'relative flex items-center bg-card rounded-full shadow-md dark:shadow-lg border transition-colors',
+                          urlError ? 'border-red-400' : 'border-border'
+                        )}
+                      >
+                        <div className="pl-5 text-muted-foreground flex-shrink-0">
+                          <Link2 size={20} />
+                        </div>
+                        <input
+                          type="text"
+                          value={url}
+                          onChange={(e) => { setUrl(e.target.value); setUrlError(''); }}
+                          onPaste={(e) => {
+                            const pasted = e.clipboardData.getData('text');
+                            const isIg = /instagram\.com/i.test(pasted);
+                            if (isIg && platform !== 'instagram') {
+                              handlePlatformChange('instagram');
+                              e.preventDefault();
+                              setUrl(cleanInstagramUrl(pasted));
+                              setUrlError('');
+                              return;
+                            }
+                            const cleaner = isIg ? cleanInstagramUrl : cleanYouTubeUrl;
+                            const cleaned = cleaner(pasted);
+                            if (cleaned !== pasted) { e.preventDefault(); setUrl(cleaned); setUrlError(''); }
+                          }}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+                          placeholder={platform === 'instagram'
+                            ? 'Paste Instagram URL — reel, post, story, or profile...'
+                            : 'Paste YouTube URL — video, channel, or shorts...'}
+                          className="flex-1 bg-transparent border-none outline-none px-4 py-3.5 text-foreground placeholder:text-muted-foreground/50 min-w-0 text-base"
+                        />
+                        {url && (
+                          <button type="button" onClick={handleClear} className="flex-shrink-0 p-2 mr-1 rounded-full hover:bg-muted text-muted-foreground transition-colors">
+                            <X size={15} />
+                          </button>
+                        )}
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          className={cn(
+                            'flex-shrink-0 flex items-center gap-2 text-white font-semibold py-3.5 px-7 rounded-full transition-colors whitespace-nowrap m-1',
+                            platform === 'instagram'
+                              ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 disabled:opacity-60'
+                              : 'bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400'
+                          )}
+                        >
+                          {loading ? <><Spinner size={16} className="mr-1" />Fetching…</> : <><Search size={16} />Fetch</>}
+                        </button>
+                      </div>
+                    </form>
+
+                    {urlError && <p className="mt-2 text-sm text-red-500 font-medium text-center px-4">{urlError}</p>}
+
+                    {/* Instagram fetch progress */}
+                    {loading && platform === 'instagram' && igFetchProgress && (
+                      <Card className="mt-3 border-pink-100 dark:border-pink-900/30">
+                        <CardContent className="py-3 px-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Spinner size={13} className="text-pink-500" />
+                              <span className="text-sm font-medium">{igFetchProgress.channelName ? `@${igFetchProgress.channelName}` : 'Fetching profile…'}</span>
+                            </div>
+                            <span className="text-xs font-semibold text-pink-600 tabular-nums">
+                              {igFetchProgress.fetched}{igFetchProgress.total ? ` / ${igFetchProgress.total}` : ''} posts
+                            </span>
+                          </div>
+                          {igFetchProgress.total ? (
+                            <Progress value={Math.min(100, (igFetchProgress.fetched / igFetchProgress.total) * 100)} className="h-1.5 [&>div]:bg-gradient-to-r [&>div]:from-purple-500 [&>div]:to-pink-500" />
+                          ) : (
+                            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden"><div className="h-full w-2/5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full animate-pulse" /></div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Download settings (inline collapsible) ── */}
+                {!batchMode && !result && (
+                  <div className="w-full max-w-3xl mx-auto mt-2">
+                    <DownloadSettings settings={downloadSettings} onChange={setDownloadSettings} />
+                  </div>
+                )}
+
+                {/* ── Feature pills (landing only) ── */}
+                {!result && !loading && !batchMode && (
+                  <div className="flex flex-wrap items-center justify-center gap-5 mt-6 text-xs font-medium text-muted-foreground">
+                    <span className="flex items-center gap-1.5"><ShieldCheck size={14} className="text-green-500" />Secure &amp; Private</span>
+                    <span className="flex items-center gap-1.5"><Zap size={14} className="text-orange-500" />No Registration</span>
+                    <span className="flex items-center gap-1.5"><MonitorPlay size={14} className="text-blue-400" />4K / HD Quality</span>
+                  </div>
+                )}
+
+                {/* ── Results ── */}
+                {isVideoType && <VideoView info={result} ffmpegAvailable={ffmpegAvailable} onDownload={handleDownload} />}
+                {isChannelType && <ChannelView info={result} ffmpegAvailable={ffmpegAvailable} onDownload={handleDownload} />}
+                {platform === 'instagram' && result && (result.type === 'post' || result.type === 'reel' || result.type === 'story') && (
+                  <InstagramPostView info={result} account={activeIgAccount} onDownload={handleInstagramDownload} />
+                )}
+                {platform === 'instagram' && result && (result.type === 'profile' || result.type === 'profile_reels' || result.type === 'profile_tagged') && (
+                  <InstagramProfileView info={result} account={activeIgAccount} onDownload={handleInstagramDownload} onBulkDownload={handleInstagramBulkDownload} />
+                )}
+              </>
             )}
           </div>
-        )}
-
-        {/* ── Download Settings ── */}
-        <div className="w-full max-w-3xl mx-auto mt-3 mb-3 px-1">
-          <DownloadSettings
-            settings={downloadSettings}
-            onChange={setDownloadSettings}
-          />
         </div>
-
-        {/* ── Feature badges (landing only) ── */}
-        {!result && !loading && !batchMode && (
-          <div className="flex flex-wrap items-center justify-center gap-6 mt-4 text-sm font-medium text-gray-500">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck size={18} className="text-green-500" />
-              <span>Secure & Private</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Zap size={18} className="text-orange-500" />
-              <span>No Registration</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <MonitorPlay size={18} className="text-blue-400" />
-              <span>4K/HD Quality</span>
-            </div>
-          </div>
-        )}
-
-        {/* ── Video result ── */}
-        {isVideoType && (
-          <VideoView
-            info={result}
-            ffmpegAvailable={ffmpegAvailable}
-            onDownload={handleDownload}
-          />
-        )}
-
-        {/* ── Channel result ── */}
-        {isChannelType && (
-          <ChannelView
-            info={result}
-            ffmpegAvailable={ffmpegAvailable}
-            onDownload={handleDownload}
-          />
-        )}
-
-        {/* ── Instagram single post / reel / story result ── */}
-        {platform === 'instagram' && result && (result.type === 'post' || result.type === 'reel' || result.type === 'story') && (
-          <InstagramPostView
-            info={result}
-            account={activeIgAccount}
-            onDownload={handleInstagramDownload}
-          />
-        )}
-
-        {/* ── Instagram profile result ── */}
-        {platform === 'instagram' && result && (result.type === 'profile' || result.type === 'profile_reels' || result.type === 'profile_tagged') && (
-          <InstagramProfileView
-            info={result}
-            account={activeIgAccount}
-            onDownload={handleInstagramDownload}
-            onBulkDownload={handleInstagramBulkDownload}
-          />
-        )}
-
-        </> /* end YouTube/Instagram pages */}
-      </main>
+      </SidebarInset>
 
       {/* ── Download progress modal ── */}
       {activeDownload && (
@@ -1453,6 +1353,6 @@ export default function App() {
           onSuccess={handleIgLoginSuccess}
         />
       )}
-    </div>
+    </SidebarProvider>
   );
 }

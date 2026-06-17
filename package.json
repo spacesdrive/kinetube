@@ -1,4 +1,71 @@
 {
+  "name": "kinetube",
+  "version": "1.0.0",
+  "description": "Local YouTube & Instagram downloader",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -n backend,frontend,electron -c cyan,magenta,yellow \"cd backend && node --no-deprecation server.js\" \"cd frontend && npx vite\" \"wait-on http://localhost:3001/health http://localhost:5173 && electron --no-deprecation .\"",
+    "build:frontend": "cd frontend && npx vite build",
+    "postinstall": "node scripts/patch-7zip.js",
+    "dist":       "npm run build:frontend && npx electron-builder",
+    "dist:win":   "npm run build:frontend && npx electron-builder --win",
+    "dist:mac":   "npm run build:frontend && npx electron-builder --mac",
+    "dist:linux": "npm run build:frontend && npx electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.kinetube.app",
+    "productName": "KineTube",
+    "copyright": "Copyright © 2025 KineTube",
+    "asar": false,
+    "files": [
+      "electron/**/*"
+    ],
+    "extraResources": [
+      { "from": "backend", "to": "backend", "filter": [
+        "**/*",
+        "!.env",
+        "!downloads/*.exe",
+        "!downloads/*.dll",
+        "!downloads/*.zip",
+        "!downloads/*.bin",
+        "!downloads/*.mp4",
+        "!downloads/*.webm",
+        "!downloads/*.mkv",
+        "!downloads/*.mp3",
+        "!downloads/*.m4a",
+        "!models/**"
+      ]},
+      { "from": "frontend/dist", "to": "frontend/dist" }
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "frontend/public/favicon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "KineTube"
+    },
+    "mac": {
+      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "icon": "frontend/public/favicon.png",
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "icon": "frontend/public/favicon.png",
+      "category": "Utility"
+    }
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.1"
+  },
   "dependencies": {
     "unzipper": "^0.12.3"
   }

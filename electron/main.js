@@ -84,7 +84,7 @@ function createWindow() {
     minWidth:  960,
     minHeight: 640,
     title: 'KineTube',
-    icon: path.join(__dirname, '..', 'frontend', 'public', 'favicon.png'),
+    icon: path.join(__dirname, '..', 'build', 'icon.png'),
     webPreferences: {
       preload:          path.join(__dirname, 'preload.js'),
       contextIsolation: true,

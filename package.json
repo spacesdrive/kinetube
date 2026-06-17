@@ -39,7 +39,7 @@
     ],
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
-      "icon": "frontend/public/favicon.png"
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -51,12 +51,12 @@
     },
     "mac": {
       "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
-      "icon": "frontend/public/favicon.png",
+      "icon": "build/icon.png",
       "category": "public.app-category.utilities"
     },
     "linux": {
       "target": [{ "target": "AppImage", "arch": ["x64"] }],
-      "icon": "frontend/public/favicon.png",
+      "icon": "build/icon.png",
       "category": "Utility"
     }
   },

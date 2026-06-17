@@ -1,33 +1,28 @@
-/**
- * SettingsPage
- *
- * Manages user preferences persisted to localStorage under the key
- * "kinetube_settings".
- *
- * Sections:
- *   • Transcription  — default model and language for Whisper
- *   • Downloads      — default output directory, quality, file naming
- */
-
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Save, RotateCcw, Folder, CheckCircle } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 // ── Persisted settings schema ─────────────────────────────────────────────────
 
 export const DEFAULT_SETTINGS = {
-  // Transcription
   transcription: {
     defaultModel:    'base',
     defaultLanguage: 'auto',
   },
-  // Downloads
   downloads: {
-    outputDir:   '',
-    defaultQuality: 'best',
-    useNumbering:   false,
-    prefix:         '',
-    suffix:         '',
-    useCustomFilename: false,
+    outputDir:              '',
+    defaultQuality:         'best',
+    useNumbering:           false,
+    prefix:                 '',
+    suffix:                 '',
+    useCustomFilename:      false,
     customFilenameTemplate: '%(title)s',
   },
 };
@@ -39,7 +34,6 @@ export function loadSettings() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
-    // Deep merge so new keys added in DEFAULT_SETTINGS are always present
     return {
       transcription: { ...DEFAULT_SETTINGS.transcription, ...parsed.transcription },
       downloads:     { ...DEFAULT_SETTINGS.downloads,     ...parsed.downloads     },
@@ -53,60 +47,7 @@ export function saveSettings(settings) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
 
-// ── Inline section components ─────────────────────────────────────────────────
-
-function SectionCard({ title, children }) {
-  return (
-    <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm">
-      <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">{title}</h2>
-      <div className="space-y-4">{children}</div>
-    </div>
-  );
-}
-
-function Row({ label, hint, children }) {
-  return (
-    <div className="flex items-start gap-4">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-700">{label}</p>
-        {hint && <p className="text-xs text-gray-400 mt-0.5">{hint}</p>}
-      </div>
-      <div className="flex-shrink-0">{children}</div>
-    </div>
-  );
-}
-
-function Toggle({ checked, onChange }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={`relative w-10 h-5.5 rounded-full transition-colors duration-200 flex-shrink-0 ${checked ? 'bg-blue-500' : 'bg-gray-200'}`}
-      style={{ minWidth: '2.5rem', height: '1.375rem' }}
-    >
-      <span
-        className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
-        style={{ transform: checked ? 'translateX(1.125rem)' : 'translateX(0)' }}
-      />
-    </button>
-  );
-}
-
-function SelectField({ value, onChange, options }) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 transition-colors"
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
-      ))}
-    </select>
-  );
-}
-
-// ── Main export ───────────────────────────────────────────────────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const WHISPER_MODELS = [
   { label: 'Tiny  (~75 MB)',    value: 'tiny'   },
@@ -138,16 +79,29 @@ const QUALITIES = [
   { label: '480p',           value: '480p'  },
 ];
 
+// ── Setting row layout ────────────────────────────────────────────────────────
+
+function SettingRow({ label, hint, children }) {
+  return (
+    <div className="flex items-start gap-4">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold">{label}</p>
+        {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
+      </div>
+      <div className="flex-shrink-0">{children}</div>
+    </div>
+  );
+}
+
+// ── Main export ───────────────────────────────────────────────────────────────
+
 export default function SettingsPage() {
   const [settings, setSettings] = useState(() => loadSettings());
   const [saved, setSaved]       = useState(false);
   const [browsingFolder, setBrowsingFolder] = useState(false);
 
   const update = useCallback((section, key, value) => {
-    setSettings((prev) => ({
-      ...prev,
-      [section]: { ...prev[section], [key]: value },
-    }));
+    setSettings((prev) => ({ ...prev, [section]: { ...prev[section], [key]: value } }));
     setSaved(false);
   }, []);
 
@@ -165,9 +119,15 @@ export default function SettingsPage() {
   const browseFolder = useCallback(async () => {
     setBrowsingFolder(true);
     try {
-      const r = await fetch('/api/dialog/folder');
-      const d = await r.json();
-      if (d.path) update('downloads', 'outputDir', d.path);
+      let chosen = null;
+      if (window.electronAPI?.openFolderDialog) {
+        chosen = await window.electronAPI.openFolderDialog();
+      } else {
+        const r = await fetch('/api/dialog/folder');
+        const d = await r.json();
+        chosen = d.path;
+      }
+      if (chosen) update('downloads', 'outputDir', chosen);
     } finally {
       setBrowsingFolder(false);
     }
@@ -175,143 +135,191 @@ export default function SettingsPage() {
 
   return (
     <div className="w-full max-w-2xl mx-auto px-4 py-8">
-
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Settings</h1>
-          <p className="text-sm text-gray-400 mt-0.5">Preferences are saved locally in your browser</p>
+          <h1 className="text-2xl font-extrabold tracking-tight">Settings</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Preferences are saved locally in your browser</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-          >
-            <RotateCcw size={13} />
-            Reset
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-colors"
-          >
+          <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1.5">
+            <RotateCcw size={13} /> Reset
+          </Button>
+          <Button size="sm" onClick={handleSave} className="gap-1.5">
             {saved ? <CheckCircle size={14} /> : <Save size={14} />}
             {saved ? 'Saved' : 'Save'}
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="space-y-5">
 
-        {/* ── Transcription settings ── */}
-        <SectionCard title="Transcription">
-          <Row
-            label="Default model"
-            hint="Larger models are more accurate but slower and need more disk space."
-          >
-            <SelectField
-              value={settings.transcription.defaultModel}
-              onChange={(v) => update('transcription', 'defaultModel', v)}
-              options={WHISPER_MODELS}
-            />
-          </Row>
-
-          <Row label="Default language" hint="Auto-detect works well for most content.">
-            <SelectField
-              value={settings.transcription.defaultLanguage}
-              onChange={(v) => update('transcription', 'defaultLanguage', v)}
-              options={LANGUAGES}
-            />
-          </Row>
-
-        </SectionCard>
-
-        {/* ── Download settings ── */}
-        <SectionCard title="Downloads">
-          <Row label="Default output folder" hint="Leave empty to use the default downloads folder.">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={settings.downloads.outputDir}
-                onChange={(e) => update('downloads', 'outputDir', e.target.value)}
-                placeholder="C:\Users\…\Downloads"
-                className="text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 transition-colors w-52 font-mono text-xs"
-              />
-              <button
-                type="button"
-                onClick={browseFolder}
-                disabled={browsingFolder}
-                className="p-1.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors"
-                title="Browse…"
+        {/* Transcription */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Transcription</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <SettingRow
+              label="Default model"
+              hint="Larger models are more accurate but slower and need more disk space."
+            >
+              <Select
+                value={settings.transcription.defaultModel}
+                onValueChange={(v) => update('transcription', 'defaultModel', v)}
               >
-                <Folder size={14} />
-              </button>
-            </div>
-          </Row>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {WHISPER_MODELS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingRow>
 
-          <Row label="Default quality">
-            <SelectField
-              value={settings.downloads.defaultQuality}
-              onChange={(v) => update('downloads', 'defaultQuality', v)}
-              options={QUALITIES}
-            />
-          </Row>
+            <Separator />
 
-          <Row label="Auto-number files" hint="Prefix downloaded files with a sequence number.">
-            <Toggle
-              checked={settings.downloads.useNumbering}
-              onChange={(v) => update('downloads', 'useNumbering', v)}
-            />
-          </Row>
+            <SettingRow label="Default language" hint="Auto-detect works well for most content.">
+              <Select
+                value={settings.transcription.defaultLanguage}
+                onValueChange={(v) => update('transcription', 'defaultLanguage', v)}
+              >
+                <SelectTrigger className="w-36">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LANGUAGES.map((l) => (
+                    <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingRow>
+          </CardContent>
+        </Card>
 
-          <Row label="Filename prefix">
-            <input
-              type="text"
-              value={settings.downloads.prefix}
-              onChange={(e) => update('downloads', 'prefix', e.target.value)}
-              placeholder="e.g. 2024-"
-              className="text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 transition-colors w-40"
-            />
-          </Row>
-
-          <Row label="Filename suffix">
-            <input
-              type="text"
-              value={settings.downloads.suffix}
-              onChange={(e) => update('downloads', 'suffix', e.target.value)}
-              placeholder="e.g. _HD"
-              className="text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 transition-colors w-40"
-            />
-          </Row>
-
-          <Row label="Custom filename template" hint="yt-dlp variables like %(title)s, %(id)s, %(uploader)s.">
-            <div className="flex items-center gap-2">
-              <Toggle
-                checked={settings.downloads.useCustomFilename}
-                onChange={(v) => update('downloads', 'useCustomFilename', v)}
-              />
-              {settings.downloads.useCustomFilename && (
-                <input
-                  type="text"
-                  value={settings.downloads.customFilenameTemplate}
-                  onChange={(e) => update('downloads', 'customFilenameTemplate', e.target.value)}
-                  placeholder="%(title)s"
-                  className="text-sm bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 outline-none focus:border-blue-400 transition-colors w-44 font-mono text-xs"
+        {/* Downloads */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Downloads</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <SettingRow label="Default output folder" hint="Leave empty to use the default downloads folder.">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={settings.downloads.outputDir}
+                  onChange={(e) => update('downloads', 'outputDir', e.target.value)}
+                  placeholder="C:\Users\…\Downloads"
+                  className="w-52 font-mono text-xs"
                 />
-              )}
-            </div>
-          </Row>
-        </SectionCard>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={browseFolder}
+                  disabled={browsingFolder}
+                  title="Browse…"
+                  className="flex-shrink-0"
+                >
+                  <Folder size={14} />
+                </Button>
+              </div>
+            </SettingRow>
 
-        {/* ── About ── */}
-        <SectionCard title="About">
-          <div className="text-sm text-gray-500 space-y-1">
-            <p><span className="font-semibold text-gray-700">KineTube</span> — local YouTube &amp; Instagram downloader</p>
-            <p>Powered by <span className="font-medium">yt-dlp</span>, <span className="font-medium">ffmpeg</span>, <span className="font-medium">instaloader</span>, and <span className="font-medium">whisper.cpp</span></p>
-            <p className="text-xs text-gray-400 mt-3">All downloads and transcriptions happen locally on your machine. No data is sent to any third-party server.</p>
-          </div>
-        </SectionCard>
+            <Separator />
+
+            <SettingRow label="Default quality">
+              <Select
+                value={settings.downloads.defaultQuality}
+                onValueChange={(v) => update('downloads', 'defaultQuality', v)}
+              >
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {QUALITIES.map((q) => (
+                    <SelectItem key={q.value} value={q.value}>{q.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SettingRow>
+
+            <Separator />
+
+            <SettingRow label="Auto-number files" hint="Prefix downloaded files with a sequence number.">
+              <Switch
+                checked={settings.downloads.useNumbering}
+                onCheckedChange={(v) => update('downloads', 'useNumbering', v)}
+              />
+            </SettingRow>
+
+            <Separator />
+
+            <SettingRow label="Filename prefix">
+              <Input
+                value={settings.downloads.prefix}
+                onChange={(e) => update('downloads', 'prefix', e.target.value)}
+                placeholder="e.g. 2024-"
+                className="w-40"
+              />
+            </SettingRow>
+
+            <Separator />
+
+            <SettingRow label="Filename suffix">
+              <Input
+                value={settings.downloads.suffix}
+                onChange={(e) => update('downloads', 'suffix', e.target.value)}
+                placeholder="e.g. _HD"
+                className="w-40"
+              />
+            </SettingRow>
+
+            <Separator />
+
+            <SettingRow
+              label="Custom filename template"
+              hint="yt-dlp variables like %(title)s, %(id)s, %(uploader)s."
+            >
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={settings.downloads.useCustomFilename}
+                  onCheckedChange={(v) => update('downloads', 'useCustomFilename', v)}
+                />
+                {settings.downloads.useCustomFilename && (
+                  <Input
+                    value={settings.downloads.customFilenameTemplate}
+                    onChange={(e) => update('downloads', 'customFilenameTemplate', e.target.value)}
+                    placeholder="%(title)s"
+                    className="w-44 font-mono text-xs"
+                  />
+                )}
+              </div>
+            </SettingRow>
+          </CardContent>
+        </Card>
+
+        {/* About */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-widest">About</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground space-y-1">
+            <p>
+              <span className="font-semibold text-foreground">KineTube</span> — local YouTube &amp; Instagram downloader
+            </p>
+            <p>
+              Powered by{' '}
+              {['yt-dlp', 'ffmpeg', 'instaloader', 'whisper.cpp'].map((t) => (
+                <Badge key={t} variant="secondary" className="mr-1 text-[11px]">{t}</Badge>
+              ))}
+            </p>
+            <p className="text-xs text-muted-foreground mt-3">
+              All downloads and transcriptions happen locally on your machine. No data is sent to any third-party server.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

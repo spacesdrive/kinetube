@@ -42,6 +42,9 @@ jobs:
       - name: Install frontend dependencies
         run: cd frontend && npm install
 
+      - name: Install backend dependencies
+        run: cd backend && npm install --omit=dev
+
       - name: Build and package
         run: npm run ${{ matrix.script }}
         env:

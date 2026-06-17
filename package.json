@@ -6,11 +6,12 @@
   "scripts": {
     "dev": "concurrently -n backend,frontend,electron -c cyan,magenta,yellow \"cd backend && node --no-deprecation server.js\" \"cd frontend && npx vite\" \"wait-on http://localhost:3001/health http://localhost:5173 && electron --no-deprecation .\"",
     "build:frontend": "cd frontend && npx vite build",
+    "build:backend": "cd backend && npm install --omit=dev",
     "postinstall": "node scripts/patch-7zip.js",
-    "dist":       "npm run build:frontend && npx electron-builder",
-    "dist:win":   "npm run build:frontend && npx electron-builder --win",
-    "dist:mac":   "npm run build:frontend && npx electron-builder --mac",
-    "dist:linux": "npm run build:frontend && npx electron-builder --linux"
+    "dist":       "npm run build:frontend && npm run build:backend && npx electron-builder",
+    "dist:win":   "npm run build:frontend && npm run build:backend && npx electron-builder --win",
+    "dist:mac":   "npm run build:frontend && npm run build:backend && npx electron-builder --mac",
+    "dist:linux": "npm run build:frontend && npm run build:backend && npx electron-builder --linux"
   },
   "build": {
     "appId": "com.kinetube.app",

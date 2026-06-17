@@ -5,6 +5,10 @@ node_modules/
 frontend/dist/
 frontend/dist-ssr/
 
+# ── Electron build output ─────────────────────────────────────────────────────
+dist/
+release/
+
 # ── Auto-downloaded binaries (re-downloaded on first run) ─────────────────────
 backend/downloads/*.exe
 backend/downloads/*.zip
@@ -38,3 +42,8 @@ Thumbs.db
 .idea/
 *.suo
 *.sw?
+skills-lock.json
+.agents
+run-server.bat
+scripts
+electron

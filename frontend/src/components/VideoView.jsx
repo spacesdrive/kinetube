@@ -1,14 +1,13 @@
 import { useState } from 'react';
-import {
-  Play,
-  Music,
-  Download,
-  Eye,
-  Calendar,
-  Clock,
-  AlertCircle,
-  Zap,
-} from 'lucide-react';
+import { Play, Music, Download, Eye, Calendar, Clock, AlertCircle, Zap } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 
 const VIDEO_QUALITIES = ['best', '2160p', '1440p', '1080p', '720p', '480p', '360p'];
 const QUALITY_LABELS = {
@@ -32,62 +31,28 @@ function formatNumber(n) {
 function formatDate(uploadDate) {
   if (!uploadDate) return '—';
   const s = uploadDate.toString();
-  if (s.length === 8) {
-    return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-  }
+  if (s.length === 8) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
   return s;
 }
 
-// Inline toggle for the transcription option
-function Toggle({ checked, onChange }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!checked)}
-      className={`relative flex-shrink-0 rounded-full transition-colors duration-200 ${checked ? 'bg-blue-500' : 'bg-gray-200'}`}
-      style={{ minWidth: '2.5rem', height: '1.375rem' }}
-    >
-      <span
-        className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200"
-        style={{ transform: checked ? 'translateX(1.125rem)' : 'translateX(0)' }}
-      />
-    </button>
-  );
-}
-
 export default function VideoView({ info, ffmpegAvailable, onDownload }) {
-  const [tab, setTab] = useState('video'); // 'video' | 'audio'
+  const [tab, setTab]           = useState('video');
   const [videoQuality, setVideoQuality] = useState('best');
-  const [audioQuality, setAudioQuality] = useState('best_audio');
-  const [transcribe, setTranscribe] = useState(false);
+  const [transcribe, setTranscribe]     = useState(false);
 
-  const handleVideoDownload = () => {
-    onDownload({
-      url: info.cleanUrl,
-      quality: videoQuality,
-      audioOnly: false,
-      title: info.title,
-      transcribe,
-    });
-  };
+  const handleVideoDownload = () =>
+    onDownload({ url: info.cleanUrl, quality: videoQuality, audioOnly: false, title: info.title, transcribe });
 
-  const handleAudioDownload = () => {
-    onDownload({
-      url: info.cleanUrl,
-      quality: 'best',
-      audioOnly: true,
-      title: info.title,
-      transcribe,
-    });
-  };
+  const handleAudioDownload = () =>
+    onDownload({ url: info.cleanUrl, quality: 'best', audioOnly: true, title: info.title, transcribe });
 
   const needsFFmpeg = NEEDS_FFMPEG.includes(videoQuality);
 
   return (
-    <div className="w-full max-w-4xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto space-y-4">
       {/* Video preview card */}
-      <div className="bg-white rounded-3xl shadow-lg overflow-hidden border border-gray-100">
-        <div className="flex flex-col md:flex-row gap-0">
+      <Card className="overflow-hidden">
+        <div className="flex flex-col md:flex-row">
           {/* Thumbnail */}
           <div className="relative md:w-72 flex-shrink-0">
             <img
@@ -108,15 +73,13 @@ export default function VideoView({ info, ffmpegAvailable, onDownload }) {
           </div>
 
           {/* Metadata */}
-          <div className="flex-1 p-5 flex flex-col justify-between">
+          <CardContent className="flex-1 p-5 flex flex-col justify-between">
             <div>
-              <h2 className="text-lg font-bold text-gray-900 leading-snug line-clamp-2 mb-2">
-                {info.title}
-              </h2>
+              <h2 className="text-lg font-bold leading-snug line-clamp-2 mb-2">{info.title}</h2>
               {info.uploader && (
                 <p className="text-sm text-blue-600 font-medium mb-3">{info.uploader}</p>
               )}
-              <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+              <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
                 {info.viewCount && (
                   <span className="flex items-center gap-1">
                     <Eye size={13} /> {formatNumber(info.viewCount)} views
@@ -134,64 +97,56 @@ export default function VideoView({ info, ffmpegAvailable, onDownload }) {
                 )}
               </div>
               {info.description && (
-                <p className="text-xs text-gray-400 mt-3 line-clamp-2">{info.description}</p>
+                <p className="text-xs text-muted-foreground mt-3 line-clamp-2">{info.description}</p>
               )}
             </div>
-          </div>
+          </CardContent>
         </div>
-      </div>
+      </Card>
 
       {/* Download options */}
-      <div className="mt-5 bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-        {/* Tab switcher */}
-        <div className="flex border-b border-gray-100">
-          <button
-            onClick={() => setTab('video')}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-semibold transition-colors ${
-              tab === 'video'
-                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Play size={16} />
-            Video + Audio
-          </button>
-          <button
-            onClick={() => setTab('audio')}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-semibold transition-colors ${
-              tab === 'audio'
-                ? 'text-purple-600 border-b-2 border-purple-600 bg-purple-50/50'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            <Music size={16} />
-            Audio Only (MP3)
-          </button>
-        </div>
+      <Card>
+        <Tabs value={tab} onValueChange={setTab}>
+          <CardHeader className="p-0">
+            <TabsList className="w-full rounded-none rounded-t-xl border-b h-auto p-0 bg-transparent">
+              <TabsTrigger
+                value="video"
+                className="flex-1 flex items-center justify-center gap-2 py-4 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-blue-50/50 data-[state=active]:shadow-none"
+              >
+                <Play size={16} />
+                Video + Audio
+              </TabsTrigger>
+              <TabsTrigger
+                value="audio"
+                className="flex-1 flex items-center justify-center gap-2 py-4 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-purple-600 data-[state=active]:text-purple-600 data-[state=active]:bg-purple-50/50 data-[state=active]:shadow-none"
+              >
+                <Music size={16} />
+                Audio Only (MP3)
+              </TabsTrigger>
+            </TabsList>
+          </CardHeader>
 
-        <div className="p-6">
-          {tab === 'video' && (
-            <div className="space-y-4">
+          <CardContent className="p-6">
+            <TabsContent value="video" className="mt-0 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Select Quality
-                </label>
+                <Label className="mb-2 block font-semibold">Select Quality</Label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {VIDEO_QUALITIES.map((q) => {
-                    const needsMerge = NEEDS_FFMPEG.includes(q);
+                    const needsMerge  = NEEDS_FFMPEG.includes(q);
                     const unavailable = needsMerge && !ffmpegAvailable;
                     return (
                       <button
                         key={q}
                         onClick={() => !unavailable && setVideoQuality(q)}
                         disabled={unavailable}
-                        className={`relative px-3 py-2.5 rounded-xl text-sm font-medium border-2 transition-all text-center ${
+                        className={cn(
+                          'relative px-3 py-2.5 rounded-xl text-sm font-medium border-2 transition-all text-center',
                           videoQuality === q
                             ? 'border-blue-500 bg-blue-50 text-blue-700'
                             : unavailable
-                            ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50/50'
-                        }`}
+                            ? 'border-border bg-muted text-muted-foreground cursor-not-allowed opacity-60'
+                            : 'border-border bg-background text-foreground hover:border-blue-300 hover:bg-blue-50/50'
+                        )}
                       >
                         {QUALITY_LABELS[q]}
                         {needsMerge && (
@@ -205,85 +160,80 @@ export default function VideoView({ info, ffmpegAvailable, onDownload }) {
                 </div>
 
                 {needsFFmpeg && !ffmpegAvailable && (
-                  <div className="mt-3 flex items-start gap-2 text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2.5">
-                    <AlertCircle size={14} className="flex-shrink-0 mt-0.5" />
-                    <span>
+                  <Alert variant="default" className="mt-3 border-amber-200 bg-amber-50 py-2.5">
+                    <AlertCircle className="h-4 w-4 text-amber-500" />
+                    <AlertDescription className="text-xs text-amber-700">
                       FFmpeg is required to merge video+audio for qualities above 720p. Install FFmpeg and
                       restart the server, or choose 720p or below.
-                    </span>
-                  </div>
+                    </AlertDescription>
+                  </Alert>
                 )}
 
                 {needsFFmpeg && ffmpegAvailable && (
-                  <div className="mt-3 flex items-start gap-2 text-xs text-green-600 bg-green-50 rounded-xl px-3 py-2.5">
-                    <Zap size={14} className="flex-shrink-0 mt-0.5" />
-                    <span>FFmpeg detected — video and audio will be merged automatically.</span>
-                  </div>
+                  <Alert variant="default" className="mt-3 border-green-200 bg-green-50 py-2.5">
+                    <Zap className="h-4 w-4 text-green-500" />
+                    <AlertDescription className="text-xs text-green-700">
+                      FFmpeg detected — video and audio will be merged automatically.
+                    </AlertDescription>
+                  </Alert>
                 )}
               </div>
 
-              <button
+              <Button
                 onClick={handleVideoDownload}
                 disabled={needsFFmpeg && !ffmpegAvailable}
-                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-4 rounded-2xl transition-colors text-base shadow-md hover:shadow-lg"
+                className="w-full h-12 text-base shadow-md"
               >
-                <Download size={18} />
+                <Download className="mr-2 h-4 w-4" />
                 Download Video — {QUALITY_LABELS[videoQuality]}
-              </button>
+              </Button>
 
-              {/* Transcription toggle */}
-              <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+              <div className="flex items-center justify-between pt-1 border-t">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Transcribe after download</p>
-                  <p className="text-xs text-gray-400">Generate a text transcript using Whisper AI</p>
+                  <p className="text-sm font-medium">Transcribe after download</p>
+                  <p className="text-xs text-muted-foreground">Generate a text transcript using Whisper AI</p>
                 </div>
-                <Toggle checked={transcribe} onChange={setTranscribe} />
+                <Switch checked={transcribe} onCheckedChange={setTranscribe} />
               </div>
-            </div>
-          )}
+            </TabsContent>
 
-          {tab === 'audio' && (
-            <div className="space-y-4">
+            <TabsContent value="audio" className="mt-0 space-y-4">
               <div className="bg-purple-50 rounded-xl p-4 text-sm text-purple-700 font-medium">
                 Downloads the best available audio track and converts it to MP3.
               </div>
 
-              {info.audioFormats && info.audioFormats.length > 0 && (
+              {info.audioFormats?.length > 0 && (
                 <div>
-                  <p className="text-xs text-gray-500 mb-2 font-medium">Available audio streams</p>
+                  <p className="text-xs text-muted-foreground mb-2 font-medium">Available audio streams</p>
                   <div className="flex flex-wrap gap-2">
                     {info.audioFormats.map((af) => (
-                      <span
-                        key={af.formatId}
-                        className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-lg text-xs font-medium"
-                      >
+                      <Badge key={af.formatId} variant="secondary" className="bg-purple-100 text-purple-700 hover:bg-purple-200">
                         {af.label}
-                      </span>
+                      </Badge>
                     ))}
                   </div>
                 </div>
               )}
 
-              <button
+              <Button
                 onClick={handleAudioDownload}
-                className="w-full flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-4 rounded-2xl transition-colors text-base shadow-md hover:shadow-lg"
+                className="w-full h-12 text-base bg-purple-600 hover:bg-purple-700 shadow-md"
               >
-                <Music size={18} />
+                <Music className="mr-2 h-4 w-4" />
                 Download Audio (MP3)
-              </button>
+              </Button>
 
-              {/* Transcription toggle */}
-              <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+              <div className="flex items-center justify-between pt-1 border-t">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Transcribe after download</p>
-                  <p className="text-xs text-gray-400">Generate a text transcript using Whisper AI</p>
+                  <p className="text-sm font-medium">Transcribe after download</p>
+                  <p className="text-xs text-muted-foreground">Generate a text transcript using Whisper AI</p>
                 </div>
-                <Toggle checked={transcribe} onChange={setTranscribe} />
+                <Switch checked={transcribe} onCheckedChange={setTranscribe} />
               </div>
-            </div>
-          )}
-        </div>
-      </div>
+            </TabsContent>
+          </CardContent>
+        </Tabs>
+      </Card>
     </div>
   );
 }

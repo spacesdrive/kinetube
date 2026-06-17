@@ -13,7 +13,12 @@ const transcribeRoutes = require('./routes/transcribe');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
+// In Electron (packaged or dev), all requests come from localhost — allow everything.
+// In standalone dev mode, only allow the Vite dev server origin.
+const ALLOWED_ORIGINS = ['http://localhost:5173', 'http://127.0.0.1:5173', `http://localhost:${process.env.PORT || 3001}`];
+app.use(cors({
+  origin: (origin, cb) => cb(null, !origin || ALLOWED_ORIGINS.includes(origin) || !!process.env.ELECTRON_APP),
+}));
 app.use(express.json());
 
 app.use('/api', infoRoutes);
@@ -82,37 +87,52 @@ app.get('/api/proxy/img', (req, res) => {
 // Health check
 app.get('/health', (req, res) => res.json({ ok: true }));
 
+// ── Serve built frontend in Electron production mode ──────────────────────────
+// When packaged, Express is the only server — it must serve both the API and the
+// React static files. ELECTRON_FRONTEND_DIST is injected by electron/main.js.
+if (process.env.ELECTRON_APP && process.env.ELECTRON_FRONTEND_DIST) {
+  const dist = process.env.ELECTRON_FRONTEND_DIST;
+  app.use(express.static(dist));
+  app.use((req, res) => res.sendFile(path.join(dist, 'index.html')));
+}
+
 // ── Server startup ──────────────────────────────────────────────────────────
+
+// Hold a module-level reference so the server keeps the Node event loop alive
+// and cannot be garbage collected while the process is running.
+let _server;
 
 async function startServer() {
   console.log('\n╔══════════════════════════════════════╗');
   console.log('║         KineTube Backend v1.0        ║');
   console.log('╚══════════════════════════════════════╝\n');
 
-  // ── yt-dlp auto-download ─────────────────────────────────────────────
-  const ytdlpOk = await ensureYtDlp();
-  if (ytdlpOk) {
-    console.log('✅  yt-dlp.exe is ready.');
-  } else {
-    console.log('❌ yt-dlp.exe could not be downloaded. Please download it manually and place it in backend/downloads.');
-  }
+  // Listen first so /health responds immediately (Electron waits on it)
+  await new Promise((resolve, reject) => {
+    _server = app.listen(PORT, resolve);
+    _server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`❌  Port ${PORT} is already in use. Stop the other instance and retry.`);
+        process.exit(1);
+      }
+      reject(err);
+    });
+  });
+  console.log(`🚀  Server listening at http://localhost:${PORT}`);
 
-  // ── FFmpeg auto-download ─────────────────────────────────────────────
-  const ffmpegOk = await ensureFfmpeg();
-  if (ffmpegOk) {
-    console.log('✅  FFmpeg ready in downloads folder — high-quality merging enabled (1080p, 4K)');
-  } else {
-    console.log('⚠️  FFmpeg NOT available in backend/downloads');
-    console.log('   Downloads above 720p require FFmpeg for video+audio merging.');
-    console.log('   Please download ffmpeg.exe manually and place it in backend/downloads.');
-  }
+  // Binary checks run after server is already up — non-blocking for Electron
+  ensureYtDlp().then((ok) => {
+    console.log(ok ? '✅  yt-dlp ready.' : '❌  yt-dlp not found — run the app to trigger setup.');
+  });
 
-  console.log('');
-
-  app.listen(PORT, () => {
-    console.log(`🚀  Server listening at http://localhost:${PORT}`);
-    console.log(`    Frontend expected at http://localhost:5173\n`);
+  ensureFfmpeg().then((ok) => {
+    if (ok) {
+      console.log('✅  FFmpeg ready — high-quality merging enabled (1080p, 4K)');
+    } else {
+      console.log('⚠️  FFmpeg not available. Downloads above 720p require FFmpeg.');
+      console.log('   Place ffmpeg.exe manually in backend/downloads.');
+    }
   });
 }
 
-startServer().catch(console.error);
+startServer().catch((err) => { console.error('Fatal startup error:', err); process.exit(1); });

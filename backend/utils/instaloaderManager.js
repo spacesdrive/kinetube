@@ -12,19 +12,14 @@ const fs       = require('fs');
 const path     = require('path');
 const unzipper = require('unzipper');
 
-const DOWNLOADS_DIR       = path.join(__dirname, '..', 'downloads');
-const SESSIONS_DIR        = path.join(__dirname, '..', 'sessions');
+const { DOWNLOADS_DIR, SESSIONS_DIR } = require('./paths');
+
 const INSTALOADER_EXE     = path.join(DOWNLOADS_DIR, 'instaloader.exe');
 const ACCOUNTS_FILE       = path.join(SESSIONS_DIR,  'accounts.json');
 
 const INSTALOADER_VERSION = '4.15.1';
 const INSTALOADER_ZIP_URL =
   `https://github.com/instaloader/instaloader/releases/download/v${INSTALOADER_VERSION}/instaloader-v${INSTALOADER_VERSION}-windows-standalone.zip`;
-
-// Ensure directories exist
-[DOWNLOADS_DIR, SESSIONS_DIR].forEach((d) => {
-  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-});
 
 // ── Download helper ───────────────────────────────────────────────────────────
 

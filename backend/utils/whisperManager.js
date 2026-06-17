@@ -21,15 +21,7 @@ const unzipper  = require('unzipper');
 const os        = require('os');
 
 const { FFMPEG_EXE_PATH } = require('./ytdlpManager');
-
-// ── Paths ─────────────────────────────────────────────────────────────────────
-
-const DOWNLOADS_DIR = path.join(__dirname, '..', 'downloads');
-const MODELS_DIR    = path.join(__dirname, '..', 'models');
-
-[DOWNLOADS_DIR, MODELS_DIR].forEach((d) => {
-  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-});
+const { DOWNLOADS_DIR, MODELS_DIR } = require('./paths');
 
 // whisper.cpp renames 'main.exe' to 'whisper-cli.exe' from v1.7 onwards.
 // We check both after extraction.

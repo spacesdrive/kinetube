@@ -5,11 +5,10 @@ const path = require('path');
 const { spawn, execSync } = require('child_process');
 const unzipper = require('unzipper');
 
-const FFMPEG_EXE_PATH = path.join(__dirname, '..', 'downloads', 'ffmpeg.exe');
-const YTDLP_EXE_PATH  = path.join(__dirname, '..', 'downloads', 'yt-dlp.exe');
-const DOWNLOADS_DIR   = path.join(__dirname, '..', 'downloads');
+const { DOWNLOADS_DIR } = require('./paths');
 
-if (!fs.existsSync(DOWNLOADS_DIR)) fs.mkdirSync(DOWNLOADS_DIR, { recursive: true });
+const FFMPEG_EXE_PATH = path.join(DOWNLOADS_DIR, 'ffmpeg.exe');
+const YTDLP_EXE_PATH  = path.join(DOWNLOADS_DIR, 'yt-dlp.exe');
 
 function getYtdlpPath() { return YTDLP_EXE_PATH; }
 

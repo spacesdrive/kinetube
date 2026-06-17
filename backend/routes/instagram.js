@@ -75,7 +75,7 @@ const {
 } = require('../utils/instaloaderManager');
 const { YTDLP_EXE_PATH, FFMPEG_EXE_PATH } = require('../utils/ytdlpManager');
 
-const DOWNLOADS_DIR = path.join(__dirname, '..', 'downloads');
+const { DOWNLOADS_DIR } = require('../utils/paths');
 
 // ── SSE helper ────────────────────────────────────────────────────────────────
 

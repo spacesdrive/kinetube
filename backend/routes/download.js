@@ -6,8 +6,7 @@ const fs = require('fs');
 const { YTDLP_EXE_PATH, FFMPEG_EXE_PATH } = require('../utils/ytdlpManager');
 const { parseYouTubeUrl } = require('../utils/urlParser');
 
-const DEFAULT_DOWNLOADS_DIR = path.join(__dirname, '..', 'downloads');
-if (!fs.existsSync(DEFAULT_DOWNLOADS_DIR)) fs.mkdirSync(DEFAULT_DOWNLOADS_DIR, { recursive: true });
+const { DOWNLOADS_DIR: DEFAULT_DOWNLOADS_DIR } = require('../utils/paths');
 
 const QUALITY_FORMATS = {
   best: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',

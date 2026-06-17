@@ -1,4 +1,8 @@
-// ── Icons (inline SVG — avoids lucide-react version gaps) ────────────────────
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import { ModeToggle } from './ModeToggle';
+
+// ── Platform icons (inline SVG — preserve original brand colours) ─────────────
 
 const YT_ICON = (
   <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5">
@@ -29,39 +33,34 @@ const SETTINGS_ICON = (
   </svg>
 );
 
-// ── Platform tabs config ──────────────────────────────────────────────────────
-
 const TABS = [
   {
     id: 'youtube',
     label: 'YouTube',
     icon: YT_ICON,
-    activeClass: 'bg-red-500 text-white shadow-sm',
-    hoverClass:  'hover:text-red-500 hover:bg-red-50',
+    activeClass: 'bg-red-500 text-white shadow-sm hover:bg-red-600',
+    inactiveClass: 'text-muted-foreground hover:text-red-500 hover:bg-red-50',
   },
   {
     id: 'instagram',
     label: 'Instagram',
     icon: IG_ICON,
-    activeClass: 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm',
-    hoverClass:  'hover:text-pink-500 hover:bg-pink-50',
+    activeClass: 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-sm hover:from-purple-600 hover:to-pink-600',
+    inactiveClass: 'text-muted-foreground hover:text-pink-500 hover:bg-pink-50',
   },
   {
     id: 'transcribe',
     label: 'Transcribe',
     icon: TX_ICON,
-    activeClass: 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-sm',
-    hoverClass:  'hover:text-blue-500 hover:bg-blue-50',
+    activeClass: 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-sm hover:from-blue-600 hover:to-purple-600',
+    inactiveClass: 'text-muted-foreground hover:text-blue-500 hover:bg-blue-50',
   },
 ];
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 export default function Navbar({ platform, onPlatformChange, onSettingsClick }) {
   return (
     <nav className="flex items-center gap-1.5">
-      {/* Platform tabs */}
-      <div className="flex items-center gap-1 bg-gray-100/80 backdrop-blur-sm rounded-full p-1">
+      <div className="flex items-center gap-1 bg-muted/60 backdrop-blur-sm rounded-full p-1">
         {TABS.map((tab) => {
           const active = platform === tab.id;
           return (
@@ -69,9 +68,10 @@ export default function Navbar({ platform, onPlatformChange, onSettingsClick }) 
               key={tab.id}
               type="button"
               onClick={() => onPlatformChange(tab.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 ease-out select-none ${
-                active ? tab.activeClass : `text-gray-500 ${tab.hoverClass}`
-              }`}
+              className={cn(
+                'flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 select-none',
+                active ? tab.activeClass : tab.inactiveClass
+              )}
             >
               {tab.icon}
               <span>{tab.label}</span>
@@ -80,19 +80,23 @@ export default function Navbar({ platform, onPlatformChange, onSettingsClick }) 
         })}
       </div>
 
-      {/* Settings gear */}
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={onSettingsClick}
-        className={`p-2 rounded-full transition-all duration-150 ${
+        className={cn(
+          'rounded-full transition-all duration-150',
           platform === 'settings'
-            ? 'bg-gray-800 text-white shadow-sm'
-            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'
-        }`}
+            ? 'bg-foreground text-background hover:bg-foreground/90 shadow-sm'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+        )}
         title="Settings"
       >
         {SETTINGS_ICON}
-      </button>
+      </Button>
+
+      <ModeToggle />
     </nav>
   );
 }

@@ -45,5 +45,3 @@ Thumbs.db
 skills-lock.json
 .agents
 run-server.bat
-scripts
-electron

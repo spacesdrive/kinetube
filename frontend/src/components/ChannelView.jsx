@@ -1,19 +1,18 @@
 import { useState, useMemo } from 'react';
 import {
-  Download,
-  Music,
-  CheckSquare,
-  Square,
-  Play,
-  Eye,
-  Calendar,
-  Search,
-  Video,
-  Zap,
-  ChevronDown,
-  Mic,
-  MicOff,
+  Download, Music, Play, Eye, Calendar, Search, Video, Zap, Mic, MicOff,
 } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const VIDEO_QUALITIES = ['best', '2160p', '1440p', '1080p', '720p', '480p', '360p'];
 const QUALITY_LABELS = {
@@ -41,35 +40,26 @@ function formatDate(uploadDate) {
 }
 
 function VideoCard({ video, selected, transcribe, onToggle, onTranscribeToggle, onDownload }) {
-  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
-  const [dlQuality, setDlQuality] = useState('best');
-
   return (
     <div
-      className={`relative flex gap-3 p-3 rounded-2xl border transition-all cursor-pointer group ${
-        selected
-          ? 'border-blue-300 bg-blue-50/60'
-          : 'border-gray-100 bg-white hover:border-gray-200 hover:shadow-sm'
-      }`}
+      className={cn(
+        'relative flex gap-3 p-3 rounded-2xl border transition-all cursor-pointer group',
+        selected ? 'border-blue-300 bg-blue-50/60' : 'border-border bg-card hover:border-muted-foreground/30 hover:shadow-sm'
+      )}
       onClick={() => onToggle(video.id)}
     >
       {/* Checkbox */}
-      <div className="flex-shrink-0 mt-0.5">
-        {selected ? (
-          <CheckSquare size={18} className="text-blue-600" />
-        ) : (
-          <Square size={18} className="text-gray-300 group-hover:text-gray-400" />
-        )}
+      <div className="flex-shrink-0 mt-0.5" onClick={(e) => e.stopPropagation()}>
+        <Checkbox
+          checked={selected}
+          onCheckedChange={() => onToggle(video.id)}
+          className={selected ? 'border-blue-500 data-[state=checked]:bg-blue-500' : ''}
+        />
       </div>
 
       {/* Thumbnail */}
-      <div className="flex-shrink-0 relative w-28 h-16 rounded-xl overflow-hidden bg-gray-100">
-        <img
-          src={video.thumbnail}
-          alt={video.title}
-          className="w-full h-full object-cover"
-          loading="lazy"
-        />
+      <div className="flex-shrink-0 relative w-28 h-16 rounded-xl overflow-hidden bg-muted">
+        <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" loading="lazy" />
         {video.durationString && (
           <span className="absolute bottom-1 right-1 bg-black/80 text-white text-[10px] font-bold px-1 py-0.5 rounded">
             {video.durationString}
@@ -79,104 +69,75 @@ function VideoCard({ video, selected, transcribe, onToggle, onTranscribeToggle, 
 
       {/* Info */}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-gray-800 line-clamp-2 leading-snug">
-          {video.title}
-        </p>
-        <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-gray-400">
+        <p className="text-sm font-semibold line-clamp-2 leading-snug">{video.title}</p>
+        <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted-foreground">
           {formatNumber(video.viewCount) && (
-            <span className="flex items-center gap-1">
-              <Eye size={11} /> {formatNumber(video.viewCount)}
-            </span>
+            <span className="flex items-center gap-1"><Eye size={11} /> {formatNumber(video.viewCount)}</span>
           )}
           {formatDate(video.uploadDate) && (
-            <span className="flex items-center gap-1">
-              <Calendar size={11} /> {formatDate(video.uploadDate)}
-            </span>
+            <span className="flex items-center gap-1"><Calendar size={11} /> {formatDate(video.uploadDate)}</span>
           )}
         </div>
       </div>
 
       {/* Actions */}
-      <div
-        className="flex-shrink-0 self-center flex items-center gap-1"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Per-video transcribe toggle */}
-        <button
-          onClick={() => onTranscribeToggle(video.id)}
-          className={`p-2 rounded-xl transition-colors ${
-            transcribe
-              ? 'bg-purple-100 text-purple-600 hover:bg-purple-200'
-              : 'bg-gray-100 text-gray-300 hover:bg-gray-200 hover:text-gray-500'
-          }`}
-          title={transcribe ? 'Transcription enabled — click to disable' : 'Click to transcribe this video after download'}
-        >
-          {transcribe ? <Mic size={14} /> : <MicOff size={14} />}
-        </button>
+      <div className="flex-shrink-0 self-center flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn('h-8 w-8', transcribe ? 'bg-purple-100 text-purple-600 hover:bg-purple-200' : 'text-muted-foreground/40 hover:text-muted-foreground')}
+                onClick={() => onTranscribeToggle(video.id)}
+              >
+                {transcribe ? <Mic size={14} /> : <MicOff size={14} />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {transcribe ? 'Transcription on — click to disable' : 'Click to transcribe after download'}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
 
-        {/* Individual download button */}
-        <div className="relative">
-          <button
-            onClick={() => setShowDownloadMenu((v) => !v)}
-            className="p-2 rounded-xl bg-gray-100 hover:bg-blue-100 text-gray-500 hover:text-blue-600 transition-colors"
-            title="Download this video"
-          >
-            <Download size={15} />
-          </button>
-
-          {showDownloadMenu && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowDownloadMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-2xl shadow-xl border border-gray-100 p-3 w-52">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Quality</p>
-                <div className="space-y-1 mb-3">
-                  {VIDEO_QUALITIES.map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => setDlQuality(q)}
-                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        dlQuality === q ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {QUALITY_LABELS[q]}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    onClick={() => {
-                      setShowDownloadMenu(false);
-                      onDownload({ videos: [{ ...video, transcribe }], quality: dlQuality, audioOnly: false });
-                    }}
-                    className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
-                  >
-                    <Play size={12} /> Download Video{transcribe ? ' + Transcript' : ''}
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowDownloadMenu(false);
-                      onDownload({ videos: [{ ...video, transcribe: false }], quality: 'best', audioOnly: true });
-                    }}
-                    className="flex items-center gap-1.5 w-full px-2.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold"
-                  >
-                    <Music size={12} /> Audio Only (MP3)
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+              <Download size={15} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel>Quality</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {VIDEO_QUALITIES.map((q) => (
+              <DropdownMenuItem
+                key={q}
+                onClick={() => onDownload({ videos: [{ ...video, transcribe }], quality: q, audioOnly: false })}
+              >
+                <Play size={12} className="mr-2" />
+                {QUALITY_LABELS[q]}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onDownload({ videos: [{ ...video, transcribe: false }], quality: 'best', audioOnly: true })}
+              className="text-purple-600"
+            >
+              <Music size={12} className="mr-2" />
+              Audio Only (MP3)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );
 }
 
 export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
-  const [selected, setSelected] = useState(new Set());
+  const [selected, setSelected]         = useState(new Set());
   const [transcribeIds, setTranscribeIds] = useState(new Set());
-  const [search, setSearch] = useState('');
-  const [bulkQuality, setBulkQuality] = useState('best');
-  const [showQualityPicker, setShowQualityPicker] = useState(false);
+  const [search, setSearch]             = useState('');
+  const [bulkQuality, setBulkQuality]   = useState('best');
 
   const filtered = useMemo(() => {
     if (!search.trim()) return info.entries;
@@ -184,200 +145,155 @@ export default function ChannelView({ info, ffmpegAvailable, onDownload }) {
     return info.entries.filter((v) => v.title?.toLowerCase().includes(q));
   }, [info.entries, search]);
 
-  const allSelected = filtered.length > 0 && filtered.every((v) => selected.has(v.id));
+  const allSelected  = filtered.length > 0 && filtered.every((v) => selected.has(v.id));
   const someSelected = filtered.some((v) => selected.has(v.id));
 
-  const toggleVideo = (id) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const toggleVideo = (id) =>
+    setSelected((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const toggleTranscribe = (id) => {
-    setTranscribeIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const toggleTranscribe = (id) =>
+    setTranscribeIds((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const toggleAll = () => {
     if (allSelected) {
-      setSelected((prev) => {
-        const next = new Set(prev);
-        filtered.forEach((v) => next.delete(v.id));
-        return next;
-      });
+      setSelected((prev) => { const n = new Set(prev); filtered.forEach((v) => n.delete(v.id)); return n; });
     } else {
-      setSelected((prev) => {
-        const next = new Set(prev);
-        filtered.forEach((v) => next.add(v.id));
-        return next;
-      });
+      setSelected((prev) => { const n = new Set(prev); filtered.forEach((v) => n.add(v.id)); return n; });
     }
   };
 
-  const selectedVideos = info.entries.filter((v) => selected.has(v.id));
-  const downloadTarget = selectedVideos.length > 0 ? selectedVideos : filtered;
-  const downloadCount = downloadTarget.length;
+  const selectedVideos  = info.entries.filter((v) => selected.has(v.id));
+  const downloadTarget  = selectedVideos.length > 0 ? selectedVideos : filtered;
+  const downloadCount   = downloadTarget.length;
   const transcribeCount = downloadTarget.filter((v) => transcribeIds.has(v.id)).length;
-
-  const withTranscribeFlag = (vids) => vids.map((v) => ({ ...v, transcribe: transcribeIds.has(v.id) }));
-
-  const handleBulkVideoDownload = () => {
-    onDownload({ videos: withTranscribeFlag(downloadTarget), quality: bulkQuality, audioOnly: false });
-  };
-
-  const handleBulkAudioDownload = () => {
-    onDownload({ videos: downloadTarget.map((v) => ({ ...v, transcribe: false })), quality: 'best', audioOnly: true });
-  };
+  const withTranscribe  = (vids) => vids.map((v) => ({ ...v, transcribe: transcribeIds.has(v.id) }));
 
   const isChannelShorts = info.type === 'channel_shorts';
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-4">
-      {/* Channel header */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5 flex items-center gap-4">
-        {info.avatar && (
-          <img
-            src={`/api/proxy/img?url=${encodeURIComponent(info.avatar)}`}
-            alt={info.channelName}
-            className="w-14 h-14 rounded-full object-cover flex-shrink-0 bg-gray-100"
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-          />
-        )}
-        <div className="flex-1 min-w-0">
-          <h2 className="text-lg font-bold text-gray-900 truncate">{info.channelName}</h2>
-          <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
-            {isChannelShorts ? (
-              <span className="flex items-center gap-1">
-                <Zap size={14} className="text-amber-500" /> Shorts channel
-              </span>
-            ) : (
-              <span className="flex items-center gap-1">
-                <Video size={14} /> Videos
-              </span>
+    <TooltipProvider>
+      <div className="w-full max-w-4xl mx-auto space-y-4">
+        {/* Channel header */}
+        <Card>
+          <CardContent className="p-5 flex items-center gap-4">
+            {info.avatar && (
+              <img
+                src={`/api/proxy/img?url=${encodeURIComponent(info.avatar)}`}
+                alt={info.channelName}
+                className="w-14 h-14 rounded-full object-cover flex-shrink-0 bg-muted"
+                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+              />
             )}
-            <span className="flex items-center gap-1">
-              <Play size={14} />
-              {info.videoCount} {isChannelShorts ? 'shorts' : 'videos'} found
-            </span>
-          </div>
-        </div>
-      </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg font-bold truncate">{info.channelName}</h2>
+              <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
+                {isChannelShorts ? (
+                  <span className="flex items-center gap-1"><Zap size={14} className="text-amber-500" /> Shorts channel</span>
+                ) : (
+                  <span className="flex items-center gap-1"><Video size={14} /> Videos</span>
+                )}
+                <span className="flex items-center gap-1">
+                  <Play size={14} /> {info.videoCount} {isChannelShorts ? 'shorts' : 'videos'} found
+                </span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Bulk actions */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            onClick={toggleAll}
-            className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-blue-600 transition-colors px-3 py-2 rounded-xl hover:bg-blue-50"
-          >
-            {allSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} />}
-            {allSelected ? 'Deselect All' : 'Select All'}
-          </button>
+        {/* Bulk actions toolbar */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={toggleAll} className="gap-2">
+                <Checkbox
+                  checked={allSelected}
+                  className={allSelected ? 'border-blue-500 data-[state=checked]:bg-blue-500' : ''}
+                  onCheckedChange={toggleAll}
+                />
+                {allSelected ? 'Deselect All' : 'Select All'}
+              </Button>
 
-          {someSelected && (
-            <span className="text-sm text-blue-600 font-medium">{selectedVideos.length} selected</span>
-          )}
+              {someSelected && (
+                <Badge variant="secondary" className="text-blue-600 bg-blue-100">
+                  {selectedVideos.length} selected
+                </Badge>
+              )}
+              {transcribeCount > 0 && (
+                <span className="flex items-center gap-1.5 text-sm text-purple-600 font-medium">
+                  <Mic size={13} /> {transcribeCount} to transcribe
+                </span>
+              )}
 
-          {transcribeCount > 0 && (
-            <span className="flex items-center gap-1.5 text-sm text-purple-600 font-medium">
-              <Mic size={13} /> {transcribeCount} to transcribe
-            </span>
-          )}
+              <div className="flex-1" />
 
-          <div className="flex-1" />
-
-          {/* Quality picker */}
-          <div className="relative">
-            <button
-              onClick={() => setShowQualityPicker((v) => !v)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:border-blue-300 bg-white"
-            >
-              {QUALITY_LABELS[bulkQuality]}
-              <ChevronDown size={14} />
-            </button>
-            {showQualityPicker && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setShowQualityPicker(false)} />
-                <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-2xl shadow-xl border border-gray-100 p-2 w-44">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    {QUALITY_LABELS[bulkQuality]}
+                    <svg className="h-3.5 w-3.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
                   {VIDEO_QUALITIES.map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => { setBulkQuality(q); setShowQualityPicker(false); }}
-                      className={`w-full text-left px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
-                        bulkQuality === q ? 'bg-blue-600 text-white' : 'hover:bg-gray-100 text-gray-700'
-                      }`}
-                    >
+                    <DropdownMenuItem key={q} onClick={() => setBulkQuality(q)}>
                       {QUALITY_LABELS[q]}
-                    </button>
+                    </DropdownMenuItem>
                   ))}
-                </div>
-              </>
-            )}
-          </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-          <button
-            onClick={handleBulkVideoDownload}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
-          >
-            <Download size={15} />
-            Download {downloadCount} Video{downloadCount !== 1 ? 's' : ''}
-          </button>
+              <Button size="sm" onClick={() => onDownload({ videos: withTranscribe(downloadTarget), quality: bulkQuality, audioOnly: false })}>
+                <Download size={15} className="mr-1.5" />
+                Download {downloadCount} Video{downloadCount !== 1 ? 's' : ''}
+              </Button>
 
-          <button
-            onClick={handleBulkAudioDownload}
-            className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
-          >
-            <Music size={15} />
-            {downloadCount} Audio (MP3)
-          </button>
+              <Button size="sm" variant="secondary" className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => onDownload({ videos: downloadTarget.map((v) => ({ ...v, transcribe: false })), quality: 'best', audioOnly: true })}>
+                <Music size={15} className="mr-1.5" />
+                {downloadCount} Audio (MP3)
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Search */}
+        <div className="relative">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder={`Search ${isChannelShorts ? 'shorts' : 'videos'}...`}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10 rounded-2xl"
+          />
+        </div>
+
+        <p className="text-xs text-muted-foreground px-1 flex items-center gap-1">
+          <MicOff size={11} /> Click the mic icon on a video to include a text transcript when it downloads.
+        </p>
+
+        {/* Video list */}
+        <div className="space-y-2">
+          {filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <Search size={32} className="mx-auto mb-3 opacity-40" />
+              <p>No results found for "{search}"</p>
+            </div>
+          ) : (
+            filtered.map((video) => (
+              <VideoCard
+                key={video.id}
+                video={video}
+                selected={selected.has(video.id)}
+                transcribe={transcribeIds.has(video.id)}
+                onToggle={toggleVideo}
+                onTranscribeToggle={toggleTranscribe}
+                onDownload={onDownload}
+              />
+            ))
+          )}
         </div>
       </div>
-
-      {/* Search */}
-      <div className="relative">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text"
-          placeholder={`Search ${isChannelShorts ? 'shorts' : 'videos'}...`}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-2xl text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition"
-        />
-      </div>
-
-      <p className="text-xs text-gray-400 px-1 flex items-center gap-1">
-        <MicOff size={11} /> Click the mic icon on a video to include a text transcript when it downloads.
-      </p>
-
-      {/* Video list */}
-      <div className="space-y-2">
-        {filtered.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            <Search size={32} className="mx-auto mb-3 opacity-40" />
-            <p>No results found for "{search}"</p>
-          </div>
-        ) : (
-          filtered.map((video) => (
-            <VideoCard
-              key={video.id}
-              video={video}
-              selected={selected.has(video.id)}
-              transcribe={transcribeIds.has(video.id)}
-              onToggle={toggleVideo}
-              onTranscribeToggle={toggleTranscribe}
-              onDownload={onDownload}
-              ffmpegAvailable={ffmpegAvailable}
-            />
-          ))
-        )}
-      </div>
-    </div>
+    </TooltipProvider>
   );
 }

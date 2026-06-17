@@ -144,9 +144,12 @@ router.get('/download', (req, res) => {
     if (code === 0) {
       // For merged downloads (video+audio → .mp4) yt-dlp writes the final file
       // to a path derived from the first Destination but with .mp4 extension.
+      // The first Destination has a format code appended: "Title.f299.webm" — strip
+      // both the format ID (.f299) and extension before appending .mp4.
       let finalPath = firstDestPath;
       if (isMultiFile && firstDestPath) {
-        finalPath = firstDestPath.replace(/\.[^.]+$/, '.mp4');
+        const fmtMatch = firstDestPath.match(/^(.+?)\.f\d+\.[^.]+$/);
+        finalPath = (fmtMatch ? fmtMatch[1] : firstDestPath.replace(/\.[^.]+$/, '')) + '.mp4';
       } else if (isAudioOnly && firstDestPath) {
         finalPath = firstDestPath.replace(/\.[^.]+$/, '.mp3');
       }

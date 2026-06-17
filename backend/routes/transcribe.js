@@ -71,6 +71,10 @@ router.get('/transcribe/setup/check', (_req, res) => {
 // SSE: download + install whisper.cpp
 router.get('/transcribe/setup', (req, res) => {
   const { send, finish } = initSSE(res);
+
+  // Immediate ping so the client knows the connection is live
+  send('connected', { ok: true });
+
   const keepAlive = setInterval(() => {
     if (!res.writableEnded) res.write(': keepalive\n\n');
   }, 15000);

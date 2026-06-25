@@ -1,6 +1,6 @@
 {
   "name": "kinetube",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Local YouTube & Instagram downloader",
   "main": "electron/main.js",
   "scripts": {
@@ -8,35 +8,48 @@
     "build:frontend": "cd frontend && npx vite build",
     "build:backend": "cd backend && npm install --omit=dev",
     "postinstall": "node scripts/patch-7zip.js",
-    "dist":       "npm run build:frontend && npm run build:backend && npx electron-builder",
-    "dist:win":   "npm run build:frontend && npm run build:backend && npx electron-builder --win",
-    "dist:mac":   "npm run build:frontend && npm run build:backend && npx electron-builder --mac",
-    "dist:linux": "npm run build:frontend && npm run build:backend && npx electron-builder --linux"
+    "dist":       "npm run build:frontend && npm run build:backend && npx electron-builder --publish never",
+    "dist:win":   "npm run build:frontend && npm run build:backend && npx electron-builder --win --publish never",
+    "dist:mac":   "npm run build:frontend && npm run build:backend && npx electron-builder --mac --publish never",
+    "dist:linux": "npm run build:frontend && npm run build:backend && npx electron-builder --linux --publish never"
   },
   "build": {
     "appId": "com.kinetube.app",
     "productName": "KineTube",
     "copyright": "Copyright © 2025 KineTube",
     "asar": false,
+    "publish": {
+      "provider": "github",
+      "owner": "spacesdrive",
+      "repo": "kinetube",
+      "releaseType": "release"
+    },
     "files": [
       "electron/**/*"
     ],
     "extraResources": [
-      { "from": "backend", "to": "backend", "filter": [
-        "**/*",
-        "!.env",
-        "!downloads/*.exe",
-        "!downloads/*.dll",
-        "!downloads/*.zip",
-        "!downloads/*.bin",
-        "!downloads/*.mp4",
-        "!downloads/*.webm",
-        "!downloads/*.mkv",
-        "!downloads/*.mp3",
-        "!downloads/*.m4a",
-        "!models/**"
-      ]},
-      { "from": "frontend/dist", "to": "frontend/dist" }
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!.env",
+          "!downloads/*.exe",
+          "!downloads/*.dll",
+          "!downloads/*.zip",
+          "!downloads/*.bin",
+          "!downloads/*.mp4",
+          "!downloads/*.webm",
+          "!downloads/*.mkv",
+          "!downloads/*.mp3",
+          "!downloads/*.m4a",
+          "!models/**"
+        ]
+      },
+      {
+        "from": "frontend/dist",
+        "to": "frontend/dist"
+      }
     ],
     "win": {
       "target": [{ "target": "nsis", "arch": ["x64"] }],
@@ -68,6 +81,7 @@
     "wait-on": "^8.0.1"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "unzipper": "^0.12.3"
   }
 }

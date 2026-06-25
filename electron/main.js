@@ -1,4 +1,5 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, utilityProcess } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const http = require('http');
 const fs   = require('fs');
@@ -129,6 +130,60 @@ ipcMain.handle('open-folder-dialog', async () => {
   return canceled ? null : filePaths[0];
 });
 
+// ── Auto-updater ──────────────────────────────────────────────────────────────
+function setupAutoUpdater() {
+  if (isDev) return; // app-update.yml is only present in packaged builds
+
+  autoUpdater.autoDownload = false;      // user must click "Update Now"
+  autoUpdater.autoInstallOnAppQuit = false;
+
+  autoUpdater.logger = {
+    info:  (m) => writeLog(`[updater] ${m}\n`),
+    warn:  (m) => writeLog(`[updater:warn] ${m}\n`),
+    error: (m) => writeLog(`[updater:err] ${m}\n`),
+    debug: () => {},
+  };
+
+  autoUpdater.on('update-available', (info) => {
+    mainWindow?.webContents.send('update-status', {
+      type: 'available',
+      version: info.version,
+    });
+  });
+
+  autoUpdater.on('download-progress', (prog) => {
+    mainWindow?.webContents.send('update-status', {
+      type: 'progress',
+      percent: prog.percent,
+      speed: prog.bytesPerSecond,
+      transferred: prog.transferred,
+      total: prog.total,
+    });
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    mainWindow?.webContents.send('update-status', { type: 'downloaded' });
+  });
+
+  autoUpdater.on('error', (err) => {
+    writeLog(`[updater:err] ${err.message}\n`);
+    mainWindow?.webContents.send('update-status', {
+      type: 'error',
+      message: err.message,
+    });
+  });
+
+  // Delay the first check so the app has time to fully load
+  setTimeout(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      writeLog(`[updater:err] check failed: ${err.message}\n`);
+    });
+  }, 5000);
+}
+
+ipcMain.handle('download-update', () => autoUpdater.downloadUpdate());
+ipcMain.handle('install-update',  () => autoUpdater.quitAndInstall(false, true));
+
 // ── Enforce a single instance ─────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -147,6 +202,7 @@ app.whenReady().then(async () => {
   // In dev the backend is started by the `dev` npm script (concurrently).
   // In production we start it here.
   createWindow();
+  setupAutoUpdater();
 
   if (!isDev) {
     startBackend();

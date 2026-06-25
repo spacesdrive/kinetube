@@ -22,6 +22,7 @@ import BatchResultsView from './components/BatchResultsView';
 import TranscribePage from './components/TranscribePage';
 import SettingsPage from './components/SettingsPage';
 import { loadSettings } from './components/SettingsPage';
+import UpdateDialog from './components/UpdateDialog';
 
 // ── API helpers ──────────────────────────────────────────────────────────────
 
@@ -273,6 +274,7 @@ export default function App() {
   const [activeIgAccount, setActiveIgAccount] = useState(null);
   const [showLoginModal, setShowLoginModal]   = useState(false);
   const [igFetchProgress, setIgFetchProgress] = useState(null);
+  const [pendingUpdate, setPendingUpdate]     = useState(null); // { version } when a new release is found
   // ── Shared ────────────────────────────────────────────────────────────────
   const [url, setUrl]                       = useState('');
   const [urlError, setUrlError]             = useState('');
@@ -795,6 +797,14 @@ export default function App() {
   }, []);
   const triggerTranscriptionSilentRef = useRef(null);
   useEffect(() => { triggerTranscriptionSilentRef.current = triggerTranscriptionSilent; }, [triggerTranscriptionSilent]);
+
+  // Listen for update-available from the Electron main process
+  useEffect(() => {
+    if (!window.electronAPI?.onUpdateStatus) return;
+    return window.electronAPI.onUpdateStatus((data) => {
+      if (data.type === 'available') setPendingUpdate({ version: data.version });
+    });
+  }, []);
 
   // ── Unified bulk download (mixed YouTube + Instagram) ───────────────────
   // Each item: { url, title, platform: 'youtube'|'instagram', quality, account? }
@@ -1348,6 +1358,14 @@ export default function App() {
         <InstagramLoginModal
           onClose={() => setShowLoginModal(false)}
           onSuccess={handleIgLoginSuccess}
+        />
+      )}
+
+      {/* ── Auto-update dialog ── */}
+      {pendingUpdate && (
+        <UpdateDialog
+          version={pendingUpdate.version}
+          onDismiss={() => setPendingUpdate(null)}
         />
       )}
     </SidebarProvider>

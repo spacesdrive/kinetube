@@ -95,7 +95,7 @@ function SettingRow({ label, hint, children }) {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export default function SettingsPage() {
+export default function SettingsPage({ onSave }) {
   const [settings, setSettings] = useState(() => loadSettings());
   const [saved, setSaved]       = useState(false);
   const [browsingFolder, setBrowsingFolder] = useState(false);
@@ -108,8 +108,9 @@ export default function SettingsPage() {
   const handleSave = useCallback(() => {
     saveSettings(settings);
     setSaved(true);
+    onSave?.();
     setTimeout(() => setSaved(false), 2500);
-  }, [settings]);
+  }, [settings, onSave]);
 
   const handleReset = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);

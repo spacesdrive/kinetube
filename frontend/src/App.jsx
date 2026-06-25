@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { AppSidebar } from './components/AppSidebar';
@@ -270,12 +269,10 @@ export default function App() {
   // ── Platform ──────────────────────────────────────────────────────────────
   const [platform, setPlatform]             = useState('youtube'); // 'youtube' | 'instagram'
   // ── Instagram ─────────────────────────────────────────────────────────────
-  const [igAccounts, setIgAccounts]         = useState([]);
+  const [igAccounts, setIgAccounts]           = useState([]);
   const [activeIgAccount, setActiveIgAccount] = useState(null);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [igSetupReady, setIgSetupReady]     = useState(false);
-  const [igSetupLoading, setIgSetupLoading] = useState(false);
-  const [igFetchProgress, setIgFetchProgress] = useState(null); // { fetched, total, channelName }
+  const [showLoginModal, setShowLoginModal]   = useState(false);
+  const [igFetchProgress, setIgFetchProgress] = useState(null);
   // ── Shared ────────────────────────────────────────────────────────────────
   const [url, setUrl]                       = useState('');
   const [urlError, setUrlError]             = useState('');
@@ -336,37 +333,37 @@ export default function App() {
   // ── Instagram account loading ──────────────────────────────────────────────
   // instaloader.exe is no longer required — Python + instaloader library handles
   // everything. Just fetch saved accounts whenever the Instagram tab is opened.
+  // Sync downloadSettings from localStorage whenever the user saves in SettingsPage
+  const syncDownloadSettings = useCallback(() => {
+    const saved = loadSettings().downloads;
+    setDownloadSettings((prev) => ({
+      ...prev,
+      outputDir:              saved.outputDir              ?? '',
+      prefix:                 saved.prefix                 ?? '',
+      suffix:                 saved.suffix                 ?? '',
+      useNumbering:           saved.useNumbering           ?? false,
+      useCustomFilename:      saved.useCustomFilename      ?? false,
+      customFilenameTemplate: saved.customFilenameTemplate ?? '%(title)s',
+    }));
+  }, []);
+
   const handlePlatformChange = useCallback((newPlatform) => {
     // Re-sync download settings whenever the user leaves the Settings page
     if (platform === 'settings' && newPlatform !== 'settings') {
-      const saved = loadSettings().downloads;
-      setDownloadSettings((prev) => ({
-        ...prev,
-        outputDir:              saved.outputDir              ?? '',
-        prefix:                 saved.prefix                 ?? '',
-        suffix:                 saved.suffix                 ?? '',
-        useNumbering:           saved.useNumbering           ?? false,
-        useCustomFilename:      saved.useCustomFilename      ?? false,
-        customFilenameTemplate: saved.customFilenameTemplate ?? '%(title)s',
-      }));
+      syncDownloadSettings();
     }
     setPlatform(newPlatform);
-    if (newPlatform === 'transcribe' || newPlatform === 'settings') {
-      setResult(null);
-      setUrl('');
-      setUrlError('');
-      setBatchMode(false);
-      return;
-    }
     setResult(null);
     setUrl('');
     setUrlError('');
+    if (newPlatform === 'transcribe' || newPlatform === 'settings') {
+      setBatchMode(false);
+      return;
+    }
     if (newPlatform === 'instagram') {
-      setIgSetupReady(true);
-      setIgSetupLoading(false);
       fetch('/api/instagram/accounts').then((r) => r.json()).then(setIgAccounts).catch(() => {});
     }
-  }, []);
+  }, [platform, syncDownloadSettings]);
 
   const handleIgLoginSuccess = useCallback((username) => {
     setShowLoginModal(false);
@@ -1138,7 +1135,7 @@ export default function App() {
 
             {/* ── Full-page routes ── */}
             {platform === 'transcribe' && <TranscribePage />}
-            {platform === 'settings'   && <SettingsPage />}
+            {platform === 'settings'   && <SettingsPage onSave={syncDownloadSettings} />}
 
             {/* ── Download pages (YouTube / Instagram) ── */}
             {isDownloadPage && (

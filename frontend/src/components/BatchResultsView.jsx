@@ -152,6 +152,48 @@ function SingleCard({ result, onSelectionChange }) {
   );
 }
 
+// Extracted to a component so useState is never called inside a .map()
+function ThumbGridItem({ entry, platform, isSel, onToggle }) {
+  const [err, setErr] = useState(false);
+  return (
+    <div
+      onClick={onToggle}
+      className={cn(
+        'relative aspect-square rounded-xl overflow-hidden cursor-pointer transition-all duration-100',
+        isSel ? 'ring-2 ring-purple-400 ring-offset-1' : 'hover:opacity-80'
+      )}
+    >
+      {!err && entry.thumbnail ? (
+        <img
+          src={thumb(entry.thumbnail, platform)}
+          alt={entry.title}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          onError={() => setErr(true)}
+        />
+      ) : (
+        <div className="w-full h-full bg-muted flex items-center justify-center">
+          <Play size={14} className="text-muted-foreground/30" />
+        </div>
+      )}
+      {isSel && (
+        <div className="absolute inset-0 bg-purple-500/20 flex items-end justify-end p-1">
+          <div className="w-4 h-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow">
+            <svg viewBox="0 0 12 12" fill="none" className="w-2.5 h-2.5">
+              <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+        </div>
+      )}
+      {entry.duration && !isSel && (
+        <span className="absolute bottom-0.5 right-0.5 px-1 text-[9px] font-mono font-semibold bg-black/60 text-white rounded">
+          {Math.floor(entry.duration / 60)}:{String(Math.floor(entry.duration % 60)).padStart(2, '0')}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function MultiCard({ result, expanded, onToggleExpand, onSelectionChange }) {
   const { platform, info, selectedIds } = result;
   const entries = info.entries || [];
@@ -180,8 +222,7 @@ function MultiCard({ result, expanded, onToggleExpand, onSelectionChange }) {
         >
           <div onClick={(e) => e.stopPropagation()}>
             <Checkbox
-              checked={allSel}
-              ref={(el) => { if (el) el.indeterminate = partSel && !allSel; }}
+              checked={partSel ? 'indeterminate' : allSel}
               onCheckedChange={toggleAll}
               className={allSel ? 'border-purple-500 data-[state=checked]:bg-purple-500' : ''}
             />
@@ -216,48 +257,15 @@ function MultiCard({ result, expanded, onToggleExpand, onSelectionChange }) {
               <p className="text-xs text-muted-foreground text-center py-4">No items found.</p>
             ) : (
               <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 max-h-72 overflow-y-auto pr-1">
-                {entries.map((entry) => {
-                  const isSel = selectedIds.has(entry.id);
-                  const [err, setErr] = useState(false);
-                  return (
-                    <div
-                      key={entry.id}
-                      onClick={() => toggleEntry(entry.id)}
-                      className={cn(
-                        'relative aspect-square rounded-xl overflow-hidden cursor-pointer transition-all duration-100',
-                        isSel ? 'ring-2 ring-purple-400 ring-offset-1' : 'hover:opacity-80'
-                      )}
-                    >
-                      {!err && entry.thumbnail ? (
-                        <img
-                          src={thumb(entry.thumbnail, platform)}
-                          alt={entry.title}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                          onError={() => setErr(true)}
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-muted flex items-center justify-center">
-                          <Play size={14} className="text-muted-foreground/30" />
-                        </div>
-                      )}
-                      {isSel && (
-                        <div className="absolute inset-0 bg-purple-500/20 flex items-end justify-end p-1">
-                          <div className="w-4 h-4 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow">
-                            <svg viewBox="0 0 12 12" fill="none" className="w-2.5 h-2.5">
-                              <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          </div>
-                        </div>
-                      )}
-                      {entry.duration && !isSel && (
-                        <span className="absolute bottom-0.5 right-0.5 px-1 text-[9px] font-mono font-semibold bg-black/60 text-white rounded">
-                          {Math.floor(entry.duration / 60)}:{String(Math.floor(entry.duration % 60)).padStart(2, '0')}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+                {entries.map((entry) => (
+                  <ThumbGridItem
+                    key={entry.id}
+                    entry={entry}
+                    platform={platform}
+                    isSel={selectedIds.has(entry.id)}
+                    onToggle={() => toggleEntry(entry.id)}
+                  />
+                ))}
               </div>
             )}
           </div>

@@ -9,6 +9,12 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
+Nothing yet.
+
+---
+
+## [1.3.0] - 2026-07-26
+
 ### Added
 
 **Cross-platform tool support (yt-dlp, ffmpeg, whisper.cpp)**

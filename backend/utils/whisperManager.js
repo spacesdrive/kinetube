@@ -1,9 +1,13 @@
 /**
  * whisperManager.js
  *
- * Manages whisper.cpp on Windows:
- *  - Downloads the pre-built Windows binary (whisper-blas-bin-x64.zip from GitHub)
- *  - Downloads GGML model files from Hugging Face
+ * Manages whisper.cpp:
+ *  - Windows: downloads the pre-built binary (whisper-blas-bin-x64.zip from GitHub)
+ *  - macOS/Linux: ggml-org does not publish prebuilt binaries for these platforms
+ *    (only Windows zips and WASM/xcframework artifacts), so this builds
+ *    whisper.cpp from source instead (requires git + cmake + a C/C++ toolchain
+ *    already present on the machine). See docs/philosophy/CROSS_PLATFORM.md.
+ *  - Downloads GGML model files from Hugging Face (all platforms, unchanged)
  *  - Runs transcription via spawn, returning clean plain-text output
  *
  * Audio extraction (video → 16 kHz mono WAV) is done with the ffmpeg that is
@@ -16,23 +20,28 @@ const https   = require('https');
 const http    = require('http');
 const fs      = require('fs');
 const path    = require('path');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
 const unzipper  = require('unzipper');
 const os        = require('os');
 
 const { FFMPEG_EXE_PATH } = require('./ytdlpManager');
 const { DOWNLOADS_DIR, MODELS_DIR } = require('./paths');
 
-// whisper.cpp renames 'main.exe' to 'whisper-cli.exe' from v1.7 onwards.
-// We check both after extraction.
-const WHISPER_EXE_CANDIDATES = [
-  path.join(DOWNLOADS_DIR, 'whisper-cli.exe'),
-  path.join(DOWNLOADS_DIR, 'main.exe'),
-];
-
 const WHISPER_VERSION = '1.8.4';
+
+function getWhisperBinaryName(platform) {
+  return platform === 'win32' ? 'whisper-cli.exe' : 'whisper-cli';
+}
+
+// whisper.cpp renamed 'main.exe' to 'whisper-cli.exe' from v1.7 onwards.
+// We check both, using the platform-correct extension (or lack of one).
+const WHISPER_EXE_CANDIDATES = process.platform === 'win32'
+  ? [path.join(DOWNLOADS_DIR, 'whisper-cli.exe'), path.join(DOWNLOADS_DIR, 'main.exe')]
+  : [path.join(DOWNLOADS_DIR, 'whisper-cli'), path.join(DOWNLOADS_DIR, 'main')];
+
 const WHISPER_ZIP_URL =
   `https://github.com/ggml-org/whisper.cpp/releases/download/v${WHISPER_VERSION}/whisper-blas-bin-x64.zip`;
+const WHISPER_REPO_URL = 'https://github.com/ggml-org/whisper.cpp.git';
 
 // ── Model registry ────────────────────────────────────────────────────────────
 
@@ -106,12 +115,92 @@ function downloadFileWithProgress(url, dest, onProgress, maxRedirects = 12) {
   });
 }
 
+// ── Build from source (macOS / Linux) ─────────────────────────────────────────
+// ggml-org only publishes prebuilt Windows binaries for whisper.cpp. There is
+// no official prebuilt macOS/Linux binary to download, so we build from source
+// instead. This requires git, cmake, and a C/C++ toolchain already present on
+// the machine (Xcode Command Line Tools on macOS, build-essential on Linux).
+
+function checkCommandAvailable(cmd) {
+  return new Promise((resolve) => {
+    execFile(cmd, ['--version'], { timeout: 8000 }, (err) => resolve(!err));
+  });
+}
+
+function runBuildStep(cmd, args, cwd, onLine) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(cmd, args, { cwd });
+    proc.stdout?.on('data', (d) => onLine?.(d.toString()));
+    proc.stderr?.on('data', (d) => onLine?.(d.toString()));
+    proc.on('error', reject);
+    proc.on('close', (code) => {
+      if (code !== 0) return reject(new Error(`${cmd} ${args.join(' ')} exited with code ${code}`));
+      resolve();
+    });
+  });
+}
+
+function findBuiltWhisperCli(srcDir) {
+  const candidateDirs = ['build/bin', 'build/bin/Release', 'build'].map((p) => path.join(srcDir, p));
+  return candidateDirs.find((dir) => fs.existsSync(path.join(dir, 'whisper-cli'))) || null;
+}
+
+async function buildWhisperFromSource(onEvent) {
+  const [hasGit, hasCmake] = await Promise.all([checkCommandAvailable('git'), checkCommandAvailable('cmake')]);
+  if (!hasGit || !hasCmake) {
+    const missing = [!hasGit && 'git', !hasCmake && 'cmake'].filter(Boolean).join(' and ');
+    throw new Error(
+      `Building whisper.cpp from source requires ${missing}. Install ${missing} ` +
+      '(e.g. "xcode-select --install" on macOS, or "sudo apt install git cmake build-essential" on Debian/Ubuntu Linux) and try again.'
+    );
+  }
+
+  const srcDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kinetube-whisper-src-'));
+  try {
+    onEvent?.('phase', { tool: 'whisper', phase: 'cloning', message: 'Cloning whisper.cpp source…' });
+    await runBuildStep('git', ['clone', '--depth', '1', '--branch', `v${WHISPER_VERSION}`, WHISPER_REPO_URL, srcDir]);
+
+    onEvent?.('phase', { tool: 'whisper', phase: 'configuring', message: 'Configuring build (cmake)…' });
+    await runBuildStep('cmake', ['-B', 'build', '-S', '.'], srcDir);
+
+    onEvent?.('phase', { tool: 'whisper', phase: 'building', message: 'Compiling whisper.cpp — this can take several minutes…' });
+    await runBuildStep('cmake', ['--build', 'build', '--config', 'Release', '-j'], srcDir);
+
+    const buildBinDir = findBuiltWhisperCli(srcDir);
+    if (!buildBinDir) throw new Error('whisper-cli was not produced by the build — check the build output above for compiler errors');
+
+    fs.copyFileSync(path.join(buildBinDir, 'whisper-cli'), path.join(DOWNLOADS_DIR, 'whisper-cli'));
+    fs.chmodSync(path.join(DOWNLOADS_DIR, 'whisper-cli'), 0o755);
+
+    // Bundle any shared libraries whisper-cli was dynamically linked against.
+    for (const file of fs.readdirSync(buildBinDir)) {
+      if (/\.(so|dylib)(\.\d+)*$/.test(file)) {
+        fs.copyFileSync(path.join(buildBinDir, file), path.join(DOWNLOADS_DIR, file));
+      }
+    }
+  } finally {
+    fs.rmSync(srcDir, { recursive: true, force: true });
+  }
+}
+
 // ── Ensure whisper.cpp binary ─────────────────────────────────────────────────
 
 async function ensureWhisper(onEvent) {
   if (isWhisperReady()) {
     onEvent?.('phase', { tool: 'whisper', phase: 'done', message: 'whisper already installed', skipped: true });
     return true;
+  }
+
+  if (process.platform !== 'win32') {
+    try {
+      await buildWhisperFromSource(onEvent);
+      if (!isWhisperReady()) throw new Error('whisper-cli was built but is not where it was expected');
+      onEvent?.('phase', { tool: 'whisper', phase: 'done', message: 'whisper.cpp built and installed' });
+      return true;
+    } catch (err) {
+      onEvent?.('phase', { tool: 'whisper', phase: 'error', message: err.message });
+      return false;
+    }
   }
 
   const zipPath = path.join(DOWNLOADS_DIR, 'whisper-setup.zip');
@@ -333,5 +422,7 @@ module.exports = {
   ensureWhisper,
   ensureModel,
   transcribeFile,
+  cleanTranscription,
+  getWhisperBinaryName,
   MODELS,
 };

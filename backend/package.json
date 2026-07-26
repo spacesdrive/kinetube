@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",
@@ -16,5 +17,8 @@
     "express": "^5.2.1",
     "multer": "^2.1.1",
     "unzipper": "^0.12.3"
+  },
+  "devDependencies": {
+    "supertest": "^7.2.2"
   }
 }

@@ -1,15 +1,15 @@
 /**
  * Instagram API routes
  *
- * POST /api/instagram/info           — fetch reel/post/profile metadata
- * GET  /api/instagram/download       — SSE: download single post/reel
- * GET  /api/instagram/bulk-download  — SSE: download multiple posts
- * GET  /api/instagram/accounts       — list saved accounts
- * POST /api/instagram/login          — start login (spawns instaloader, handles 2FA state)
- * POST /api/instagram/login/2fa      — inject 2FA code into waiting login process
- * DELETE /api/instagram/accounts/:u — remove account + session
- * GET  /api/instagram/setup          — SSE: download instaloader.exe
- * GET  /api/instagram/setup/check    — JSON: is instaloader ready?
+ * POST /api/instagram/info                 — fetch reel/post/profile metadata
+ * GET  /api/instagram/download              — SSE: download single post/reel
+ * GET  /api/instagram/bulk-download         — SSE: download multiple posts
+ * GET  /api/instagram/accounts              — list saved accounts
+ * POST /api/instagram/login                 — start login (Python + instaloader, handles 2FA state)
+ * POST /api/instagram/login/2fa             — inject 2FA code into waiting login process
+ * DELETE /api/instagram/accounts/:u        — remove account + session
+ * GET  /api/instagram/setup/python/check    — JSON: is Python + instaloader ready?
+ * GET  /api/instagram/setup/instaloader     — SSE: pip install instaloader
  */
 
 const express = require('express');
@@ -69,8 +69,7 @@ async function checkPythonSetup() {
 
 const { parseInstagramUrl } = require('../utils/instagramUrlParser');
 const {
-  getInstaloaderPath, isInstaloaderReady, getSessionPath,
-  ensureInstaloader, getAccounts, addAccount, removeAccount,
+  getSessionPath, getAccounts, addAccount, removeAccount,
   registerLoginProc, getActiveLogin, clearActiveLogin,
 } = require('../utils/instaloaderManager');
 const { YTDLP_EXE_PATH, FFMPEG_EXE_PATH } = require('../utils/ytdlpManager');
@@ -118,11 +117,7 @@ function parseTqdm(line) {
   };
 }
 
-// ── Setup: download instaloader.exe ──────────────────────────────────────────
-
-router.get('/instagram/setup/check', (req, res) => {
-  res.json({ ready: isInstaloaderReady() });
-});
+// ── Setup: Python + instaloader (pip package, cross-platform) ────────────────
 
 // Check Python + instaloader availability (for login modal setup UI)
 router.get('/instagram/setup/python/check', async (req, res) => {
@@ -174,19 +169,6 @@ router.get('/instagram/setup/instaloader', async (req, res) => {
   });
 
   res.on('close', () => { if (proc.exitCode === null) proc.kill(); });
-});
-
-router.get('/instagram/setup', (req, res) => {
-  const { send, finish } = initSSE(res);
-  const keepAlive = setInterval(() => {
-    if (!res.writableEnded) { res.write(': keepalive\n\n'); if (typeof res.flush === 'function') res.flush(); }
-  }, 15000);
-
-  ensureInstaloader((event, data) => send(event, data))
-    .then(() => { clearInterval(keepAlive); send('done', { success: true }); finish(); })
-    .catch((err) => { clearInterval(keepAlive); send('done', { success: false, message: err.message }); finish(); });
-
-  res.on('close', () => clearInterval(keepAlive));
 });
 
 // ── Account management ────────────────────────────────────────────────────────

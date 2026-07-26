@@ -2,19 +2,79 @@
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { spawn, execSync } = require('child_process');
 const unzipper = require('unzipper');
 
 const { DOWNLOADS_DIR } = require('./paths');
 
-const FFMPEG_EXE_PATH = path.join(DOWNLOADS_DIR, 'ffmpeg.exe');
-const YTDLP_EXE_PATH  = path.join(DOWNLOADS_DIR, 'yt-dlp.exe');
+const PLATFORM = process.platform; // 'win32' | 'darwin' | 'linux' | ...
+
+// ── yt-dlp ────────────────────────────────────────────────────────────────────
+// yt-dlp publishes a standalone binary per platform on the same GitHub release
+// (yt-dlp.exe / yt-dlp_macos / yt-dlp_linux) - no archive extraction needed.
+
+const YTDLP_VERSION = '2026.03.17';
+
+const YTDLP_ASSET_BY_PLATFORM = {
+  win32: 'yt-dlp.exe',
+  darwin: 'yt-dlp_macos',
+  linux: 'yt-dlp_linux',
+};
+
+function getYtdlpAssetName(platform) {
+  const asset = YTDLP_ASSET_BY_PLATFORM[platform];
+  if (!asset) throw new Error(`yt-dlp has no managed binary for platform "${platform}"`);
+  return asset;
+}
+
+function getYtdlpBinaryName(platform) {
+  return platform === 'win32' ? 'yt-dlp.exe' : 'yt-dlp';
+}
+
+function getYtdlpDownloadUrl(platform) {
+  return `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/${getYtdlpAssetName(platform)}`;
+}
+
+const YTDLP_BINARY_NAME = getYtdlpBinaryName(PLATFORM);
+const YTDLP_EXE_PATH = path.join(DOWNLOADS_DIR, YTDLP_BINARY_NAME);
+const YTDLP_URL = PLATFORM in YTDLP_ASSET_BY_PLATFORM ? getYtdlpDownloadUrl(PLATFORM) : null;
 
 function getYtdlpPath() { return YTDLP_EXE_PATH; }
 
-const YTDLP_VERSION  = '2026.03.17';
-const YTDLP_URL      = `https://github.com/yt-dlp/yt-dlp/releases/download/${YTDLP_VERSION}/yt-dlp.exe`;
-const FFMPEG_ZIP_URL = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip';
+// ── ffmpeg ────────────────────────────────────────────────────────────────────
+// Each platform gets its build from the community-standard static-build source
+// (the same sources the popular `ffmpeg-static` npm package uses):
+//   Windows      - gyan.dev "essentials" zip (bin/ffmpeg.exe inside)
+//   macOS        - evermeet.cx's stable "latest release" zip redirect (x64;
+//                  relies on Rosetta 2 to run on Apple Silicon - see DECISIONS.md)
+//   Linux (x64)  - johnvansickle.com static tar.xz build
+
+const FFMPEG_WINDOWS_ZIP_URL = 'https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip';
+const FFMPEG_MACOS_ZIP_URL   = 'https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip';
+const FFMPEG_LINUX_TARXZ_URL = 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz';
+
+function getFfmpegBinaryName(platform) {
+  return platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+}
+
+// Pure, platform-keyed description of how to fetch ffmpeg - kept separate from
+// I/O so the mapping itself is unit-testable without touching the filesystem.
+function getFfmpegDownloadInfo(platform) {
+  if (platform === 'win32') {
+    return { archiveType: 'zip', url: FFMPEG_WINDOWS_ZIP_URL, matchEntry: (p) => /ffmpeg\.exe$/i.test(p) && /bin[/\\]/.test(p) };
+  }
+  if (platform === 'darwin') {
+    return { archiveType: 'zip', url: FFMPEG_MACOS_ZIP_URL, matchEntry: (p) => path.basename(p) === 'ffmpeg' };
+  }
+  if (platform === 'linux') {
+    return { archiveType: 'tar.xz', url: FFMPEG_LINUX_TARXZ_URL, matchEntry: null };
+  }
+  throw new Error(`ffmpeg has no managed static build for platform "${platform}"`);
+}
+
+const FFMPEG_BINARY_NAME = getFfmpegBinaryName(PLATFORM);
+const FFMPEG_EXE_PATH = path.join(DOWNLOADS_DIR, FFMPEG_BINARY_NAME);
 
 // ── Basic download (no progress) — kept for backwards compat ────────────────
 
@@ -45,7 +105,7 @@ function downloadFile(url, dest, maxRedirects = 5) {
 // ── Progress-aware download ──────────────────────────────────────────────────
 // onProgress({ downloaded, total, percent, speed })
 
-function downloadFileWithProgress(url, dest, onProgress, maxRedirects = 5) {
+function downloadFileWithProgress(url, dest, onProgress, maxRedirects = 10) {
   return new Promise((resolve, reject) => {
     function requestUrl(currentUrl, redirectsLeft) {
       https.get(currentUrl, (response) => {
@@ -88,6 +148,69 @@ function downloadFileWithProgress(url, dest, onProgress, maxRedirects = 5) {
   });
 }
 
+// ── ffmpeg extraction helpers ─────────────────────────────────────────────────
+
+function extractFfmpegFromZip(zipPath, matchEntry) {
+  return new Promise((resolve, reject) => {
+    let found = false;
+    fs.createReadStream(zipPath)
+      .pipe(unzipper.Parse())
+      .on('entry', (entry) => {
+        if (matchEntry(entry.path)) {
+          found = true;
+          entry.pipe(fs.createWriteStream(FFMPEG_EXE_PATH)).on('error', reject);
+        } else {
+          entry.autodrain();
+        }
+      })
+      .promise()
+      .then(() => resolve(found))
+      .catch(reject);
+  });
+}
+
+function runTar(args) {
+  return new Promise((resolve, reject) => {
+    const proc = spawn('tar', args);
+    let stderr = '';
+    proc.stderr.on('data', (d) => (stderr += d.toString()));
+    proc.on('error', (err) => reject(new Error(
+      `Could not run "tar" (${err.message}). ffmpeg's Linux static build ships as a .tar.xz archive - ` +
+      'install tar and xz-utils (they ship with virtually every Linux distribution) and try again.'
+    )));
+    proc.on('close', (code) => {
+      if (code !== 0) return reject(new Error(`tar exited with code ${code}: ${stderr.slice(-300)}`));
+      resolve();
+    });
+  });
+}
+
+function findFileRecursive(dir, filename) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const found = findFileRecursive(full, filename);
+      if (found) return found;
+    } else if (entry.name === filename) {
+      return full;
+    }
+  }
+  return null;
+}
+
+async function extractFfmpegFromTarXz(tarPath) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kinetube-ffmpeg-'));
+  try {
+    await runTar(['-xJf', tarPath, '-C', tempDir]);
+    const extracted = findFileRecursive(tempDir, 'ffmpeg');
+    if (!extracted) return false;
+    fs.copyFileSync(extracted, FFMPEG_EXE_PATH);
+    return true;
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 // ── Setup orchestrator ───────────────────────────────────────────────────────
 // onEvent(eventName, data) — emits 'phase' and 'progress' events.
 
@@ -96,55 +219,62 @@ async function setupToolsWithProgress(onEvent) {
 
   // ── yt-dlp ──────────────────────────────────────────────────────────────────
   if (!status.exists) {
-    onEvent('phase', { tool: 'ytdlp', phase: 'downloading', message: 'Downloading yt-dlp.exe...' });
-    try {
-      await downloadFileWithProgress(YTDLP_URL, YTDLP_EXE_PATH, (prog) => {
-        onEvent('progress', { tool: 'ytdlp', ...prog });
-      });
-      onEvent('phase', { tool: 'ytdlp', phase: 'done', message: 'yt-dlp.exe installed successfully' });
-    } catch (err) {
-      onEvent('phase', { tool: 'ytdlp', phase: 'error', message: `Download failed: ${err.message}` });
+    if (!YTDLP_URL) {
+      onEvent('phase', { tool: 'ytdlp', phase: 'error', message: `yt-dlp has no managed binary for this platform (${PLATFORM}).` });
+    } else {
+      onEvent('phase', { tool: 'ytdlp', phase: 'downloading', message: `Downloading ${YTDLP_BINARY_NAME}...` });
+      try {
+        await downloadFileWithProgress(YTDLP_URL, YTDLP_EXE_PATH, (prog) => {
+          onEvent('progress', { tool: 'ytdlp', ...prog });
+        });
+        if (PLATFORM !== 'win32') fs.chmodSync(YTDLP_EXE_PATH, 0o755);
+        onEvent('phase', { tool: 'ytdlp', phase: 'done', message: `${YTDLP_BINARY_NAME} installed successfully` });
+      } catch (err) {
+        onEvent('phase', { tool: 'ytdlp', phase: 'error', message: `Download failed: ${err.message}` });
+      }
     }
   } else {
-    onEvent('phase', { tool: 'ytdlp', phase: 'done', message: 'yt-dlp.exe already installed', skipped: true });
+    onEvent('phase', { tool: 'ytdlp', phase: 'done', message: `${YTDLP_BINARY_NAME} already installed`, skipped: true });
   }
 
   // ── ffmpeg ───────────────────────────────────────────────────────────────────
   if (!status.ffmpegAvailable) {
-    onEvent('phase', { tool: 'ffmpeg', phase: 'downloading', message: 'Downloading ffmpeg (this may take a moment)...' });
-    const zipPath = path.join(DOWNLOADS_DIR, 'ffmpeg-setup.zip');
+    let ffmpegInfo;
     try {
-      await downloadFileWithProgress(FFMPEG_ZIP_URL, zipPath, (prog) => {
-        onEvent('progress', { tool: 'ffmpeg', ...prog });
-      });
-
-      onEvent('phase', { tool: 'ffmpeg', phase: 'extracting', message: 'Extracting ffmpeg.exe from archive...' });
-
-      let found = false;
-      await fs.createReadStream(zipPath)
-        .pipe(unzipper.Parse())
-        .on('entry', (entry) => {
-          const fileName = entry.path;
-          if (/ffmpeg\.exe$/i.test(fileName) && /bin[/\\]/.test(fileName)) {
-            entry.pipe(fs.createWriteStream(FFMPEG_EXE_PATH));
-            found = true;
-          } else {
-            entry.autodrain();
-          }
-        })
-        .promise();
-
-      try { fs.unlinkSync(zipPath); } catch {}
-
-      if (!found) throw new Error('ffmpeg.exe not found inside the downloaded zip');
-
-      onEvent('phase', { tool: 'ffmpeg', phase: 'done', message: 'ffmpeg.exe installed successfully' });
+      ffmpegInfo = getFfmpegDownloadInfo(PLATFORM);
     } catch (err) {
-      try { if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath); } catch {}
-      onEvent('phase', { tool: 'ffmpeg', phase: 'error', message: `Setup failed: ${err.message}` });
+      onEvent('phase', { tool: 'ffmpeg', phase: 'error', message: err.message });
+      ffmpegInfo = null;
+    }
+
+    if (ffmpegInfo) {
+      onEvent('phase', { tool: 'ffmpeg', phase: 'downloading', message: 'Downloading ffmpeg (this may take a moment)...' });
+      const archivePath = path.join(DOWNLOADS_DIR, ffmpegInfo.archiveType === 'zip' ? 'ffmpeg-setup.zip' : 'ffmpeg-setup.tar.xz');
+
+      try {
+        await downloadFileWithProgress(ffmpegInfo.url, archivePath, (prog) => {
+          onEvent('progress', { tool: 'ffmpeg', ...prog });
+        });
+
+        onEvent('phase', { tool: 'ffmpeg', phase: 'extracting', message: `Extracting ${FFMPEG_BINARY_NAME} from archive...` });
+
+        const found = ffmpegInfo.archiveType === 'zip'
+          ? await extractFfmpegFromZip(archivePath, ffmpegInfo.matchEntry)
+          : await extractFfmpegFromTarXz(archivePath);
+
+        try { fs.unlinkSync(archivePath); } catch {}
+
+        if (!found) throw new Error(`${FFMPEG_BINARY_NAME} not found inside the downloaded archive`);
+        if (PLATFORM !== 'win32') fs.chmodSync(FFMPEG_EXE_PATH, 0o755);
+
+        onEvent('phase', { tool: 'ffmpeg', phase: 'done', message: `${FFMPEG_BINARY_NAME} installed successfully` });
+      } catch (err) {
+        try { if (fs.existsSync(archivePath)) fs.unlinkSync(archivePath); } catch {}
+        onEvent('phase', { tool: 'ffmpeg', phase: 'error', message: `Setup failed: ${err.message}` });
+      }
     }
   } else {
-    onEvent('phase', { tool: 'ffmpeg', phase: 'done', message: 'ffmpeg.exe already installed', skipped: true });
+    onEvent('phase', { tool: 'ffmpeg', phase: 'done', message: `${FFMPEG_BINARY_NAME} already installed`, skipped: true });
   }
 }
 
@@ -152,7 +282,7 @@ async function setupToolsWithProgress(onEvent) {
 
 async function ensureYtDlp() {
   if (!fs.existsSync(YTDLP_EXE_PATH)) {
-    console.log('yt-dlp.exe not found — run the app in a browser to trigger setup.');
+    console.log(`${YTDLP_BINARY_NAME} not found — run the app in a browser to trigger setup.`);
     return false;
   }
   return true;
@@ -160,7 +290,7 @@ async function ensureYtDlp() {
 
 async function ensureFfmpeg() {
   if (!fs.existsSync(FFMPEG_EXE_PATH)) {
-    console.log('ffmpeg.exe not found — run the app in a browser to trigger setup.');
+    console.log(`${FFMPEG_BINARY_NAME} not found — run the app in a browser to trigger setup.`);
     return false;
   }
   return true;
@@ -202,4 +332,10 @@ module.exports = {
   DOWNLOADS_DIR,
   checkYtdlpStatus,
   getYtdlpPath,
+  // Exported for platform-resolution unit tests (see docs/workflows/TESTING.md):
+  getYtdlpAssetName,
+  getYtdlpBinaryName,
+  getYtdlpDownloadUrl,
+  getFfmpegBinaryName,
+  getFfmpegDownloadInfo,
 };

@@ -102,6 +102,13 @@ if (process.env.ELECTRON_APP && process.env.ELECTRON_FRONTEND_DIST) {
 // and cannot be garbage collected while the process is running.
 let _server;
 
+// Exported so tests can drive the app directly (e.g. with supertest) without
+// binding a port or running binary setup checks. `require.main === module`
+// below still auto-starts normally for `node server.js` and for Electron's
+// `utilityProcess.fork(getServerPath())`, since both invoke this file as the
+// entry module.
+module.exports = app;
+
 async function startServer() {
   console.log('\n╔══════════════════════════════════════╗');
   console.log('║         KineTube Backend v1.0        ║');
@@ -135,4 +142,6 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => { console.error('Fatal startup error:', err); process.exit(1); });
+if (require.main === module) {
+  startServer().catch((err) => { console.error('Fatal startup error:', err); process.exit(1); });
+}

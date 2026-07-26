@@ -282,3 +282,27 @@ Records every significant architectural decision, the alternatives considered, a
 **Trade-offs:**
 - Anyone reading `server.js` for the first time needs to know this idiom; it's called out explicitly in a comment at the export site and documented in `docs/architecture/backend/EXPRESS.md`
 - Adds `supertest` as a new backend devDependency (see `docs/workflows/TESTING.md`) - the one exception to this project's general zero-new-test-dependency preference for the backend, justified because there is no way to drive Express routes via `node:test` alone without either this pattern or a real bound port
+
+---
+
+## ADR-014: Pinned `nsis.artifactName` to a space-free pattern to fix a broken auto-updater
+
+**Date:** 2026-07-26
+**Status:** Accepted
+
+**Decision:** Set `build.nsis.artifactName` in `package.json` (root) to `${productName}-Setup-${version}.${ext}` instead of leaving it unset (electron-builder's NSIS default: `${productName} Setup ${version}.${ext}`, with literal spaces).
+
+**Root cause found:** v1.3.0's in-app updater failed with `Cannot download ".../KineTube-Setup-1.3.0.exe", status 404`. This release workflow runs `electron-builder` with `--publish never` and then separately uploads `dist/*.exe` via `softprops/action-gh-release` - it never goes through electron-builder's own GitHub publish plugin, which is the only path that renames a built artifact to match the space-free name it also writes into `latest.yml`. Two independent things happened to the same unset-default filename (`KineTube Setup 1.3.0.exe`) and produced two different results: electron-builder's own `computeSafeArtifactNameIfNeeded()` (`app-builder-lib/out/platformPackager.js`) replaced the spaces with dashes when writing `dist/latest.yml` (`KineTube-Setup-1.3.0.exe`), while GitHub's release-asset upload API silently rewrote the same spaces to dots when the raw file was uploaded (`KineTube.Setup.1.3.0.exe`). `electron-updater` reads the dash name from `latest.yml`, requests it from the release, and gets a 404 because the asset that actually exists has dots.
+
+**Alternatives considered:**
+- Have the CI step rename `dist/*.exe` to strip spaces before upload, matching whatever electron-builder happened to write into `latest.yml`
+- Switch the workflow to let electron-builder publish directly (`--publish always`) instead of a separate upload step
+
+**Reasoning:**
+- Pinning `artifactName` to an already GitHub-safe pattern (no spaces) makes `computeSafeArtifactNameIfNeeded()` a no-op (the suggested name is already safe, so `latest.yml` uses the real installer filename verbatim) and means GitHub's own upload sanitization has nothing to rewrite - both names converge on the same string with no second system in the loop
+- A CI-side rename step would work but leaves the underlying default (a space-containing filename) as a trap for the next platform target or config change
+- Switching to `--publish always` is a larger change to the release flow (electron-builder would then own asset upload/retry/auth end-to-end) that isn't warranted just to fix a filename mismatch
+
+**Trade-offs:**
+- Anyone adding another Windows target (e.g. a portable build) needs to keep its `artifactName` space-free too, or this class of bug reappears - called out in `docs/workflows/RELEASE.md`'s Auto-Update section
+- Every future release must be spot-checked (`latest*.yml` filename vs. actual uploaded asset filename) until this is caught by an automated CI check instead of manual verification - tracked in `ROADMAP.md`

@@ -13,6 +13,14 @@ Nothing yet.
 
 ---
 
+## [1.3.1] - 2026-07-26
+
+### Fixed
+- **Auto-update 404 on Windows** - `v1.3.0`'s in-app updater failed with `Cannot download "...KineTube-Setup-1.3.0.exe", status 404`. The unset NSIS `artifactName` default (`${productName} Setup ${version}.${ext}`, with a literal space) got sanitized two different, incompatible ways: electron-builder wrote a dash-separated name into `latest.yml` while GitHub's asset upload API rewrote the same spaces to dots on the actual uploaded `.exe`. Pinned `build.nsis.artifactName` to `${productName}-Setup-${version}.${ext}` (no spaces) in `package.json` so both names converge - see `DECISIONS.md` ADR-014.
+- **Update-failed dialog text overflow** - a long error message (e.g. the download URL in the 404 above) could overflow past the fixed-width update dialog instead of wrapping. Added `break-words` to the shared `DialogDescription` primitive (`frontend/src/components/ui/dialog.jsx`) so long unbroken strings wrap inside any dialog, not just this one.
+
+---
+
 ## [1.3.0] - 2026-07-26
 
 ### Added

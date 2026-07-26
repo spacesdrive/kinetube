@@ -39,6 +39,12 @@ Update this file whenever a feature ships (move to `CHANGELOG.md`) or when prior
 
 ---
 
+### Automated release-asset name verification
+
+**Added 2026-07-26**, following the v1.3.0 auto-update 404 (`DECISIONS.md` ADR-014). The fix (pinning `nsis.artifactName`) is in place, but nothing in CI would catch a future regression - e.g. a new Windows target whose `artifactName` reintroduces a space. Add a post-build CI step that parses each uploaded `latest*.yml` and confirms its referenced filename(s) exactly match the filenames actually present in the release assets, failing the workflow if not, instead of relying on the manual check in `docs/workflows/RELEASE.md`'s "Cutting a Release" checklist.
+
+---
+
 ## Planned (Medium Priority)
 
 ### Shared `downloadFileWithProgress()` helper

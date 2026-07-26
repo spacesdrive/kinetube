@@ -56,6 +56,8 @@ Each job: checkout, Node 20 setup, `npm install` at root, `npm install` in `fron
 
 `electron-updater` reads `dist/latest*.yml` (per-platform: `latest.yml`, `latest-mac.yml`, `latest-linux.yml`) from the GitHub Release to determine whether an update is available. See `docs/architecture/electron/MAIN_PROCESS.md` - Auto-Updater for the in-app flow. No additional server or config is required beyond the GitHub Release itself; `electron-builder`'s `publish.provider: "github"` block in `package.json` wires this up.
 
+**The NSIS artifact filename must never contain a space.** Because this workflow builds with `--publish never` and uploads the raw `dist/*.exe` file itself (rather than letting `electron-builder` publish and rename it), the filename that ends up in `dist/latest.yml` and the filename of the actual uploaded asset must be byte-for-byte identical, or `electron-updater` 404s trying to download the update (see `DECISIONS.md` ADR-014). electron-builder's default NSIS `artifactName` template is `${productName} Setup ${version}.${ext}` (with literal spaces), but it always writes a space-free, GitHub-safe name into `latest.yml`. GitHub's asset upload API also silently rewrites spaces in a filename to dots on upload - so the two space-free names it produces (`latest.yml`'s dash-separated name vs. GitHub's dot-separated rename) never matched. `build.nsis.artifactName` in `package.json` is pinned to `${productName}-Setup-${version}.${ext}` (no spaces) specifically so the built file, the GitHub asset, and `latest.yml` all agree on the same name.
+
 ## Cutting a Release
 
 1. Ensure `CHANGELOG.md`'s `[Unreleased]` section reflects everything shipped since the last tag
@@ -66,6 +68,7 @@ Each job: checkout, Node 20 setup, `npm install` at root, `npm install` in `fron
 6. Push: `git push origin main --tags`
 7. Watch `.github/workflows/release.yml` run for all three platforms at https://github.com/spacesdrive/kinetube/actions
 8. Verify the GitHub Release has all three artifacts plus the `latest*.yml` files before announcing
+9. Verify the `url`/`path` filename inside each `latest*.yml` exactly matches the corresponding uploaded asset's filename (`gh release view vX.Y.Z --json assets` vs. `gh release download vX.Y.Z --pattern "latest*.yml" --output -`) - a mismatch means the in-app updater will 404 even though the release page looks correct
 
 ## Verifying a Release
 

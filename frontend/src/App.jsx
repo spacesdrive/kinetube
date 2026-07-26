@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Badge } from '@/components/ui/badge';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
+import { cleanYouTubeUrl, cleanInstagramUrl } from '@/lib/urlCleaners';
 import { AppSidebar } from './components/AppSidebar';
 import YtdlpAlert from './components/YtdlpAlert';
 import VideoView from './components/VideoView';
@@ -42,90 +43,6 @@ async function fetchYtdlpStatus() {
   return res.json();
 }
 
-// ── URL cleaner ──────────────────────────────────────────────────────────────
-//
-// Strips every query param except the essential ones so users see a clean URL
-// the instant they paste.  Works for all YouTube URL patterns:
-//
-//   youtu.be/ID?si=xyz&pp=abc   →  https://youtu.be/ID
-//   youtube.com/watch?v=ID&si=  →  https://www.youtube.com/watch?v=ID
-//   youtube.com/shorts/ID?si=   →  https://www.youtube.com/shorts/ID
-//   youtube.com/@channel?...    →  https://www.youtube.com/@channel
-//
-// If the URL is not a recognised YouTube URL it is returned unchanged.
-
-function cleanYouTubeUrl(raw) {
-  if (!raw || typeof raw !== 'string') return raw;
-  const trimmed = raw.trim();
-  try {
-    const withProto = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    const u = new URL(withProto);
-    const host = u.hostname.replace(/^(www\.|m\.)/, '');
-
-    if (host !== 'youtube.com' && host !== 'youtu.be') return trimmed;
-
-    const path = u.pathname.replace(/\/$/, '');
-
-    // youtu.be/ID  — drop every query param and fragment
-    if (host === 'youtu.be') {
-      const id = path.slice(1).split('/')[0];
-      if (id && /^[a-zA-Z0-9_-]{11}$/.test(id)) {
-        return `https://youtu.be/${id}`;
-      }
-    }
-
-    // /watch?v=ID  — keep only the v param
-    if (path === '/watch') {
-      const v = u.searchParams.get('v');
-      if (v && /^[a-zA-Z0-9_-]{11}$/.test(v)) {
-        return `https://www.youtube.com/watch?v=${v}`;
-      }
-    }
-
-    // /shorts/ID
-    const shortsM = path.match(/^\/shorts\/([a-zA-Z0-9_-]{11})/);
-    if (shortsM) return `https://www.youtube.com/shorts/${shortsM[1]}`;
-
-    // channel URLs — keep path, drop all query params
-    if (/^\/((?:@[\w.-]+|channel\/UC[\w-]+|c\/[\w-]+|user\/[\w-]+))/.test(path)) {
-      return `https://www.youtube.com${path}`;
-    }
-  } catch {}
-  return trimmed;
-}
-
-// ── Instagram URL cleaner ────────────────────────────────────────────────────
-// Strips tracking params (utm_*, igsh, igshid) from Instagram URLs on paste.
-
-function cleanInstagramUrl(raw) {
-  if (!raw || typeof raw !== 'string') return raw;
-  const trimmed = raw.trim();
-  try {
-    const withProto = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-    const u = new URL(withProto);
-    const host = u.hostname.replace(/^(www\.|m\.)/, '');
-    if (host !== 'instagram.com') return trimmed;
-
-    const path = u.pathname.replace(/\/+$/, '');
-
-    // /p/SHORTCODE — post
-    const postM = path.match(/^\/p\/([a-zA-Z0-9_-]+)/);
-    if (postM) return `https://www.instagram.com/p/${postM[1]}/`;
-
-    // /reel/SHORTCODE or /reels/SHORTCODE
-    const reelM = path.match(/^\/reels?\/([a-zA-Z0-9_-]+)/);
-    if (reelM) return `https://www.instagram.com/reel/${reelM[1]}/`;
-
-    // /stories/USERNAME — keep path, drop all params
-    if (path.startsWith('/stories/')) return `https://www.instagram.com${path}/`;
-
-    // /USERNAME — profile, drop all params
-    const profileM = path.match(/^\/([\w.]+)/);
-    if (profileM) return `https://www.instagram.com${path}/`;
-  } catch {}
-  return trimmed;
-}
-
 // ── Instagram SSE helpers ────────────────────────────────────────────────────
 
 // Used by batch processing — regular POST, no streaming
@@ -151,10 +68,10 @@ function fetchInstagramInfoSSE(url, account, { onProfile, onProgress } = {}) {
     const es = new EventSource(`/api/instagram/info-stream?${qs}`);
 
     es.addEventListener('profile', (e) => {
-      try { onProfile?.(JSON.parse(e.data)); } catch {}
+      try { onProfile?.(JSON.parse(e.data)); } catch { /* malformed event payload - ignore */ }
     });
     es.addEventListener('progress', (e) => {
-      try { onProgress?.(JSON.parse(e.data)); } catch {}
+      try { onProgress?.(JSON.parse(e.data)); } catch { /* malformed event payload - ignore */ }
     });
     es.addEventListener('done', (e) => {
       es.close();
@@ -750,7 +667,7 @@ export default function App() {
     }).then(async (resp) => {
       if (!resp.ok) {
         let errMsg = 'Transcription failed.';
-        try { const d = await resp.json(); errMsg = d.error || errMsg; } catch {}
+        try { const d = await resp.json(); errMsg = d.error || errMsg; } catch { /* response body wasn't JSON - keep the generic message */ }
         setTranscribing(false);
         setTranscribeResult({ error: errMsg });
         return;
@@ -771,7 +688,7 @@ export default function App() {
               setTranscribing(false);
               if (d.success) setTranscribeResult({ text: d.text, outputTxt: d.outputTxt });
             }
-          } catch {}
+          } catch { /* malformed SSE line - ignore */ }
         }
         pump();
       }).catch(() => setTranscribing(false));

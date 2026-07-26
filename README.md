@@ -221,12 +221,14 @@ If you prefer to authenticate outside the app, copy the instaloader session file
 
 Contributions are welcome. To get started:
 
-1. Fork the repository and create a branch from `main`.
-2. Follow the Quick Start instructions above to run the project locally.
-3. Make your changes. Keep commits focused and the diff readable.
-4. Open a pull request with a clear description of what changed and why.
+1. Read [`CLAUDE.md`](CLAUDE.md) - project identity, architecture map, and engineering standards.
+2. Fork the repository and create a branch from `main`.
+3. Follow the Quick Start instructions above to run the project locally.
+4. Make your changes. Keep commits focused and the diff readable - see [`docs/workflows/GIT.md`](docs/workflows/GIT.md).
+5. Run `npm test` (backend + frontend) before opening a pull request - see [`docs/workflows/TESTING.md`](docs/workflows/TESTING.md).
+6. Open a pull request with a clear description of what changed and why.
 
-For larger changes, open an issue first to discuss the approach before investing time in the implementation.
+For larger changes, open an issue first to discuss the approach before investing time in the implementation. If your change touches yt-dlp, FFmpeg, whisper.cpp, or instaloader, read [`docs/philosophy/CROSS_PLATFORM.md`](docs/philosophy/CROSS_PLATFORM.md) first - these are currently Windows-only.
 
 ---
 

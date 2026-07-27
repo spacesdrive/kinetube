@@ -53,6 +53,8 @@ Run before shipping any change that isn't purely covered by the automated tests 
 ### Startup
 - [ ] `npm run dev` from the repo root launches backend, frontend, and the Electron window together
 - [ ] Backend `/health` responds before the Electron window shows content (watch the console log order)
+- [ ] `npm run dev` from a terminal inside an Electron-based editor (VS Code's integrated terminal is the common case) still opens the window - this is the scenario `ELECTRON_RUN_AS_NODE` leaks into, see `DECISIONS.md` ADR-018
+- [ ] Settings -> About shows the running version and "Check for Updates" works: shows "only runs in a packaged build" in dev, and (on a packaged build) either finds/offers an update or reports up to date
 
 ### YouTube
 - [ ] Paste a video URL -> metadata and quality picker appear

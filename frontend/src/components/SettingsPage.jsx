@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { Save, RotateCcw, Folder, CheckCircle } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Save, RotateCcw, Folder, CheckCircle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -100,6 +100,34 @@ export default function SettingsPage({ onSave }) {
   const [settings, setSettings] = useState(() => loadSettings());
   const [saved, setSaved]       = useState(false);
   const [browsingFolder, setBrowsingFolder] = useState(false);
+  const [appVersion, setAppVersion]         = useState(null);
+  // 'idle' | 'checking' | 'up-to-date' | 'dev-mode' | 'error'
+  const [updateCheckState, setUpdateCheckState] = useState('idle');
+
+  useEffect(() => {
+    window.electronAPI?.getAppVersion?.().then(setAppVersion).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!window.electronAPI?.onUpdateStatus) return;
+    return window.electronAPI.onUpdateStatus((data) => {
+      if (data.type === 'checking')      setUpdateCheckState('checking');
+      else if (data.type === 'not-available') setUpdateCheckState('up-to-date');
+      else if (data.type === 'available') setUpdateCheckState('idle'); // UpdateDialog takes over
+      else if (data.type === 'error')     setUpdateCheckState('error');
+    });
+  }, []);
+
+  const checkForUpdates = useCallback(async () => {
+    if (!window.electronAPI?.checkForUpdates) return;
+    setUpdateCheckState('checking');
+    try {
+      const result = await window.electronAPI.checkForUpdates();
+      if (result?.devMode) setUpdateCheckState('dev-mode');
+    } catch {
+      setUpdateCheckState('error');
+    }
+  }, []);
 
   const update = useCallback((section, key, value) => {
     setSettings((prev) => ({ ...prev, [section]: { ...prev[section], [key]: value } }));
@@ -306,19 +334,49 @@ export default function SettingsPage({ onSave }) {
           <CardHeader className="pb-3">
             <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-widest">About</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-1">
-            <p>
-              <span className="font-semibold text-foreground">KineTube</span> — local YouTube &amp; Instagram downloader
-            </p>
-            <p>
-              Powered by{' '}
-              {['yt-dlp', 'ffmpeg', 'instaloader', 'whisper.cpp'].map((t) => (
-                <Badge key={t} variant="secondary" className="mr-1 text-[11px]">{t}</Badge>
-              ))}
-            </p>
-            <p className="text-xs text-muted-foreground mt-3">
-              All downloads and transcriptions happen locally on your machine. No data is sent to any third-party server.
-            </p>
+          <CardContent className="space-y-4">
+            {appVersion && (
+              <>
+                <SettingRow
+                  label="Version"
+                  hint={
+                    updateCheckState === 'up-to-date' ? "You're on the latest version."
+                    : updateCheckState === 'dev-mode' ? 'Update checks only run in a packaged build.'
+                    : updateCheckState === 'error' ? 'Could not check for updates. Try again later.'
+                    : undefined
+                  }
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="font-mono text-xs">v{appVersion}</Badge>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={checkForUpdates}
+                      disabled={updateCheckState === 'checking'}
+                      className="gap-1.5"
+                    >
+                      <RefreshCw size={13} className={updateCheckState === 'checking' ? 'animate-spin' : ''} />
+                      {updateCheckState === 'checking' ? 'Checking…' : 'Check for Updates'}
+                    </Button>
+                  </div>
+                </SettingRow>
+                <Separator />
+              </>
+            )}
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p>
+                <span className="font-semibold text-foreground">KineTube</span> — local YouTube &amp; Instagram downloader
+              </p>
+              <p>
+                Powered by{' '}
+                {['yt-dlp', 'ffmpeg', 'instaloader', 'whisper.cpp'].map((t) => (
+                  <Badge key={t} variant="secondary" className="mr-1 text-[11px]">{t}</Badge>
+                ))}
+              </p>
+              <p className="text-xs text-muted-foreground mt-3">
+                All downloads and transcriptions happen locally on your machine. No data is sent to any third-party server.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>

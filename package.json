@@ -4,7 +4,7 @@
   "description": "Local YouTube & Instagram downloader",
   "main": "electron/main.js",
   "scripts": {
-    "dev": "concurrently -n backend,frontend,electron -c cyan,magenta,yellow \"cd backend && node --no-deprecation server.js\" \"cd frontend && npx vite\" \"wait-on http://localhost:3001/health http://localhost:5173 && electron --no-deprecation .\"",
+    "dev": "concurrently -n backend,frontend,electron -c cyan,magenta,yellow \"cd backend && node --no-deprecation server.js\" \"cd frontend && npx vite\" \"wait-on http://localhost:3001/health http://localhost:5173 && node scripts/run-electron.js\"",
     "test": "npm run test:backend && npm run test:frontend",
     "test:backend": "cd backend && npm test",
     "test:frontend": "cd frontend && npm test",

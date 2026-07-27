@@ -13,6 +13,24 @@ Nothing yet.
 
 ---
 
+## [1.4.1] - 2026-07-27
+
+### Fixed
+- **`npm run dev` crashed on startup before any window opened** - `TypeError: Cannot read properties of undefined (reading 'getVersion')` inside `electron-updater`. Root cause: `ELECTRON_RUN_AS_NODE=1` was present in the shell environment (commonly leaked by Electron-based terminals like VS Code/Cursor), which makes any Electron binary run as plain Node.js instead of the real Electron runtime, so `electron.app` never exists. `npm run dev`'s Electron step now runs through a new `scripts/run-electron.js` wrapper that strips this variable before spawning Electron. Only affects local development - packaging (`dist:*`) and the installed app are unaffected. See `DECISIONS.md` ADR-018.
+
+### Added
+
+**Version display and manual update check in Settings**
+- The About card in Settings now shows the running app version and a "Check for Updates" button, so a user isn't limited to the one automatic check five seconds after launch.
+- New IPC channels: `get-app-version`, `check-for-updates`; `update-status` now also forwards `checking` and `not-available` events.
+- The button is a no-op with a clear "only runs in a packaged build" message in dev, since `electron-updater` requires a packaged build's `app-update.yml`.
+- See `DECISIONS.md` ADR-019.
+
+### Documentation
+- `README.md` was updated to reflect features shipped in v1.3.0-v1.4.0 (resume downloads, in-app update check) and to correct two stale lines (instaloader's install method, whisper.cpp's per-platform install method) - this had fallen behind for several releases.
+
+---
+
 ## [1.4.0] - 2026-07-27
 
 ### Added

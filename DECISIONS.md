@@ -375,3 +375,50 @@ Records every significant architectural decision, the alternatives considered, a
 - Only single-video downloads are covered - bulk/sequential downloads and Instagram downloads are not tracked by this registry; resuming a bulk batch mid-sequence is a materially bigger feature and is tracked as a separate `ROADMAP.md` item rather than folded in here.
 - The record is best-effort: if the app is killed before the `Destination:` line is even parsed, the resume prompt falls back to showing the raw URL instead of a title. This is a cosmetic gap, not a functional one.
 - Covered by `backend/test/pendingDownloads.test.js` (id stability/collision, title updates, removal, corrupt/missing state file) and a `backend/test/routes.test.js` case for the two new routes; the frontend banner has its own test (`frontend/src/components/__tests__/ResumeDownloadsBanner.test.jsx`).
+
+---
+
+## ADR-018: `scripts/run-electron.js` strips `ELECTRON_RUN_AS_NODE` before launching Electron in dev
+
+**Date:** 2026-07-27
+**Status:** Accepted
+
+**Decision:** `npm run dev`'s Electron step no longer invokes the `electron` binary directly (`electron --no-deprecation .`). It now runs `node scripts/run-electron.js`, a small wrapper that resolves the real Electron binary path via `require('electron')`, deletes `ELECTRON_RUN_AS_NODE` from the child's environment, and spawns it with `stdio: 'inherit'`.
+
+**Root cause found:** `npm run dev` crashed on startup with `TypeError: Cannot read properties of undefined (reading 'getVersion')` inside `electron-updater`'s `ElectronAppAdapter`, before any window opened. The trace showed the crash running under plain `Node.js v20.18.3`, not Electron's runtime - `ELECTRON_RUN_AS_NODE=1` was present in the shell's environment (confirmed via `env | grep -i electron`), which makes any Electron binary behave as a bare Node.js process instead of launching the Chromium/Electron runtime. In that mode, `electron.app` never exists, so `electron-updater`'s constructor (which reads `app.getVersion()` at construction time, the moment `require('electron-updater')` first touches its `autoUpdater` getter in `electron/main.js`) throws immediately. This variable is commonly inherited from an Electron-based host process (VS Code, Cursor, and other Electron-based terminals set it for their own internal Node child processes), so it can appear in a dev shell without the user ever setting it themselves.
+
+**Alternatives considered:**
+- Tell the user to `unset ELECTRON_RUN_AS_NODE` (or the Windows equivalent) before running `npm run dev` every time
+- Defer `require('electron-updater')` in `electron/main.js` until inside `app.whenReady()`, so the crash only happens if `setupAutoUpdater()` actually runs (it already early-returns in dev via `if (isDev) return;`)
+- A `cross-env`-based `package.json` script to clear the variable inline
+
+**Reasoning:**
+- The variable is environmental, not something this project's own scripts set, and not something a contributor should have to know to unset by hand every session just to run `npm start` - the fix belongs in the repo, not in a setup instruction nobody will remember
+- Deferred `require('electron-updater')` was considered but doesn't fully solve it: the top-level `const { autoUpdater } = require('electron-updater');` in `electron/main.js` triggers the crash the instant the file is loaded (accessing the `autoUpdater` export is itself a lazy getter that constructs the updater), before any `isDev` check ever runs - moving the require would work but couples a workaround for an environment quirk into application code, rather than into the process-launch step where the actual problem (wrong environment) lives
+- A dedicated Node wrapper needs no new dependency (`electron` is already a devDependency, and `require('electron')` from plain Node returns the resolved binary path, which is the documented way to spawn it programmatically) and fixes the problem at its actual source: the environment the Electron process inherits
+
+**Trade-offs:**
+- `dist:*`/`electron-builder` packaging scripts are unaffected - they invoke `electron-builder`, not `electron` directly, so this class of crash cannot happen during a build, only during `npm run dev`
+- The packaged, installed app is also unaffected - end users launch the built `.exe`/`.dmg`/`.AppImage` directly, not through this wrapper
+
+---
+
+## ADR-019: App version and a manual "Check for Updates" button in Settings
+
+**Date:** 2026-07-27
+**Status:** Accepted
+
+**Decision:** `SettingsPage.jsx`'s About card now shows the running app version (`window.electronAPI.getAppVersion()`, backed by a new `get-app-version` IPC handler that returns Electron's `app.getVersion()`) next to a "Check for Updates" button (`window.electronAPI.checkForUpdates()`, backed by a new `check-for-updates` IPC handler calling `autoUpdater.checkForUpdates()`). `electron/main.js`'s `setupAutoUpdater()` now also forwards the `checking-for-update` and `update-not-available` autoUpdater events (previously only `update-available`, `download-progress`, `update-downloaded`, and `error` were forwarded), so the button can show "Checking…" and "You're on the latest version" instead of doing nothing when there's no update.
+
+**Alternatives considered:**
+- Only show the version, no manual check button (rely entirely on the existing 5-second-after-launch automatic check)
+- Read the version from a Vite build-time constant instead of an IPC round-trip
+
+**Reasoning:**
+- The existing auto-update flow only checks once, five seconds after launch - a user who dismisses `UpdateDialog` (or whose app was open before a release went out) has no way to ask again without restarting the app. A manual check closes that gap.
+- `electron-updater`'s `checkForUpdates()` requires `app-update.yml`, which `electron-builder` only generates for a packaged build (see ADR-018) - calling it in dev would throw. The `check-for-updates` handler special-cases `isDev` and returns `{ devMode: true }` instead, which the Settings UI surfaces as "Update checks only run in a packaged build" rather than a confusing error.
+- `app.getVersion()` via IPC is the authoritative source (reads the actual running app's `package.json`, correct in both dev and packaged builds) versus a Vite `define` constant, which would need to be kept in sync separately and wouldn't reflect what's actually installed if a build were ever run against a stale checkout.
+- The version/update UI is guarded by `window.electronAPI?.getAppVersion` and hides entirely when absent (e.g. the frontend loaded outside Electron), matching the existing guard pattern used everywhere else `window.electronAPI` is called.
+
+**Trade-offs:**
+- No dedicated test coverage was added for this - it's thin IPC plumbing (three one-line handlers, a getter, a button) with no meaningful logic to unit test beyond what `UpdateDialog.jsx`'s existing manual-verification checklist already covers; exercised via the manual checklist in `docs/workflows/TESTING.md` instead.

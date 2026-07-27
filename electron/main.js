@@ -130,6 +130,9 @@ ipcMain.handle('open-folder-dialog', async () => {
   return canceled ? null : filePaths[0];
 });
 
+// ── App version: read once from package.json via Electron, shown in Settings ──
+ipcMain.handle('get-app-version', () => app.getVersion());
+
 // ── Auto-updater ──────────────────────────────────────────────────────────────
 function setupAutoUpdater() {
   if (isDev) return; // app-update.yml is only present in packaged builds
@@ -165,6 +168,14 @@ function setupAutoUpdater() {
     mainWindow?.webContents.send('update-status', { type: 'downloaded' });
   });
 
+  autoUpdater.on('checking-for-update', () => {
+    mainWindow?.webContents.send('update-status', { type: 'checking' });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    mainWindow?.webContents.send('update-status', { type: 'not-available' });
+  });
+
   autoUpdater.on('error', (err) => {
     writeLog(`[updater:err] ${err.message}\n`);
     mainWindow?.webContents.send('update-status', {
@@ -183,6 +194,15 @@ function setupAutoUpdater() {
 
 ipcMain.handle('download-update', () => autoUpdater.downloadUpdate());
 ipcMain.handle('install-update',  () => autoUpdater.quitAndInstall(false, true));
+
+// Manual "Check for Updates" trigger from Settings. electron-updater requires
+// app-update.yml, which electron-builder only generates for a packaged build -
+// calling checkForUpdates() in dev would just throw, so tell the renderer why
+// instead of surfacing that as a generic error.
+ipcMain.handle('check-for-updates', () => {
+  if (isDev) return { devMode: true };
+  return autoUpdater.checkForUpdates().then(() => ({ devMode: false }));
+});
 
 // ── Enforce a single instance ─────────────────────────────────────────────────
 const gotLock = app.requestSingleInstanceLock();

@@ -36,10 +36,12 @@ There is no server to sign up for, no API key to buy, and no usage limit. Everyt
 | **Audio extraction** | Rip MP3 from any video with one click |
 | **Transcription** | Local Whisper AI transcription in 13 languages, five model sizes |
 | **Batch downloads** | Mix YouTube and Instagram URLs in one queue |
+| **Resume interrupted downloads** | If the app closes mid-download, the next launch offers to pick up where it left off |
 | **Dark mode** | System-aware theme with manual override |
 | **Private content** | Instagram login with 2FA support and multi-account management |
 | **Filename control** | Prefix, suffix, numbering, and custom yt-dlp templates |
 | **Progress streaming** | Real-time speed, ETA, and phase indicators via SSE |
+| **In-app updates** | Current version and a manual "Check for Updates" button live in Settings |
 
 ---
 
@@ -133,6 +135,8 @@ npm run dist:linux  # Linux AppImage
 
 KineTube calls yt-dlp under the hood. When you paste a URL and click Fetch, the backend runs `yt-dlp -J` to pull metadata and return available format streams to the frontend. On download, it constructs a format selector string such as `bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]` and streams progress back line-by-line over SSE. If FFmpeg is available, video and audio tracks are merged automatically.
 
+If KineTube closes while a video is downloading, it remembers the request and offers to resume it on the next launch - yt-dlp resumes its own partial file rather than starting over.
+
 ### Instagram
 
 Public content uses yt-dlp directly. Profile pages and private content route through `instaloader`, a Python library that handles Instagram's session-based authentication and pagination. KineTube wraps this in two helper scripts (`instaloader_login.py`, `instaloader_profile.py`) that communicate with the Express backend over stdin/stdout. Sessions are stored locally under `backend/sessions/` as binary cookie files.
@@ -152,8 +156,8 @@ After a download completes, or for any existing audio/video file, KineTube extra
 | Backend | Express 5, Node.js |
 | Downloader | yt-dlp (auto-managed) |
 | Merger | FFmpeg (auto-managed) |
-| Transcription | whisper.cpp v1.8.4 BLAS x64 (auto-managed) |
-| Instagram scraping | instaloader v4.15.1 (auto-managed) |
+| Transcription | whisper.cpp v1.8.4 (auto-managed - prebuilt on Windows, built from source on macOS/Linux) |
+| Instagram scraping | instaloader (Python, `pip install instaloader`) |
 | Theme | next-themes |
 | Icons | Lucide React |
 
@@ -166,7 +170,7 @@ kinetube/
   electron/           # Electron main process and preload
   backend/
     routes/           # Express route handlers (download, info, instagram, transcribe, setup)
-    utils/            # yt-dlp manager, binary helpers
+    utils/            # yt-dlp/ffmpeg/whisper.cpp managers, shared download helper, pending-download registry
     sessions/         # Instagram session files (gitignored)
     downloads/        # Default download output (gitignored)
     models/           # Whisper model files (gitignored)
@@ -174,6 +178,7 @@ kinetube/
     src/
       components/     # React components (shadcn-based UI)
       components/ui/  # shadcn/ui primitives
+      lib/             # Shared frontend helpers (fetch client, URL cleaning, cn())
 ```
 
 ---

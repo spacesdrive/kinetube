@@ -13,6 +13,19 @@ Nothing yet.
 
 ---
 
+## [1.5.0] - 2026-07-27
+
+### Added
+
+**Pause and Resume a download in progress**
+- `ProgressModal.jsx` now shows a Pause button during an active single-video download, and a Resume button once paused.
+- New route: `POST /api/download/:id/pause`. Pause kills the yt-dlp process (the same mechanism Cancel already used) but keeps the pending-download record instead of clearing it, and sends a new `paused` SSE event instead of `done`. Resume replays the exact original request; yt-dlp continues the same partial file on its own.
+- Pausing and force-closing the app compose for free: a paused download that's still paused when the app closes shows up in the resume-after-restart banner too, since both features share the same underlying record.
+- Only single-video YouTube downloads are covered - no Pause button on bulk/sequential or Instagram downloads yet.
+- See `DECISIONS.md` ADR-020.
+
+---
+
 ## [1.4.1] - 2026-07-27
 
 ### Fixed

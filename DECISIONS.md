@@ -422,3 +422,28 @@ Records every significant architectural decision, the alternatives considered, a
 
 **Trade-offs:**
 - No dedicated test coverage was added for this - it's thin IPC plumbing (three one-line handlers, a getter, a button) with no meaningful logic to unit test beyond what `UpdateDialog.jsx`'s existing manual-verification checklist already covers; exercised via the manual checklist in `docs/workflows/TESTING.md` instead.
+
+---
+
+## ADR-020: Pause/Resume a single-video download via the same kill-and-continue mechanism as crash recovery
+
+**Date:** 2026-07-27
+**Status:** Accepted
+
+**Decision:** `ProgressModal.jsx` gets a "Pause" button during an active single-video download (next to Cancel) and a "Resume" button once paused. Pause calls a new `POST /api/download/:id/pause` route, which looks up the in-progress request in a module-level `activeDownloads` Map (keyed by the same `pendingId` used by the resume-after-restart registry from ADR-017) and kills the yt-dlp process with `SIGTERM` - the identical mechanism `Cancel` already used. The only difference is bookkeeping: a paused request keeps its `pendingDownloads.json` record and sends a new `paused` SSE event instead of `done`, so `Resume` can replay the exact original request and yt-dlp continues the same `.part` file. `Resume` on the frontend does not call any resume-registry endpoint - it directly replays the arguments last passed to `startSingleDownload` (`lastSingleDownloadArgsRef`), since the download is still this session's state, not a lookup from disk.
+
+**Alternatives considered:**
+- True OS-level process suspension (Unix `SIGSTOP`/`SIGCONT`) so the download freezes mid-flight and resumes exactly where the TCP connection left off
+- A native addon (e.g. `ntsuspend`) to get suspend/resume parity on Windows, which has no signal-based process suspension
+- Route Resume-from-pause through `GET /api/download/pending` (the same list `ResumeDownloadsBanner` uses) instead of replaying local state
+
+**Reasoning:**
+- Real process suspension doesn't have a cross-platform story: POSIX has `SIGSTOP`/`SIGCONT` natively, but Windows has no equivalent without a native addon (`process.kill(pid, 'SIGSTOP')` is a no-op/unsupported on Windows per Node's own docs) - and Windows is this project's only fully-verified platform (see `docs/philosophy/CROSS_PLATFORM.md`), so a Windows-incompatible pause button would be a regression on the one platform that has to work.
+- yt-dlp already writes its `.part` file incrementally as it downloads, so killing the process (same as Cancel) and letting yt-dlp's own default `--continue` behavior pick it back up on the next identical request is exactly as reliable as true suspension for this app's purposes, with none of the platform risk. This is the same insight ADR-017 already relied on for crash recovery - Pause is really just "cancel, but remember it as resumable" rather than a new resume mechanism.
+- Reusing `pendingDownloads.js`'s existing record (rather than inventing a second, parallel "paused download" store) means a paused-then-force-closed download is *also* correctly offered back by `ResumeDownloadsBanner` on the next launch - pause and crash-recovery resume compose for free instead of needing to be kept in sync.
+- Replaying `lastSingleDownloadArgsRef` locally (rather than fetching from `/api/download/pending`) avoids an unnecessary round-trip and race: the frontend already has the exact args it used to start the download, in the same session, in memory.
+- A separate in-memory `activeDownloads` Map (rather than trying to derive "is this pending record currently running" from the JSON file alone) is necessary because `POST /:id/pause` is a different HTTP request than the `GET /download` SSE stream - the two only share state through this module-level registry, cleared in every exit path (`finish()`, `proc.on('error')`, `res.on('close')`) so it can never point at a dead process.
+
+**Trade-offs:**
+- Only single-video downloads are covered, matching ADR-017's scope decision - bulk/sequential downloads have no Pause button.
+- Like ADR-017, this is best-effort: if the whole app is killed while paused, the record persists and shows up in `ResumeDownloadsBanner` on next launch (a feature, not a bug - see above) - but there's no dedicated integration test exercising a real pause-mid-download-and-resume cycle, since that requires a real yt-dlp process and real network access, consistent with this project's existing policy of not automating real tool execution (see `docs/workflows/TESTING.md`). Covered by unit/route tests for the pieces that don't require a live download (the 404-when-nothing-active case) and by `ProgressModal.jsx`'s test suite for the UI states.

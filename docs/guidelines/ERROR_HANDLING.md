@@ -79,7 +79,7 @@ async function fetchInfo(url) {
 
 Components catch this and surface it through the existing alert/banner UI (`YtdlpAlert.jsx`) or local error state - never an unhandled rejection or a raw `alert()`.
 
-SSE consumers (`ProgressModal.jsx`) branch on the parsed event name: `phase` updates a status line, `progress` updates a percentage/speed readout, `warning` shows a non-blocking inline note, `error` stops the operation and shows a retry affordance, `done` shows success and any follow-up action (e.g. "Transcribe this file").
+SSE consumers (`ProgressModal.jsx`) branch on the parsed event name: `phase` updates a status line, `progress` updates a percentage/speed readout, `warning` shows a non-blocking inline note, `error` stops the operation and shows a retry affordance, `done` shows success and any follow-up action (e.g. "Transcribe this file"). `/api/download` also has a `paused` event, sent when the client explicitly pauses a single-video download (`POST /api/download/:id/pause`) - like `done`, it ends the SSE stream, but `ProgressModal.jsx` shows a Resume affordance instead of a success/failure message (see `DECISIONS.md` ADR-020).
 
 ## Logging
 

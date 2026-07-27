@@ -15,8 +15,9 @@ All routes are mounted under `/api` (plus the top-level `/health` and the inline
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/download` | SSE stream. Builds a yt-dlp format selector from query params, spawns yt-dlp with `--newline --progress`, and streams `phase`/`progress`/`done`/`error` events. Emits a `warning` event (not fatal) if ffmpeg is missing and the requested quality needs merging. Records the request in `pendingDownloads.js` on start and clears it on any in-process end (done, spawn error, or client cancel) - see `docs/architecture/backend/MANAGERS.md` - "Resuming an interrupted download". |
-| GET | `/api/download/pending` | Returns single-video downloads still recorded as in-flight - only non-empty if the app was killed mid-download last time. |
+| GET | `/api/download` | SSE stream. Builds a yt-dlp format selector from query params, spawns yt-dlp with `--newline --progress`, and streams `phase`/`progress`/`done`/`paused`/`error` events. Emits a `warning` event (not fatal) if ffmpeg is missing and the requested quality needs merging. Records the request in `pendingDownloads.js` on start and clears it on any in-process end (done, spawn error, or client cancel) - but NOT when paused via the route below. See `docs/architecture/backend/MANAGERS.md` - "Resuming an interrupted download". |
+| POST | `/api/download/:id/pause` | Pauses the single-video download identified by the `id` the `start` SSE event carried. Kills the yt-dlp process (same as cancel) but keeps the pending-download record, so the download can be resumed later - see `DECISIONS.md` ADR-020. `404` if `id` isn't a currently-active download. |
+| GET | `/api/download/pending` | Returns single-video downloads still recorded as in-flight - non-empty if the app was killed mid-download last time, or if one is currently paused. |
 | DELETE | `/api/download/pending/:id` | Dismisses a resumable download without restarting it (the partial file, if any, is left on disk). |
 
 ## Setup (`backend/routes/setup.js`)

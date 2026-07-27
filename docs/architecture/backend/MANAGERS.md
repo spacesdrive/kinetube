@@ -61,6 +61,8 @@ A record only survives to the next app launch if the whole process was killed be
 
 Only single-video downloads are tracked this way; bulk/sequential and Instagram downloads are not - see `ROADMAP.md`. See `DECISIONS.md` ADR-017 for the full reasoning and alternatives considered.
 
+**Pausing** (`POST /api/download/:id/pause`) uses this same mechanism deliberately: it kills the yt-dlp process exactly like a cancel, but skips clearing the pending-download record, so the in-app "Resume" button (and, if the app happens to close while paused, `ResumeDownloadsBanner` on next launch too) can pick the `.part` file back up. There is no real OS-level process suspension - Windows has no signal-based equivalent to POSIX `SIGSTOP` without a native addon, so "pause" and "cancel" are the same kill, differing only in whether the record is kept. See `DECISIONS.md` ADR-020.
+
 ## Adding or Extending a Manager
 
 See `docs/features/NEW_TOOL_MANAGER.md`. Before writing platform-specific download logic, read `docs/philosophy/CROSS_PLATFORM.md` for the currently-established pattern (platform-keyed pure resolver functions + a runtime constant computed from `process.platform`) and the verification-status caveat for the macOS/Linux paths implemented so far.

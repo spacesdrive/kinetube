@@ -134,3 +134,14 @@ describe('GET /api/download/pending and DELETE /api/download/pending/:id', () =>
     }
   });
 });
+
+describe('POST /api/download/:id/pause', () => {
+  test('returns 404 for an id with no active (currently downloading) request', async () => {
+    // Pause only targets a live in-memory yt-dlp process - a pending-download
+    // record on disk (from the resume-after-restart registry) is not enough,
+    // since there is nothing running to actually pause.
+    const res = await request(app).post('/api/download/some-id-that-was-never-started/pause');
+    assert.equal(res.status, 404);
+    assert.ok(res.body.error);
+  });
+});

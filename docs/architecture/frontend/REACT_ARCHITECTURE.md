@@ -50,7 +50,7 @@ frontend/src/
     ChannelView.jsx          YouTube channel/playlist video grid
     VideoView.jsx             Single video metadata + quality picker
     BatchResultsView.jsx     Mixed-queue batch download results
-    ProgressModal.jsx        Shared SSE progress UI (download/transcribe/setup); has a component test suite
+    ProgressModal.jsx        Shared SSE progress UI (download/transcribe/setup); single-video downloads have Pause/Resume, see DECISIONS.md ADR-020; has a component test suite
     ResumeDownloadsBanner.jsx  Offers to resume a single-video download interrupted by the app closing; has a component test suite
     __tests__/               Vitest + Testing Library tests (ProgressModal.jsx, ResumeDownloadsBanner.jsx)
     DownloadSettings.jsx     Quality/format/filename-template controls

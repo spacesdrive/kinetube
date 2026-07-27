@@ -14,6 +14,11 @@ const {
 
 const { DOWNLOADS_DIR: DEFAULT_DOWNLOADS_DIR } = require('../utils/paths');
 
+// Active single-video downloads, keyed by pendingId, so POST /download/:id/pause
+// (a separate HTTP request) can reach into the GET /download SSE handler's
+// closure and pause it. See "Pausing a download" below.
+const activeDownloads = new Map();
+
 const QUALITY_FORMATS = {
   best: 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo+bestaudio/best',
   '2160p': 'bestvideo[height<=2160][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=2160]+bestaudio/best',
@@ -142,8 +147,24 @@ router.get('/download', (req, res) => {
     }
   }, 20000);
 
+  // Set by pause() below. Kept as a plain closure variable (not part of the
+  // activeDownloads Map's value) so finish() and the SSE res.on('close')
+  // handler always agree on it regardless of firing order - see "Pausing a
+  // download" below.
+  let isPaused = false;
+
   const finish = (code) => {
     clearInterval(keepAlive);
+    activeDownloads.delete(pendingId);
+
+    if (isPaused) {
+      // Keep the pending-download record - Resume re-issues the identical
+      // request and yt-dlp picks the .part file back up on its own.
+      send('paused', { message: 'Download paused.' });
+      if (!res.writableEnded) res.end();
+      return;
+    }
+
     removePendingDownload(pendingId);
     // Large retry value tells EventSource not to reconnect immediately.
     if (!res.writableEnded) res.write('retry: 3600000\n\n');
@@ -219,11 +240,26 @@ router.get('/download', (req, res) => {
     sequenceNum: seqNum,
   });
 
-  // Send start — willMerge tells the frontend to pre-scale the progress bar
-  send('start', { url: parsed.cleanUrl, quality, audioOnly: isAudioOnly, willMerge });
+  // Send start — willMerge tells the frontend to pre-scale the progress bar.
+  // id lets the frontend later call POST /download/:id/pause on this request.
+  send('start', { id: pendingId, url: parsed.cleanUrl, quality, audioOnly: isAudioOnly, willMerge });
 
   // ── Spawn ────────────────────────────────────────────────────────────────────
   const proc = spawn(YTDLP_EXE_PATH, args, { windowsHide: true });
+
+  // ── Pausing a download ────────────────────────────────────────────────────
+  // "Pause" is not OS-level process suspension (SIGSTOP has no Windows
+  // equivalent without a native addon) - it is the same abrupt SIGTERM kill
+  // "Cancel" already used, just with the pending-download record deliberately
+  // kept instead of cleared. yt-dlp already writes its .part file
+  // incrementally, so an abrupt kill here is exactly as resumable as the
+  // crash-recovery path in pendingDownloads.js (see DECISIONS.md ADR-020).
+  activeDownloads.set(pendingId, {
+    pause: () => {
+      isPaused = true;
+      if (proc.exitCode === null) proc.kill('SIGTERM');
+    },
+  });
 
   let videoTitle = '';
   let firstDestPath = '';   // actual filesystem path of the first output file
@@ -307,6 +343,7 @@ router.get('/download', (req, res) => {
   proc.on('close', finish);
   proc.on('error', (err) => {
     clearInterval(keepAlive);
+    activeDownloads.delete(pendingId);
     removePendingDownload(pendingId);
     send('done', { success: false, message: `Failed to start yt-dlp: ${err.message}` });
     if (!res.writableEnded) res.end();
@@ -314,12 +351,27 @@ router.get('/download', (req, res) => {
 
   // Cancel: client closed the SSE stream. Deliberately removes the pending-download
   // record too - a user-initiated cancel should not be offered back as "resume" on
-  // the next launch, only a download that was cut off by the app itself closing.
+  // the next launch, only a download that was cut off by the app itself closing (or
+  // explicitly paused - isPaused is set by pause() above, shared via closure so this
+  // handler agrees with finish() regardless of which one runs first).
   res.on('close', () => {
     clearInterval(keepAlive);
-    removePendingDownload(pendingId);
+    activeDownloads.delete(pendingId);
+    if (!isPaused) removePendingDownload(pendingId);
     if (proc.exitCode === null) proc.kill('SIGTERM');
   });
+});
+
+// POST /api/download/:id/pause — pause an in-progress single-video download.
+// Kills the yt-dlp process (same mechanism as cancel) but keeps the pending-
+// download record so the exact request can be re-issued later; yt-dlp resumes
+// its own partial file. 404 if the id isn't an active download (already
+// finished, already paused, or never existed).
+router.post('/download/:id/pause', (req, res) => {
+  const entry = activeDownloads.get(req.params.id);
+  if (!entry) return res.status(404).json({ error: 'No active download with that id.' });
+  entry.pause();
+  res.json({ success: true });
 });
 
 // GET /api/download/pending — single-video downloads that were still in

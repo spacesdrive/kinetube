@@ -53,9 +53,11 @@ Update this file whenever a feature ships (move to `CHANGELOG.md`) or when prior
 
 **Shipped 2026-07-27** for single-video YouTube downloads. `backend/utils/pendingDownloads.js` records an in-flight download's request and clears it on any normal end (success, failure, cancel); a record surviving to the next launch means the app itself was killed mid-download. `ResumeDownloadsBanner.jsx` offers to resume it, re-issuing the identical request so yt-dlp's own `--continue` behavior picks up the partial file. See `DECISIONS.md` ADR-017.
 
+**Live Pause/Resume, shipped 2026-07-27.** `ProgressModal.jsx` now has a Pause button during an active single-video download (`POST /api/download/:id/pause`) and a Resume button once paused - same kill-and-continue mechanism as the crash-recovery resume above, just triggered explicitly instead of by the app closing. See `DECISIONS.md` ADR-020.
+
 **Remaining work:**
-- Bulk/sequential downloads and Instagram downloads are not tracked by this registry yet - resuming mid-batch is a bigger feature (needs to persist queue position and per-item state, not just one request)
-- No verification yet that yt-dlp's resume actually re-attaches to a `.part` file compared to just re-downloading from 0% - add to the manual checklist in `docs/workflows/TESTING.md` and confirm on a real large download
+- Bulk/sequential downloads and Instagram downloads are not tracked by this registry yet, and have no Pause button - resuming/pausing mid-batch is a bigger feature (needs to persist queue position and per-item state, not just one request)
+- No verification yet that yt-dlp's resume actually re-attaches to a `.part` file compared to just re-downloading from 0% - added to the manual checklist in `docs/workflows/TESTING.md`, but not yet confirmed on a real large download
 - If the user changes their download folder in Settings between the interrupted attempt and clicking Resume, the resume still targets the *original* folder (correct for the underlying `.part` file, but potentially surprising) - consider surfacing the target folder in the banner
 
 ---
@@ -74,9 +76,9 @@ The current `dmg` target is unsigned. Before wide distribution, macOS builds nee
 
 `BatchResultsView.jsx` currently handles a manually pasted mixed queue of YouTube/Instagram URLs. A full playlist URL (`youtube.com/playlist?list=...`) is not yet a first-class input type distinct from a channel's `/videos` tab.
 
-### Resume support for bulk and Instagram downloads
+### Pause/Resume support for bulk and Instagram downloads
 
-Follow-on to the single-video resume feature above. Would need the pending-download registry to track a whole batch's queue position and per-item state, not just one request - scoped out of the initial feature deliberately (see `DECISIONS.md` ADR-017's trade-offs).
+Follow-on to the single-video resume and pause features above. Would need the pending-download registry to track a whole batch's queue position and per-item state, not just one request - scoped out of the initial feature deliberately (see `DECISIONS.md` ADR-017 and ADR-020's trade-offs).
 
 ### CI check for release-asset name consistency
 

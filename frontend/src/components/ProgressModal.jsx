@@ -1,5 +1,5 @@
 import {
-  X, CheckCircle, XCircle, Download, Music, Check, ArrowDown, RefreshCw, AlertTriangle,
+  X, CheckCircle, XCircle, Download, Music, Check, ArrowDown, RefreshCw, AlertTriangle, Pause, RotateCcw,
 } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogTitle,
@@ -43,9 +43,9 @@ function StepBadge({ phase, isMultiFile }) {
 }
 
 // ── Single download panel ─────────────────────────────────────────────────────
-function SingleDownload({ item, onClose, onCancel, onTranscribe, transcribing, transcribeResult }) {
+function SingleDownload({ item, onClose, onCancel, onPause, onResumePaused, onTranscribe, transcribing, transcribeResult }) {
   const {
-    title, percent = 0, speed, eta, filename, merging, done, success,
+    title, percent = 0, speed, eta, filename, merging, done, paused, success,
     message, warning, audioOnly, quality, phaseLabel, phase, isMultiFile, filePath,
   } = item;
 
@@ -92,7 +92,12 @@ function SingleDownload({ item, onClose, onCancel, onTranscribe, transcribing, t
           <DownloadProgress percent={percent} merging={merging} />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              {merging ? (
+              {paused ? (
+                <>
+                  <Pause size={11} className="text-amber-500" />
+                  <span className="text-amber-600 font-medium">Paused</span>
+                </>
+              ) : merging ? (
                 <>
                   <RefreshCw size={11} className="animate-spin text-purple-500" />
                   <span className="text-purple-600 font-medium">{phaseLabel || 'Processing...'}</span>
@@ -106,7 +111,7 @@ function SingleDownload({ item, onClose, onCancel, onTranscribe, transcribing, t
                 </>
               )}
             </span>
-            {eta && !merging && <span>ETA {eta}</span>}
+            {eta && !merging && !paused && <span>ETA {eta}</span>}
           </div>
         </div>
       )}
@@ -183,10 +188,24 @@ function SingleDownload({ item, onClose, onCancel, onTranscribe, transcribing, t
       {/* Actions */}
       {done ? (
         <Button variant="outline" className="w-full" onClick={onClose}>Close</Button>
+      ) : paused ? (
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1 border-red-200 text-red-600 hover:bg-red-50" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button className="flex-1 gap-1.5" onClick={onResumePaused}>
+            <RotateCcw size={14} /> Resume
+          </Button>
+        </div>
       ) : (
-        <Button variant="outline" className="w-full border-red-200 text-red-600 hover:bg-red-50" onClick={onCancel}>
-          Cancel Download
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1 gap-1.5" onClick={onPause}>
+            <Pause size={14} /> Pause
+          </Button>
+          <Button variant="outline" className="flex-1 border-red-200 text-red-600 hover:bg-red-50" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -311,7 +330,7 @@ function BulkDownload({ items, onClose, onCancel }) {
 }
 
 // ── Modal wrapper ─────────────────────────────────────────────────────────────
-export default function ProgressModal({ download, onClose, onCancel, onTranscribe, transcribing, transcribeResult }) {
+export default function ProgressModal({ download, onClose, onCancel, onPause, onResumePaused, onTranscribe, transcribing, transcribeResult }) {
   if (!download) return null;
 
   const isBulk = Array.isArray(download.items);
@@ -336,6 +355,8 @@ export default function ProgressModal({ download, onClose, onCancel, onTranscrib
             item={download}
             onClose={onClose}
             onCancel={onCancel}
+            onPause={onPause}
+            onResumePaused={onResumePaused}
             onTranscribe={onTranscribe}
             transcribing={transcribing}
             transcribeResult={transcribeResult}

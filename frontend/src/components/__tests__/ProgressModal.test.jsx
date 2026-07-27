@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import ProgressModal from '../ProgressModal';
 
 describe('ProgressModal', () => {
@@ -59,15 +59,59 @@ describe('ProgressModal', () => {
     expect(screen.getByRole('button', { name: 'Transcribe this file' })).toBeTruthy();
   });
 
-  it('renders a Cancel Download button while a single download is still in progress', () => {
+  it('renders Pause and Cancel buttons while a single download is still in progress', () => {
     render(
       <ProgressModal
         download={{ title: 'My Video', percent: 10, done: false }}
         onClose={vi.fn()}
         onCancel={vi.fn()}
+        onPause={vi.fn()}
       />,
     );
-    expect(screen.getByRole('button', { name: 'Cancel Download' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Pause/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+  });
+
+  it('calls onPause when Pause is clicked', () => {
+    const onPause = vi.fn();
+    render(
+      <ProgressModal
+        download={{ title: 'My Video', percent: 10, done: false }}
+        onClose={vi.fn()}
+        onCancel={vi.fn()}
+        onPause={onPause}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Pause/ }));
+    expect(onPause).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a Paused status and Resume/Cancel buttons once paused', () => {
+    render(
+      <ProgressModal
+        download={{ title: 'My Video', percent: 42, done: false, paused: true, message: 'Download paused.' }}
+        onClose={vi.fn()}
+        onCancel={vi.fn()}
+        onResumePaused={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Paused')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Resume/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeTruthy();
+  });
+
+  it('calls onResumePaused when Resume is clicked', () => {
+    const onResumePaused = vi.fn();
+    render(
+      <ProgressModal
+        download={{ title: 'My Video', percent: 42, done: false, paused: true }}
+        onClose={vi.fn()}
+        onCancel={vi.fn()}
+        onResumePaused={onResumePaused}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Resume/ }));
+    expect(onResumePaused).toHaveBeenCalledTimes(1);
   });
 
   it('renders bulk-download totals and per-item status', () => {

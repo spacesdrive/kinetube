@@ -134,12 +134,15 @@ function createDownloadSSE(params, onEvent) {
     if (!closed) { closed = true; es.close(); }
   }
 
-  // 'done' — close immediately so the browser never auto-reconnects
-  es.addEventListener('done', (e) => {
-    safeClose();
-    let data;
-    try { data = JSON.parse(e.data); } catch { data = {}; }
-    onEvent('done', data);
+  // 'done' and 'paused' both end the SSE response server-side — close
+  // immediately so the browser never auto-reconnects
+  ['done', 'paused'].forEach((evt) => {
+    es.addEventListener(evt, (e) => {
+      safeClose();
+      let data;
+      try { data = JSON.parse(e.data); } catch { data = {}; }
+      onEvent(evt, data);
+    });
   });
 
   // All other named events
@@ -210,6 +213,8 @@ export default function App() {
   // Per-download transcribe flag set when a single download starts
   const shouldTranscribeRef    = useRef(false);
   const triggerTranscriptionRef = useRef(null);
+  // Last args passed to startSingleDownload - replayed by "Resume" after Pause
+  const lastSingleDownloadArgsRef = useRef(null);
 
   // On mount: quick check whether tools need to be installed.
   // If so, show SetupScreen which connects to /api/setup and drives the download.
@@ -357,6 +362,9 @@ export default function App() {
       const settings = downloadSettings;
       // Transcribe if the per-download flag or the global setting is on
       shouldTranscribeRef.current = transcribe;
+      // Remembered so a Resume click after Pause can replay the same request
+      // without the user having to re-select quality/audioOnly/etc.
+      lastSingleDownloadArgsRef.current = { url: dlUrl, quality, audioOnly, title, transcribe };
 
       setActiveDownload({
         title,
@@ -371,9 +379,11 @@ export default function App() {
         isMultiFile: false,
         merging: false,
         done: false,
+        paused: false,
         success: false,
         message: '',
         warning: null,
+        pendingId: null,
       });
 
       const ctrl = createDownloadSSE(
@@ -402,10 +412,8 @@ export default function App() {
                 // willMerge tells us upfront this is a two-file split download.
                 // Set isMultiFile now so ALL progress events are correctly scaled
                 // from the beginning — no backward jump when audio phase starts.
-                if (data.willMerge) {
-                  return { ...prev, isMultiFile: true };
-                }
-                return prev;
+                // id is remembered so a Pause click can target this exact request.
+                return { ...prev, isMultiFile: data.willMerge || prev.isMultiFile, pendingId: data.id || prev.pendingId };
 
               case 'warning':
                 return { ...prev, warning: data.message };
@@ -459,6 +467,9 @@ export default function App() {
                   percent: data.success ? 100 : prev.percent,
                   phaseLabel: data.success ? 'Complete' : 'Failed',
                 };
+
+              case 'paused':
+                return { ...prev, paused: true, merging: false, phaseLabel: 'Paused', message: data.message || 'Download paused.' };
 
               default:
                 return prev;
@@ -654,6 +665,20 @@ export default function App() {
     setActiveDownload(null);
     setTranscribeResult(null);
     setTranscribing(false);
+  };
+
+  // Pause a single in-progress download - kills the yt-dlp process server-side
+  // but keeps it resumable (see backend/routes/download.js). No-op for bulk
+  // downloads or before the server has reported an id via the 'start' event.
+  const handlePauseDownload = () => {
+    const id = activeDownload?.pendingId;
+    if (id) postRequest(`/api/download/${id}/pause`, {}).catch(() => {});
+  };
+
+  // Resume a download this session paused - replays the exact args originally
+  // passed to startSingleDownload so yt-dlp reuses the same output path.
+  const handleResumePausedDownload = () => {
+    if (lastSingleDownloadArgsRef.current) startSingleDownload(lastSingleDownloadArgsRef.current);
   };
 
   // Trigger transcription of the last downloaded file by path
@@ -1274,6 +1299,8 @@ export default function App() {
           download={activeDownload}
           onClose={handleCloseDownload}
           onCancel={handleCloseDownload}
+          onPause={handlePauseDownload}
+          onResumePaused={handleResumePausedDownload}
           onTranscribe={triggerTranscription}
           transcribing={transcribing}
           transcribeResult={transcribeResult}

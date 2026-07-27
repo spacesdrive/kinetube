@@ -15,7 +15,9 @@ All routes are mounted under `/api` (plus the top-level `/health` and the inline
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/download` | SSE stream. Builds a yt-dlp format selector from query params, spawns yt-dlp with `--newline --progress`, and streams `phase`/`progress`/`done`/`error` events. Emits a `warning` event (not fatal) if ffmpeg is missing and the requested quality needs merging. |
+| GET | `/api/download` | SSE stream. Builds a yt-dlp format selector from query params, spawns yt-dlp with `--newline --progress`, and streams `phase`/`progress`/`done`/`error` events. Emits a `warning` event (not fatal) if ffmpeg is missing and the requested quality needs merging. Records the request in `pendingDownloads.js` on start and clears it on any in-process end (done, spawn error, or client cancel) - see `docs/architecture/backend/MANAGERS.md` - "Resuming an interrupted download". |
+| GET | `/api/download/pending` | Returns single-video downloads still recorded as in-flight - only non-empty if the app was killed mid-download last time. |
+| DELETE | `/api/download/pending/:id` | Dismisses a resumable download without restarting it (the partial file, if any, is left on disk). |
 
 ## Setup (`backend/routes/setup.js`)
 

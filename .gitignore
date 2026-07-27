@@ -30,6 +30,9 @@ backend/downloads/*.ogg
 *.bin
 sessions/
 
+# ── Runtime app state (dev only - packaged builds write this under userData) ──
+backend/pending-downloads.json
+
 # ── Logs ──────────────────────────────────────────────────────────────────────
 *.log
 npm-debug.log*

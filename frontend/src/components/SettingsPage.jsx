@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { getJSON } from '@/lib/api';
 
 // ── Persisted settings schema ─────────────────────────────────────────────────
 
@@ -124,8 +125,7 @@ export default function SettingsPage({ onSave }) {
       if (window.electronAPI?.openFolderDialog) {
         chosen = await window.electronAPI.openFolderDialog();
       } else {
-        const r = await fetch('/api/dialog/folder');
-        const d = await r.json();
+        const d = await getJSON('/api/dialog/folder');
         chosen = d.path;
       }
       if (chosen) update('downloads', 'outputDir', chosen);

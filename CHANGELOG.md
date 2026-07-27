@@ -9,7 +9,36 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+**Resume an interrupted download**
+- If KineTube is closed (or crashes) while a single-video download is in progress, the next launch now offers to resume it instead of losing the progress. `backend/utils/pendingDownloads.js` records each in-flight download's request parameters and clears the record on any normal end (success, failure, or cancel); a leftover record can only mean the app itself was killed mid-download.
+- New routes: `GET /api/download/pending`, `DELETE /api/download/pending/:id`
+- New `frontend/src/components/ResumeDownloadsBanner.jsx`, shown on the YouTube tab when a resumable download is found. "Resume" re-issues the exact original request; yt-dlp resumes its own partial `.part` file automatically.
+- Bulk/sequential and Instagram downloads are not covered by this yet - see `ROADMAP.md`.
+- See `DECISIONS.md` ADR-017.
+
+### Changed
+
+**Shared download helper**
+- `backend/utils/ytdlpManager.js` and `backend/utils/whisperManager.js` no longer each carry their own copy of the HTTPS/HTTP redirect-following, progress-reporting download function - both now import `downloadFileWithProgress()` from a new `backend/utils/download.js`. The unified version is the more robust of the two prior copies (follows `http:` redirects, not just `https:`, and correctly rejects and cleans up on a response error mid-stream, which the yt-dlp copy did not). The dead, unused `downloadFile()` (no-progress variant) was deleted.
+- See `DECISIONS.md` ADR-015.
+
+**Centralized frontend `api.js`**
+- Added `frontend/src/lib/api.js` (`getJSON`, `postJSON`, `postJSONStrict`, `postRequest`, `deleteRequest`) and migrated every plain (non-SSE, non-streaming) `fetch()` call site across `App.jsx`, `DownloadSettings.jsx`, `SettingsPage.jsx`, `InstagramLoginModal.jsx`, and `TranscribePage.jsx` to use it, removing the duplicated request-building/JSON-parsing/error-throwing boilerplate from each component.
+- SSE (`EventSource`) consumption and the two call sites needing a raw `Response` (file upload via `FormData`, streaming-response transcription) are unchanged by design.
+- See `DECISIONS.md` ADR-016 (supersedes ADR-006).
+
+### Fixed
+- A stray corrupted line in `ROADMAP.md`'s Known Issues section (mismatched markdown bold/italic markers) was restored.
+- A missing `@testing-library/react` cleanup registration meant component tests that query the DOM by role/position (rather than unique text) could silently match elements left over from a previous test in the same file. Added `frontend/src/test/setup.js` (wired via `vite.config.js`'s `test.setupFiles`) to register `afterEach(cleanup)` globally.
+
+### Tests
+- `backend/test/download.test.js` - the shared download helper against a local throwaway HTTP server (redirects, redirect-limit exhaustion, non-200 responses, mid-stream connection drops, missing destination directory)
+- `backend/test/pendingDownloads.test.js` - the resume registry (id stability, title updates, removal, corrupt/missing state file)
+- `backend/test/routes.test.js` - `GET /api/download/pending` and `DELETE /api/download/pending/:id`
+- `frontend/src/lib/__tests__/api.test.js` - every `lib/api.js` helper
+- `frontend/src/components/__tests__/ResumeDownloadsBanner.test.jsx` - render states and Resume/Dismiss callbacks
 
 ---
 

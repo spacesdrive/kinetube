@@ -37,6 +37,7 @@
         "filter": [
           "**/*",
           "!.env",
+          "!pending-downloads.json",
           "!downloads/*.exe",
           "!downloads/*.dll",
           "!downloads/*.zip",

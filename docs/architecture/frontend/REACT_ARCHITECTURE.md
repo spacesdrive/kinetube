@@ -26,6 +26,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 `App.jsx` is the root component and owns most top-level state directly with `useState`/`useRef`/`useCallback` - there is no global context/store. It:
 
 - Fetches yt-dlp/ffmpeg status on mount (`fetchYtdlpStatus()`) and renders `YtdlpAlert` / `SetupScreen` if tools are missing
+- Fetches `/api/download/pending` on mount and renders `ResumeDownloadsBanner` if the backend reports a single-video download that was still in flight when the app last closed (see `docs/architecture/backend/MANAGERS.md` - "Resuming an interrupted download")
 - Owns the pasted-URL input, the parsed metadata result, and which "view" (video/channel/Instagram post/profile/batch/transcribe/settings) is currently shown
 - Cleans pasted YouTube/Instagram URLs client-side (`cleanYouTubeUrl()`/`cleanInstagramUrl()`, extracted to `lib/urlCleaners.js` and unit tested) before sending them to `/api/info`, purely for a better-looking input field - the backend's `parseYouTubeUrl()` in `backend/utils/urlParser.js` is the authoritative parser and re-validates independently
 - Renders `ProgressModal` for any active download/transcription, driven by SSE events consumed with a manual `fetch` + `ReadableStream` reader (see `docs/guidelines/ERROR_HANDLING.md` for the parsing pattern)
@@ -40,6 +41,7 @@ frontend/src/
   lib/
     utils.js                cn() = clsx + tailwind-merge
     urlCleaners.js          cleanYouTubeUrl()/cleanInstagramUrl() - tracking-param stripping on paste, used by App.jsx
+    api.js                  getJSON/postJSON/postJSONStrict/postRequest/deleteRequest - shared fetch() helpers for plain (non-SSE) endpoints, see DECISIONS.md ADR-016
     __tests__/              Vitest unit tests for the files above
   hooks/
     use-mobile.js            useIsMobile()
@@ -49,7 +51,8 @@ frontend/src/
     VideoView.jsx             Single video metadata + quality picker
     BatchResultsView.jsx     Mixed-queue batch download results
     ProgressModal.jsx        Shared SSE progress UI (download/transcribe/setup); has a component test suite
-    __tests__/               Vitest + Testing Library tests (ProgressModal.jsx so far)
+    ResumeDownloadsBanner.jsx  Offers to resume a single-video download interrupted by the app closing; has a component test suite
+    __tests__/               Vitest + Testing Library tests (ProgressModal.jsx, ResumeDownloadsBanner.jsx)
     DownloadSettings.jsx     Quality/format/filename-template controls
     SetupScreen.jsx          First-run tool installation flow
     TranscribePage.jsx       Whisper model picker + transcription UI
@@ -73,10 +76,11 @@ There is no `Context`/global store. State lives in `App.jsx` and is passed down 
 
 ## Communicating with the Backend
 
-There is no centralized `api.js` module (unlike a typical multi-page SPA) - components call `fetch()`/`axios` directly against `/api/...` paths, which the Vite dev server proxies to `:3001` (see `frontend/vite.config.js`) and which resolve as same-origin in a packaged build (Express serves both the API and the static frontend). Two call shapes are used:
+Requests go through `/api/...` paths, which the Vite dev server proxies to `:3001` (see `frontend/vite.config.js`) and which resolve as same-origin in a packaged build (Express serves both the API and the static frontend). Three call shapes are used:
 
-- **Request/response:** `await fetch('/api/info', { method: 'POST', ... })`, parse JSON, throw on `!res.ok`.
-- **Streaming (SSE):** manual `fetch` + `response.body.getReader()` loop, parsing `event:`/`data:` lines and dispatching on the `phase`/`progress`/`done`/`error` shape. `ProgressModal.jsx` is the shared consumer for this pattern - new streaming features should drive it through the same component rather than building a second progress UI.
+- **Plain request/response:** `lib/api.js`'s `getJSON`/`postJSON`/`postJSONStrict`/`deleteRequest` (see `DECISIONS.md` ADR-016). `postJSON` never throws - use it for routes that always answer `200` with a status field even on logical failure (e.g. `/api/instagram/login`). `postJSONStrict` throws using the backend's `{ error, hint?, detail? }` shape on a non-2xx response (see `docs/guidelines/ERROR_HANDLING.md`) - use it for routes like `/api/info` that signal failure via HTTP status.
+- **Request needing the raw `Response`:** `lib/api.js`'s `postRequest` builds the fetch call but returns the unparsed `Response`, for the few call sites that need `resp.body.getReader()` (streaming a response) or `FormData` instead of a JSON body (`TranscribePage.jsx`'s file upload, `App.jsx`'s transcription trigger).
+- **Streaming (SSE):** either `new EventSource(...)` for GET-based streams, or a manual `fetch` + `response.body.getReader()` loop for the one POST-based stream (`/api/transcribe/file`), parsing `event:`/`data:` lines and dispatching on the `phase`/`progress`/`done`/`error` shape. These stay colocated with the component that renders their progress rather than going through `lib/api.js` - `ProgressModal.jsx` is the shared consumer for this pattern; new streaming features should drive it through the same component rather than building a second progress UI.
 
 ## Electron Bridge
 

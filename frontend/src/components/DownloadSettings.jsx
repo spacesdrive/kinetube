@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { getJSON } from '@/lib/api';
 
 const TEMPLATE_VARS = [
   { label: 'Title',    value: '%(title)s',       desc: 'Video title' },
@@ -27,8 +28,7 @@ export default function DownloadSettings({ settings, onChange }) {
     setBrowsing(true);
     setPathError('');
     try {
-      const res  = await fetch('/api/dialog/folder');
-      const data = await res.json();
+      const data = await getJSON('/api/dialog/folder');
       if (data.path) onChange({ ...settings, outputDir: data.path });
     } catch {
       setPathError('Could not open folder dialog.');
@@ -40,8 +40,7 @@ export default function DownloadSettings({ settings, onChange }) {
   const handleDirBlur = async () => {
     if (!settings.outputDir.trim()) { setPathError(''); return; }
     try {
-      const res  = await fetch(`/api/validate-path?dir=${encodeURIComponent(settings.outputDir)}`);
-      const data = await res.json();
+      const data = await getJSON(`/api/validate-path?dir=${encodeURIComponent(settings.outputDir)}`);
       setPathError(data.valid ? '' : 'Folder not found — downloads will use the default folder.');
     } catch {}
   };

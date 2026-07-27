@@ -15,6 +15,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Spinner } from '@/components/ui/spinner';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { getJSON } from '@/lib/api';
 
 // ── Model card ────────────────────────────────────────────────────────────────
 function ModelCard({ model, selected, onSelect, onDownload, downloading }) {
@@ -203,15 +204,13 @@ export default function TranscribePage() {
   const abortRef     = useRef(false);
 
   useEffect(() => {
-    fetch('/api/transcribe/setup/check')
-      .then((r) => r.json())
+    getJSON('/api/transcribe/setup/check')
       .then((d) => { setWhisperReady(d.ready); setModels(d.models || []); })
       .catch(console.error);
   }, []);
 
   const refreshModels = () => {
-    fetch('/api/transcribe/models')
-      .then((r) => r.json())
+    getJSON('/api/transcribe/models')
       .then((d) => setModels(d.models || []))
       .catch(console.error);
   };

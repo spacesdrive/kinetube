@@ -13,7 +13,7 @@ Every manager follows the same shape, established by `ytdlpManager.js`:
 | `getXPath()` / `getXExe()` | Returns the resolved path to the managed binary, or `null` if not installed |
 | `isXReady()` / `checkXStatus()` | Synchronous or cheap check of install state, used by `*/setup/check` routes |
 | `ensureX(onEvent)` | Downloads/builds the tool if missing, emitting `phase`/`progress` events; no-ops if already installed |
-| `downloadFileWithProgress(url, dest, onProgress)` | Shared low-level download helper (HTTPS GET with redirect-following and progress callback), duplicated per-manager rather than factored into a shared module - see `DECISIONS.md` for why this duplication currently exists |
+| `downloadFileWithProgress(url, dest, onProgress)` | Shared low-level download helper (HTTP/HTTPS GET with redirect-following and progress callback), imported by every manager from `backend/utils/download.js` - see `DECISIONS.md` ADR-015 |
 
 All managers resolve their install directory from `backend/utils/paths.js` (`DOWNLOADS_DIR`, `MODELS_DIR`, or `SESSIONS_DIR`), never a path relative to their own `__dirname`. On macOS/Linux, every downloaded or built binary is `chmod 755`'d before use.
 
@@ -52,6 +52,14 @@ Manages the Instagram **account/session registry** only: `accounts.json` (userna
 **This manager does not download or manage any binary.** Instagram scraping itself goes through `python3 -m pip install instaloader` and the `instaloader` Python module, orchestrated entirely in `backend/routes/instagram.js` (`detectPython()`, `checkPythonSetup()`, `loginWithPython()`, and the `instaloader_login.py`/`instaloader_profile.py` helper scripts). That path has no platform-specific code - `pip install` and `python3 -m instaloader` work identically on Windows, macOS, and Linux, given Python is installed. An earlier version of this manager downloaded a Windows-only standalone `instaloader.exe`; that code was dead (never called by the frontend) and has been removed - see `DECISIONS.md`.
 
 Session files and `accounts.json` are read/written only by this manager - route handlers never touch the filesystem paths directly.
+
+## Resuming an interrupted download
+
+`backend/utils/pendingDownloads.js` is not a tool manager - it doesn't own a binary - but it lives alongside the managers because it exists to make one of their outputs (a partially-downloaded video) recoverable. `backend/routes/download.js` records every single-video download's request parameters (`makeDownloadId()` hashes the exact fields that determine yt-dlp's output path: URL, quality, audio-only flag, output dir, prefix/suffix/naming template, numbering) to a small JSON file the moment the download starts, and removes that record the instant the request ends for any reason handled in-process - success, failure, or the user cancelling.
+
+A record only survives to the next app launch if the whole process was killed before it could clean up after itself. `GET /api/download/pending` returns whatever is left, and `DELETE /api/download/pending/:id` lets the user dismiss one without resuming it. The frontend's `ResumeDownloadsBanner` (see `docs/architecture/frontend/REACT_ARCHITECTURE.md`) re-issues the exact original request on "Resume" - yt-dlp resumes the partial `.part` file on its own (its default `--continue` behavior) as long as the output path matches exactly, which is why the recorded parameters have to be replayed verbatim rather than rebuilt from the user's current download settings.
+
+Only single-video downloads are tracked this way; bulk/sequential and Instagram downloads are not - see `ROADMAP.md`. See `DECISIONS.md` ADR-017 for the full reasoning and alternatives considered.
 
 ## Adding or Extending a Manager
 

@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { getJSON, postJSON } from '@/lib/api';
 
 export default function InstagramLoginModal({ onClose, onSuccess }) {
   const [step, setStep]         = useState('credentials');
@@ -30,8 +31,7 @@ export default function InstagramLoginModal({ onClose, onSuccess }) {
   async function checkSetup() {
     setSetupStatus('checking');
     try {
-      const res  = await fetch('/api/instagram/setup/python/check');
-      const data = await res.json();
+      const data = await getJSON('/api/instagram/setup/python/check');
       if (!data.pythonFound)           setSetupStatus('no_python');
       else if (!data.instaloaderReady) setSetupStatus('needs_install');
       else                             setSetupStatus('ready');
@@ -54,11 +54,7 @@ export default function InstagramLoginModal({ onClose, onSuccess }) {
     if (!username.trim() || !password.trim()) { setError('Enter both username and password.'); return; }
     setError(''); setLoading(true);
     try {
-      const res  = await fetch('/api/instagram/login', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
-      });
-      const data = await res.json();
+      const data = await postJSON('/api/instagram/login', { username: username.trim(), password });
       if      (data.status === 'success')        onSuccess(username.trim());
       else if (data.status === 'twofa_required') setStep('twofa');
       else    setError(data.message || 'Login failed.');
@@ -71,11 +67,7 @@ export default function InstagramLoginModal({ onClose, onSuccess }) {
     if (!code.trim()) { setError('Enter the verification code.'); return; }
     setError(''); setLoading(true);
     try {
-      const res  = await fetch('/api/instagram/login/2fa', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), code: code.trim() }),
-      });
-      const data = await res.json();
+      const data = await postJSON('/api/instagram/login/2fa', { username: username.trim(), code: code.trim() });
       if (data.status === 'success') onSuccess(username.trim());
       else setError(data.message || 'Invalid code.');
     } catch { setError('Network error.'); }

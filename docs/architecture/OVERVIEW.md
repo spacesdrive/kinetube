@@ -71,6 +71,7 @@ Transcription (`backend/routes/transcribe.js` + `backend/utils/whisperManager.js
 | Whisper GGML models | `{dataRoot}/models/*.bin` | Large (75 MB - 2.9 GB); downloaded from Hugging Face only when a model is selected |
 | Instagram session cookies | `{dataRoot}/sessions/session-<username>` + `accounts.json` | Written by `instaloaderManager.js`; never returned in any API response |
 | Downloaded media | User-configured folder, default `{dataRoot}/downloads/` | Frontend setting persisted in `localStorage`, passed to the backend per-request |
+| In-flight single-video download records | `{dataRoot}/pending-downloads.json` | Written/cleared by `pendingDownloads.js` so a download interrupted by the app closing can be offered back as "resume" on next launch - see `docs/architecture/backend/MANAGERS.md` and `DECISIONS.md` ADR-017 |
 | App settings (theme, filename template, default model) | Renderer `localStorage` | No backend involvement - purely a frontend concern |
 
 `{dataRoot}` is `backend/` in development and `app.getPath('userData')` in a packaged build - resolved once in `backend/utils/paths.js` and imported everywhere else that needs a writable path. See `docs/architecture/backend/EXPRESS.md`.

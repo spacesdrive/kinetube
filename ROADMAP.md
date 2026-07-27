@@ -39,25 +39,24 @@ Update this file whenever a feature ships (move to `CHANGELOG.md`) or when prior
 
 ---
 
-### Automated release-asset name verification
-
-**Added 2026-07-26**, following the v1.3.0 auto-update 404 (`DECISIONS.md` ADR-014). The fix (pinning `nsis.artifactName`) is in place, but nothing in CI would catch a future regression - e.g. a new Windows target whose `artifactName` reintroduces a space. Add a post-build CI step that parses each uploaded `latest*.yml` and confirms its referenced filename(s) exactly match the filenames actually present in the release assets, failing the workflow if not, instead of relying on the manual check in `docs/workflows/RELEASE.md`'s "Cutting a Release" checklist.
-
----
-
 ## Planned (Medium Priority)
 
 ### Shared `downloadFileWithProgress()` helper
 
-All four tool managers currently duplicate a near-identical HTTPS-download-with-redirect-following-and-progress-callback function. Factor it into a shared `backend/utils/download.js` once a fifth consumer appears or a bug fix needs to be applied in more than one place at once (see `DECISIONS.md` ADR-003's trade-offs section) - premature extraction before that point isn't worth the abstraction cost.
+**Shipped 2026-07-27.** `backend/utils/ytdlpManager.js` and `backend/utils/whisperManager.js` now both import a single implementation from `backend/utils/download.js`, unifying two copies that had already drifted (whisper's was more robust - `http:` redirect support, a `settled` guard, response-error cleanup - and is now what both managers get). See `DECISIONS.md` ADR-015 and `backend/test/download.test.js`.
 
 ### Centralized frontend `api.js`
 
-Currently every component calls `fetch()` directly (see `DECISIONS.md` ADR-006). Revisit if the number of distinct backend endpoints grows substantially or if any shared request behavior (auth, base URL switching) is introduced.
+**Shipped 2026-07-27.** Added `frontend/src/lib/api.js` and migrated every plain (non-SSE, non-streaming) `fetch()` call site to it - roughly 20 call sites across 6 components, well past the "grows substantially" trigger ADR-006 named for revisiting this. SSE consumption stays colocated with its component, per ADR-006's still-valid reasoning. See `DECISIONS.md` ADR-016 and `frontend/src/lib/__tests__/api.test.js`.
 
-### Redis-free progress persistence across app restarts
+### Resume a download interrupted by the app closing
 
-If the app is closed mid-download, the in-progress operation is lost with no resume capability. Investigate whether yt-dlp's own partial-download resume (`.part` files) can be surfaced as a "resume" option in the UI rather than starting over.
+**Shipped 2026-07-27** for single-video YouTube downloads. `backend/utils/pendingDownloads.js` records an in-flight download's request and clears it on any normal end (success, failure, cancel); a record surviving to the next launch means the app itself was killed mid-download. `ResumeDownloadsBanner.jsx` offers to resume it, re-issuing the identical request so yt-dlp's own `--continue` behavior picks up the partial file. See `DECISIONS.md` ADR-017.
+
+**Remaining work:**
+- Bulk/sequential downloads and Instagram downloads are not tracked by this registry yet - resuming mid-batch is a bigger feature (needs to persist queue position and per-item state, not just one request)
+- No verification yet that yt-dlp's resume actually re-attaches to a `.part` file compared to just re-downloading from 0% - add to the manual checklist in `docs/workflows/TESTING.md` and confirm on a real large download
+- If the user changes their download folder in Settings between the interrupted attempt and clicking Resume, the resume still targets the *original* folder (correct for the underlying `.part` file, but potentially surprising) - consider surfacing the target folder in the banner
 
 ---
 
@@ -75,6 +74,18 @@ The current `dmg` target is unsigned. Before wide distribution, macOS builds nee
 
 `BatchResultsView.jsx` currently handles a manually pasted mixed queue of YouTube/Instagram URLs. A full playlist URL (`youtube.com/playlist?list=...`) is not yet a first-class input type distinct from a channel's `/videos` tab.
 
+### Resume support for bulk and Instagram downloads
+
+Follow-on to the single-video resume feature above. Would need the pending-download registry to track a whole batch's queue position and per-item state, not just one request - scoped out of the initial feature deliberately (see `DECISIONS.md` ADR-017's trade-offs).
+
+### CI check for release-asset name consistency
+
+**Added 2026-07-26**, following the v1.3.0 auto-update 404 (`DECISIONS.md` ADR-014). The fix (pinning `nsis.artifactName`) is in place, but nothing in CI would catch a future regression - e.g. a new Windows target whose `artifactName` reintroduces a space. Add a post-build CI step that parses each uploaded `latest*.yml` and confirms its referenced filename(s) exactly match the filenames actually present in the release assets, failing the workflow if not, instead of relying on the manual check in `docs/workflows/RELEASE.md`'s "Cutting a Release" checklist.
+
+### Remove the unused `axios` dependency
+
+`frontend/package.json` lists `axios` as a dependency, but nothing in `frontend/src` imports it - every request goes through native `fetch` (now via `lib/api.js`, see above). Confirm it's genuinely dead, then remove it and update `docs/architecture/frontend/REACT_ARCHITECTURE.md`'s stack table, which still lists it.
+
 ---
 
 ## Known Issues / Tech Debt
@@ -85,8 +96,9 @@ The current `dmg` target is unsigned. Before wide distribution, macOS builds nee
 - macOS ffmpeg is x64-only; Apple Silicon runs it under Rosetta 2 rather than a native arm64 binary (deliberate trade-off, see `DECISIONS.md` ADR-011).
 - yt-dlp and ffmpeg's Linux builds target x86_64 only; arm64 Linux is not wired up.
 - `GET /api/dialog/folder` (backend/routes/info.js) shells out to PowerShell and is Windows-only, but only matters for the dev-only fallback path used when the frontend runs outside Electron - see `docs/philosophy/CROSS_PLATFORM.md`.
-- Most React components other than `ProgressModal.jsx` have no test coverage yet - see `docs/workflows/TESTING.md`.
+- Most React components other than `ProgressModal.jsx` and `ResumeDownloadsBanner.jsx` have no test coverage yet - see `docs/workflows/TESTING.md`.
 - SSE (streaming) routes have no automated coverage - see `docs/workflows/TESTING.md`.
 - `console.log` startup banner in `backend/server.js` uses emoji markers, predating the writing standards in `docs/WRITING_STANDARDS.md`. Low priority cleanup - replace opportunistically when that file is next touched for another reason, not as a standalone change.
-- No centralized frontend API client (see `DECISIONS.md` ADR-006) - acceptable at current scale, revisit if it grows.
+- `frontend/package.json` lists an unused `axios` dependency - see "Remove the unused `axios` dependency" above.
+- The pending-downloads registry (`backend/utils/pendingDownloads.js`) never prunes a record whose original output folder has since been deleted - a stale "Resume" entry would fail on click rather than being filtered out proactively. Low priority: the failure is a normal, visible SSE `error` event, not a silent one.
 - yt-dlp's pinned version (`YTDLP_VERSION` in `ytdlpManager.js`) was deliberately left unchanged in this pass to avoid destabilizing the verified-working Windows path while adding platform branching - bumping it to the current upstream release is a separate, routine maintenance task.

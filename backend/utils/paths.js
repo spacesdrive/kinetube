@@ -14,9 +14,13 @@ const DOWNLOADS_DIR = path.join(BASE, 'downloads');
 const MODELS_DIR    = path.join(BASE, 'models');
 const SESSIONS_DIR  = path.join(BASE, 'sessions');
 
+// Small app-state file (not user media) - lives at the userData root rather
+// than inside DOWNLOADS_DIR so it is never mistaken for a downloaded file.
+const PENDING_DOWNLOADS_FILE = path.join(BASE, 'pending-downloads.json');
+
 // Create all writable dirs up front so every manager can import this safely.
 for (const dir of [DOWNLOADS_DIR, MODELS_DIR, SESSIONS_DIR]) {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 }
 
-module.exports = { DOWNLOADS_DIR, MODELS_DIR, SESSIONS_DIR };
+module.exports = { DOWNLOADS_DIR, MODELS_DIR, SESSIONS_DIR, PENDING_DOWNLOADS_FILE };

@@ -9,8 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import { cleanYouTubeUrl, cleanInstagramUrl } from '@/lib/urlCleaners';
+import { getJSON, postJSONStrict, postRequest, deleteRequest } from '@/lib/api';
 import { AppSidebar } from './components/AppSidebar';
 import YtdlpAlert from './components/YtdlpAlert';
+import ResumeDownloadsBanner from './components/ResumeDownloadsBanner';
 import VideoView from './components/VideoView';
 import ChannelView from './components/ChannelView';
 import ProgressModal from './components/ProgressModal';
@@ -28,36 +30,18 @@ import UpdateDialog from './components/UpdateDialog';
 // ── API helpers ──────────────────────────────────────────────────────────────
 
 async function fetchInfo(url) {
-  const res = await fetch('/api/info', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Failed to fetch info');
-  return data;
+  return postJSONStrict('/api/info', { url }, 'Failed to fetch info');
 }
 
 async function fetchYtdlpStatus() {
-  const res = await fetch('/api/ytdlp-status');
-  return res.json();
+  return getJSON('/api/ytdlp-status');
 }
 
 // ── Instagram SSE helpers ────────────────────────────────────────────────────
 
 // Used by batch processing — regular POST, no streaming
 async function fetchInstagramInfo(url, account) {
-  const res = await fetch('/api/instagram/info', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, account }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    const parts = [data.error, data.hint, data.detail].filter(Boolean);
-    throw new Error(parts.join(' — ') || 'Failed to fetch Instagram info');
-  }
-  return data;
+  return postJSONStrict('/api/instagram/info', { url, account }, 'Failed to fetch Instagram info');
 }
 
 // Used by single-URL submit — SSE stream with live progress callbacks
@@ -198,6 +182,7 @@ export default function App() {
   const [loading, setLoading]               = useState(false);
   const [result, setResult]                 = useState(null);
   const [activeDownload, setActiveDownload] = useState(null);
+  const [resumableDownloads, setResumableDownloads] = useState([]);
   const [downloadSettings, setDownloadSettings] = useState(() => {
     const saved = loadSettings().downloads;
     return {
@@ -229,8 +214,7 @@ export default function App() {
   // On mount: quick check whether tools need to be installed.
   // If so, show SetupScreen which connects to /api/setup and drives the download.
   useEffect(() => {
-    fetch('/api/setup/check')
-      .then((r) => r.json())
+    getJSON('/api/setup/check')
       .then((data) => {
         setNeedsSetup(!data.allReady);
         setSetupChecked(true);
@@ -242,6 +226,8 @@ export default function App() {
         // Backend not yet ready — show main app; YtdlpAlert will handle warnings
         setSetupChecked(true);
       });
+
+    getJSON('/api/download/pending').then((data) => setResumableDownloads(data.pending || [])).catch(() => {});
   }, []);
 
   const handleSetupComplete = useCallback(() => {
@@ -280,18 +266,18 @@ export default function App() {
       return;
     }
     if (newPlatform === 'instagram') {
-      fetch('/api/instagram/accounts').then((r) => r.json()).then(setIgAccounts).catch(() => {});
+      getJSON('/api/instagram/accounts').then(setIgAccounts).catch(() => {});
     }
   }, [platform, syncDownloadSettings]);
 
   const handleIgLoginSuccess = useCallback((username) => {
     setShowLoginModal(false);
     setActiveIgAccount(username);
-    fetch('/api/instagram/accounts').then((r) => r.json()).then(setIgAccounts).catch(() => {});
+    getJSON('/api/instagram/accounts').then(setIgAccounts).catch(() => {});
   }, []);
 
   const handleIgAccountRemove = useCallback((username) => {
-    fetch(`/api/instagram/accounts/${username}`, { method: 'DELETE' })
+    deleteRequest(`/api/instagram/accounts/${username}`)
       .then(() => {
         setIgAccounts((prev) => prev.filter((a) => a.username !== username));
         if (activeIgAccount === username) setActiveIgAccount(null);
@@ -361,8 +347,12 @@ export default function App() {
   }
 
   // ── Single video download ─────────────────────────────────────────────────
+  // sseParams lets a resumed download (see ResumeDownloadsBanner) reissue the
+  // exact request the backend recorded, rather than the user's current
+  // download settings, since yt-dlp only resumes a partial file when it is
+  // re-invoked with the identical output path.
   const startSingleDownload = useCallback(
-    ({ url: dlUrl, quality, audioOnly, title, transcribe = false }) => {
+    ({ url: dlUrl, quality, audioOnly, title, transcribe = false, sseParams = null }) => {
       if (esRef.current) esRef.current.close();
       const settings = downloadSettings;
       // Transcribe if the per-download flag or the global setting is on
@@ -387,7 +377,7 @@ export default function App() {
       });
 
       const ctrl = createDownloadSSE(
-        {
+        sseParams || {
           url: dlUrl,
           quality,
           audioOnly,
@@ -481,6 +471,23 @@ export default function App() {
     },
     [downloadSettings]
   );
+
+  // ── Resume an interrupted download (see ResumeDownloadsBanner) ────────────
+  const handleResumeDownload = useCallback((item) => {
+    setResumableDownloads((prev) => prev.filter((r) => r.id !== item.id));
+    startSingleDownload({
+      url: item.url,
+      quality: item.quality,
+      audioOnly: item.audioOnly,
+      title: item.title || item.url,
+      sseParams: item,
+    });
+  }, [startSingleDownload]);
+
+  const handleDismissResumableDownload = useCallback((item) => {
+    setResumableDownloads((prev) => prev.filter((r) => r.id !== item.id));
+    deleteRequest(`/api/download/pending/${item.id}`).catch(() => {});
+  }, []);
 
   // ── Bulk download (sequential queue) ─────────────────────────────────────
   const startBulkDownload = useCallback(
@@ -656,14 +663,10 @@ export default function App() {
     setTranscribing(true);
     setTranscribeResult(null);
 
-    fetch('/api/transcribe/file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filePath,
-        model:    settings.transcription.defaultModel,
-        language: settings.transcription.defaultLanguage,
-      }),
+    postRequest('/api/transcribe/file', {
+      filePath,
+      model:    settings.transcription.defaultModel,
+      language: settings.transcription.defaultLanguage,
     }).then(async (resp) => {
       if (!resp.ok) {
         let errMsg = 'Transcription failed.';
@@ -702,14 +705,10 @@ export default function App() {
   const triggerTranscriptionSilent = useCallback((filePath) => {
     if (!filePath) return;
     const settings = loadSettings();
-    fetch('/api/transcribe/file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filePath,
-        model:    settings.transcription.defaultModel,
-        language: settings.transcription.defaultLanguage,
-      }),
+    postRequest('/api/transcribe/file', {
+      filePath,
+      model:    settings.transcription.defaultModel,
+      language: settings.transcription.defaultLanguage,
     }).catch(() => {});
   }, []);
   const triggerTranscriptionSilentRef = useRef(null);
@@ -1140,6 +1139,17 @@ export default function App() {
                 {ytdlpStatus && !ytdlpStatus.isUpToDate && (
                   <div className="w-full max-w-3xl mx-auto mb-4">
                     <YtdlpAlert status={ytdlpStatus} />
+                  </div>
+                )}
+
+                {/* ── Resume interrupted downloads ── */}
+                {platform === 'youtube' && !activeDownload && resumableDownloads.length > 0 && (
+                  <div className="w-full max-w-3xl mx-auto mb-4">
+                    <ResumeDownloadsBanner
+                      items={resumableDownloads}
+                      onResume={handleResumeDownload}
+                      onDismiss={handleDismissResumableDownload}
+                    />
                   </div>
                 )}
 

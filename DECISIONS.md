@@ -306,3 +306,72 @@ Records every significant architectural decision, the alternatives considered, a
 **Trade-offs:**
 - Anyone adding another Windows target (e.g. a portable build) needs to keep its `artifactName` space-free too, or this class of bug reappears - called out in `docs/workflows/RELEASE.md`'s Auto-Update section
 - Every future release must be spot-checked (`latest*.yml` filename vs. actual uploaded asset filename) until this is caught by an automated CI check instead of manual verification - tracked in `ROADMAP.md`
+
+---
+
+## ADR-015: Extracted `downloadFileWithProgress()` into a shared `backend/utils/download.js`
+
+**Date:** 2026-07-27
+**Status:** Accepted
+
+**Decision:** `backend/utils/ytdlpManager.js` and `backend/utils/whisperManager.js` no longer each define their own copy of the HTTPS/HTTP redirect-following, progress-reporting download function. Both now import `downloadFileWithProgress()` from a new `backend/utils/download.js`. The dead, never-called, never-exported `downloadFile()` (no-progress variant) in `ytdlpManager.js` was deleted outright rather than migrated, since nothing used it.
+
+**Alternatives considered:**
+- Leave the duplication in place (the original position in ADR-003's trade-offs and `ROADMAP.md`, pending "a fifth consumer or a cross-cutting bug fix")
+- Extract only a subset (e.g. keep the simpler yt-dlp version, drop whisper's extra robustness)
+
+**Reasoning:**
+- The two copies had already drifted: whisper.cpp's version supported both `http:` and `https:` redirect targets (Hugging Face model downloads sometimes redirect through plain `http:`), guarded against double-resolve/reject with a `settled` flag, and explicitly handled a response-stream `error` event by destroying the partial file - the yt-dlp copy did none of these, meaning a dropped connection mid-download would have left an unresolved, hanging promise instead of a rejection. That is exactly the "bug fix needs to be applied in more than one place" trigger `ROADMAP.md` named as the reason to extract.
+- The unified implementation is the whisper.cpp version verbatim (the more correct one), so `ytdlpManager.js` gained the missing robustness for free rather than whisper.cpp losing anything.
+- Both managers already only used the progress-reporting variant - `ytdlpManager.js`'s non-progress `downloadFile()` had no remaining callers, so it was deleted rather than carried into the shared module.
+
+**Trade-offs:**
+- None identified - this is a pure de-duplication with no behavior change for either manager's existing call sites.
+- Covered by `backend/test/download.test.js` (redirects, redirect-limit exhaustion, non-200 responses, mid-stream connection drops, missing destination directories), which is now the only place this logic needs to be tested instead of being implicitly exercised through two managers' setup flows.
+
+---
+
+## ADR-016: Centralized frontend `frontend/src/lib/api.js` for plain fetch endpoints
+
+**Date:** 2026-07-27
+**Status:** Supersedes ADR-006
+
+**Decision:** Added `getJSON`, `postJSON`, `postJSONStrict`, `postRequest`, and `deleteRequest` helpers in `frontend/src/lib/api.js`, and migrated every component's plain (non-SSE, non-FormData, non-streaming-response) `fetch()` call to use them: `App.jsx`, `DownloadSettings.jsx`, `SettingsPage.jsx`, `InstagramLoginModal.jsx`, and `TranscribePage.jsx`.
+
+**Alternatives considered:**
+- Leave `fetch()` calls inline in every component, as ADR-006 originally decided
+- A single opinionated `apiRequest()` that always throws on `!res.ok`, forcing every call site onto one error contract
+
+**Reasoning:**
+- ADR-006 explicitly named its own reconsideration trigger: "if the number of distinct backend calls grows substantially... revisit." The app now has roughly 20 fetch/EventSource call sites across 6 components, calling around 15 distinct endpoints - well past where it was when ADR-006 was written.
+- The backend does not have one uniform response contract: some routes always return `200` with a `status`/`valid`/`path` field even on logical failure (`/api/dialog/folder`, `/api/instagram/login`), while others use `{ error, hint?, detail? }` with a non-2xx status (`/api/info`, `/api/instagram/info`). Forcing a single throwing helper onto both would either break the no-throw call sites or silence the strict ones, so the module exposes both `postJSON` (no throw, matches the no-ok-check call sites' existing behavior exactly) and `postJSONStrict` (throws using the `error`/`hint`/`detail` convention already documented in `docs/guidelines/ERROR_HANDLING.md`) rather than picking one.
+- SSE streams (`new EventSource(...)`) and the two request/response shapes that need the raw `Response` (the `multipart/form-data` transcription upload, and the two `transcribe/file` calls that read `resp.body.getReader()` for their own SSE-like line stream) are deliberately left untouched - ADR-006's reasoning that SSE consumption belongs colocated with the component that renders its progress still holds, and forcing those into a JSON-in/JSON-out helper would lose the raw `Response`/`FormData` they need.
+
+**Trade-offs:**
+- Two POST helpers (`postJSON` vs. `postJSONStrict`) instead of one means a future call site has to pick the right one by checking how the target route actually reports failure - documented in `frontend/src/lib/api.js`'s own comments and `docs/guidelines/ERROR_HANDLING.md`.
+- Covered by `frontend/src/lib/__tests__/api.test.js`; component-level behavior is unchanged (no new component tests were needed since no call site's semantics changed).
+
+---
+
+## ADR-017: Resume support for a single-video download interrupted by the app closing
+
+**Date:** 2026-07-27
+**Status:** Accepted
+
+**Decision:** `backend/routes/download.js` records every in-flight single-video download's request parameters to a small JSON file (`backend/utils/pendingDownloads.js`, stored at `PENDING_DOWNLOADS_FILE` from `paths.js`) when it starts, and removes that record the moment the request ends for any reason handled in-process: success, failure, or the user cancelling (SSE `res.on('close')`). A new `GET /api/download/pending` route returns whatever records are still present - which can only be downloads that were in flight when the whole app process was killed, since every other end-of-download path already cleaned up. The frontend (`App.jsx` + a new `ResumeDownloadsBanner.jsx`) fetches this list on mount and offers to resume each one by re-issuing the exact original request.
+
+**Alternatives considered:**
+- Do nothing beyond yt-dlp's own default `--continue`-on-restart behavior (yt-dlp already resumes a partial `.part` file for free if re-invoked with the identical output path) and rely on the user manually re-pasting the same URL with the same settings
+- A full persistent job queue (survives restarts, tracks progress, retries automatically)
+- Detect resumability by scanning `DOWNLOADS_DIR` for `.part` files at startup instead of recording requests explicitly
+
+**Reasoning:**
+- yt-dlp's resume-by-default behavior only helps if the app re-issues the *exact* original request (same URL, quality, output path, naming options) - the missing piece was remembering what that request was and surfacing it to the user, not teaching yt-dlp to resume.
+- A full job queue is a much bigger feature (persistent progress, retry policy, multi-download scheduling) than "don't lose a single interrupted download when the app closes" calls for; `ROADMAP.md` explicitly scoped this as an investigation into surfacing yt-dlp's existing resume behavior, not a new download-orchestration system.
+- Scanning for `.part` files can't reconstruct the original request parameters (quality, naming template, numbering) needed to resume correctly, and yt-dlp's partial-file naming isn't uniformly predictable across formats - recording the actual request at start time is strictly more reliable.
+- Removing the record on every in-process termination path (not just success) is what makes a stale record mean "the process itself died" rather than "a download is currently running" or "the user cancelled" - both of the latter would be misleading to resurrect as a resume prompt on next launch.
+
+**Trade-offs:**
+- Only single-video downloads are covered - bulk/sequential downloads and Instagram downloads are not tracked by this registry; resuming a bulk batch mid-sequence is a materially bigger feature and is tracked as a separate `ROADMAP.md` item rather than folded in here.
+- The record is best-effort: if the app is killed before the `Destination:` line is even parsed, the resume prompt falls back to showing the raw URL instead of a title. This is a cosmetic gap, not a functional one.
+- Covered by `backend/test/pendingDownloads.test.js` (id stability/collision, title updates, removal, corrupt/missing state file) and a `backend/test/routes.test.js` case for the two new routes; the frontend banner has its own test (`frontend/src/components/__tests__/ResumeDownloadsBanner.test.jsx`).

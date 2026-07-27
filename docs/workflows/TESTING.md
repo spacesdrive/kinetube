@@ -27,10 +27,14 @@ Automated coverage focuses on **pure, deterministic logic** (URL parsing, text c
 | `backend/utils/whisperManager.js` | `backend/test/whisperManager.test.js` | `cleanTranscription()` timestamp stripping and paragraph collapsing; `MODELS` registry shape; `getModelPath()`; `getWhisperBinaryName()` per platform |
 | `backend/utils/paths.js` | `backend/test/paths.test.js` | `DOWNLOADS_DIR`/`MODELS_DIR`/`SESSIONS_DIR` resolve under `ELECTRON_USER_DATA` when set, and fall back to the backend-relative default when it is not |
 | `backend/utils/ytdlpManager.js` (platform resolution) | `backend/test/ytdlpManager.platform.test.js` | `getYtdlpAssetName`/`getYtdlpBinaryName`/`getYtdlpDownloadUrl` and `getFfmpegBinaryName`/`getFfmpegDownloadInfo` for `win32`/`darwin`/`linux`, and the rejection error for an unsupported platform |
-| `backend/server.js` (Express routes) | `backend/test/routes.test.js` | `GET /health`, `GET /api/ytdlp-status` (real local check, no network), `POST /api/info` validation errors, `GET /api/validate-path`, `GET /api/transcribe/setup/check`, `GET /api/transcribe/models`, `GET /api/instagram/accounts`, `GET /api/proxy/img` allow-list enforcement - driven with `supertest` against the exported `app` (see `docs/architecture/backend/EXPRESS.md`) |
+| `backend/utils/download.js` | `backend/test/download.test.js` | Redirect-following, progress callback values, redirect-limit exhaustion, non-200 responses, a mid-stream connection drop, and a non-existent destination directory - driven against a throwaway local `http` server, no real network calls |
+| `backend/utils/pendingDownloads.js` | `backend/test/pendingDownloads.test.js` | Id stability for identical params (no duplicate record) vs. different params (separate records), title updates, removal, and a missing/corrupt state file both resolving to an empty list |
+| `backend/server.js` (Express routes) | `backend/test/routes.test.js` | `GET /health`, `GET /api/ytdlp-status` (real local check, no network), `POST /api/info` validation errors, `GET /api/validate-path`, `GET /api/transcribe/setup/check`, `GET /api/transcribe/models`, `GET /api/instagram/accounts`, `GET /api/proxy/img` allow-list enforcement, `GET /api/download/pending` + `DELETE /api/download/pending/:id` - driven with `supertest` against the exported `app` (see `docs/architecture/backend/EXPRESS.md`) |
 | `frontend/src/lib/utils.js` | `frontend/src/lib/__tests__/utils.test.js` | `cn()` class merging (dedupe, conditional classes, Tailwind conflict resolution) |
 | `frontend/src/lib/urlCleaners.js` | `frontend/src/lib/__tests__/urlCleaners.test.js` | `cleanYouTubeUrl()`/`cleanInstagramUrl()` tracking-param stripping for every supported URL shape, non-matching/invalid input |
+| `frontend/src/lib/api.js` | `frontend/src/lib/__tests__/api.test.js` | `getJSON`/`postJSON` resolve without throwing on any status; `postJSONStrict` resolves on success and throws using the error/hint/detail fields (or a fallback message) on failure; `postRequest`/`deleteRequest` send the correct method/headers/body - `fetch` is mocked, no real network calls |
 | `frontend/src/components/ProgressModal.jsx` | `frontend/src/components/__tests__/ProgressModal.test.jsx` | Null render, single-download progress/done/failure/transcribe-button states, bulk-download totals and per-item status, Close vs. Cancel button state |
+| `frontend/src/components/ResumeDownloadsBanner.jsx` | `frontend/src/components/__tests__/ResumeDownloadsBanner.test.jsx` | Null render with no items, singular/plural copy, title vs. URL fallback, and that Resume/Dismiss call back with the clicked item |
 
 When adding a new pure function (a new parser, a new text-cleanup helper, a new path resolver, a new platform-resolution mapping) or a new non-network route, add a test in the same pass - do not defer it.
 
@@ -39,7 +43,8 @@ When adding a new pure function (a new parser, a new text-cleanup helper, a new 
 - **Tool managers' actual download/extract/build/spawn execution** (`ensureYtDlp`'s real download, `ensureWhisper`'s real clone-and-compile, `transcribeFile`, `setupToolsWithProgress`) - these hit real network endpoints, spawn real OS processes, and (for whisper.cpp on macOS/Linux) require a full C/C++ toolchain. Testing the real execution would mean either mocking `https`/`child_process` extensively (low signal-to-effort) or hitting real GitHub/Hugging Face/johnvansickle.com/evermeet.cx endpoints in CI (slow, flaky, downloads hundreds of MB to several GB, and would need real macOS/Linux runners to mean anything for those platforms). The platform-*resolution* logic (which URL, which binary name) is unit tested; the actual download/build is verified manually per the checklist below and tracked in `docs/philosophy/CROSS_PLATFORM.md`'s verification table.
 - **Streaming (SSE) routes end-to-end** (`/api/download`, `/api/setup`, `/api/transcribe/setup`, `/api/instagram/*download*`) - covered by manual verification only; they depend on the same real tool execution as above.
 - **Electron main process** (`main.js`) - window lifecycle and IPC are exercised by running the app, not by a headless test harness.
-- **Most React components** - only `ProgressModal.jsx` has a test suite so far. Extending coverage to other components (`VideoView.jsx`, `SettingsPage.jsx`, etc.) is tracked in `ROADMAP.md`.
+- **Most React components** - only `ProgressModal.jsx` and `ResumeDownloadsBanner.jsx` have test suites so far. Extending coverage to other components (`VideoView.jsx`, `SettingsPage.jsx`, etc.) is tracked in `ROADMAP.md`.
+- **Actually resuming a partial download** - `pendingDownloads.js`'s record-keeping is unit tested and the two routes are covered by `supertest`, but whether yt-dlp truly resumes a `.part` file byte-for-byte when re-invoked (rather than restarting) is yt-dlp's own behavior, not this app's code, and is verified manually (see the checklist below).
 
 ## Manual Verification Checklist
 
@@ -55,6 +60,8 @@ Run before shipping any change that isn't purely covered by the automated tests 
 - [ ] Paste a channel URL -> channel grid loads
 - [ ] Download a video at a quality requiring ffmpeg merge -> succeeds if ffmpeg is installed, shows the fallback warning if not
 - [ ] Extract MP3 from a video -> produces a playable file
+- [ ] Start a large download, force-quit the app mid-download (not a normal close/cancel), relaunch -> `ResumeDownloadsBanner` offers to resume it; clicking Resume continues from where it left off rather than restarting from 0%
+- [ ] Start a download, cancel it normally from the UI, relaunch -> no resume prompt appears for it (cancelling is not the same as the app being killed)
 
 ### Instagram
 - [ ] Paste a public post/reel URL -> downloads without login
@@ -142,3 +149,5 @@ describe('ProgressModal', () => {
 ```
 
 Note: shadcn's `DialogContent` renders its own built-in icon close button (accessibly named "Close") in addition to any close button the app renders explicitly. When asserting on a "Close" button, use `getAllByRole('button', { name: 'Close' })` rather than `getByRole`, which throws on multiple matches.
+
+Note: `frontend/vite.config.js`'s `test.globals` is deliberately left off (every test file imports `describe`/`it`/`expect`/`vi` explicitly from `'vitest'`, matching the rest of this codebase's no-implicit-globals style). Because of that, `@testing-library/react`'s automatic post-test DOM cleanup - which depends on detecting a global `afterEach` - never registers on its own. `frontend/src/test/setup.js` (wired in via `test.setupFiles`) registers `afterEach(cleanup)` once for every test file instead. Without it, a component test that queries `screen` by position or role (rather than by exact, unique text) can silently match an element left over from a previous test in the same file - this bit `ResumeDownloadsBanner.test.jsx` during development before the shared setup file was added.

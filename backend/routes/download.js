@@ -5,6 +5,12 @@ const path = require('path');
 const fs = require('fs');
 const { YTDLP_EXE_PATH, FFMPEG_EXE_PATH } = require('../utils/ytdlpManager');
 const { parseYouTubeUrl } = require('../utils/urlParser');
+const {
+  addPendingDownload,
+  updatePendingDownloadTitle,
+  removePendingDownload,
+  getPendingDownloads,
+} = require('../utils/pendingDownloads');
 
 const { DOWNLOADS_DIR: DEFAULT_DOWNLOADS_DIR } = require('../utils/paths');
 
@@ -138,6 +144,7 @@ router.get('/download', (req, res) => {
 
   const finish = (code) => {
     clearInterval(keepAlive);
+    removePendingDownload(pendingId);
     // Large retry value tells EventSource not to reconnect immediately.
     if (!res.writableEnded) res.write('retry: 3600000\n\n');
     if (code === 0) {
@@ -198,6 +205,20 @@ router.get('/download', (req, res) => {
 
   args.push(parsed.cleanUrl);
 
+  // Recorded so the next app launch can offer to resume this download if the
+  // app closes before it finishes - see docs/architecture/backend/MANAGERS.md.
+  const pendingId = addPendingDownload({
+    url: parsed.cleanUrl,
+    quality,
+    audioOnly: isAudioOnly,
+    outputDir,
+    prefix,
+    suffix,
+    mainName,
+    useNumbering: isNumbering,
+    sequenceNum: seqNum,
+  });
+
   // Send start — willMerge tells the frontend to pre-scale the progress bar
   send('start', { url: parsed.cleanUrl, quality, audioOnly: isAudioOnly, willMerge });
 
@@ -247,6 +268,7 @@ router.get('/download', (req, res) => {
         if (destCount === 1) {
           firstDestPath = destM[1];
           videoTitle = cleanTitle(destM[1]);
+          updatePendingDownloadTitle(pendingId, videoTitle);
           phase = isAudioOnly ? 'audio' : 'video';
         } else {
           // Second destination = audio track in a split video+audio download
@@ -285,15 +307,32 @@ router.get('/download', (req, res) => {
   proc.on('close', finish);
   proc.on('error', (err) => {
     clearInterval(keepAlive);
+    removePendingDownload(pendingId);
     send('done', { success: false, message: `Failed to start yt-dlp: ${err.message}` });
     if (!res.writableEnded) res.end();
   });
 
-  // Cancel: client closed the SSE stream
+  // Cancel: client closed the SSE stream. Deliberately removes the pending-download
+  // record too - a user-initiated cancel should not be offered back as "resume" on
+  // the next launch, only a download that was cut off by the app itself closing.
   res.on('close', () => {
     clearInterval(keepAlive);
+    removePendingDownload(pendingId);
     if (proc.exitCode === null) proc.kill('SIGTERM');
   });
+});
+
+// GET /api/download/pending — single-video downloads that were still in
+// flight the last time the app closed, so the frontend can offer to resume them
+router.get('/download/pending', (req, res) => {
+  res.json({ pending: getPendingDownloads() });
+});
+
+// DELETE /api/download/pending/:id — dismiss a resumable download without
+// restarting it (the partial file, if any, is left on disk untouched)
+router.delete('/download/pending/:id', (req, res) => {
+  removePendingDownload(req.params.id);
+  res.json({ success: true });
 });
 
 module.exports = router;

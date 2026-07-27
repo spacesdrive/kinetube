@@ -100,3 +100,37 @@ describe('GET /api/proxy/img', () => {
     assert.equal(res.status, 403);
   });
 });
+
+describe('GET /api/download/pending and DELETE /api/download/pending/:id', () => {
+  const { addPendingDownload, removePendingDownload } = require('../utils/pendingDownloads');
+
+  test('lists in-flight downloads and dismisses one by id', async () => {
+    const id = addPendingDownload({
+      url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      quality: 'best',
+      audioOnly: false,
+      outputDir: '',
+      prefix: '',
+      suffix: '',
+      mainName: '',
+      useNumbering: false,
+      sequenceNum: 1,
+    });
+
+    try {
+      const listRes = await request(app).get('/api/download/pending');
+      assert.equal(listRes.status, 200);
+      assert.ok(listRes.body.pending.some((r) => r.id === id));
+
+      const delRes = await request(app).delete(`/api/download/pending/${id}`);
+      assert.equal(delRes.status, 200);
+      assert.equal(delRes.body.success, true);
+
+      const listAfter = await request(app).get('/api/download/pending');
+      assert.ok(!listAfter.body.pending.some((r) => r.id === id));
+    } finally {
+      // In case an assertion above threw before the DELETE request ran.
+      removePendingDownload(id);
+    }
+  });
+});

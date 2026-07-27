@@ -9,6 +9,12 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
+Nothing yet.
+
+---
+
+## [1.4.0] - 2026-07-27
+
 ### Added
 
 **Resume an interrupted download**

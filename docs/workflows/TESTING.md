@@ -63,8 +63,8 @@ Run before shipping any change that isn't purely covered by the automated tests 
 - [ ] Download a video at a quality requiring ffmpeg merge -> succeeds if ffmpeg is installed, shows the fallback warning if not
 - [ ] Extract MP3 from a video -> produces a playable file
 - [ ] Start a large download, force-quit the app mid-download (not a normal close/cancel), relaunch -> `ResumeDownloadsBanner` offers to resume it; clicking Resume continues from where it left off rather than restarting from 0%
-- [ ] Start a large download, click Pause -> the modal shows Paused with a Resume button; click Resume -> the download continues from roughly where it paused, not from 0%
-- [ ] Start a download, cancel it normally from the UI, relaunch -> no resume prompt appears for it (cancelling is not the same as the app being killed)
+- [ ] Start a large download, click Pause -> the modal shows Paused with a Resume button almost immediately (not delayed until the download would have naturally finished - see `DECISIONS.md` ADR-021), and Task Manager shows no `yt-dlp.exe`/`ffmpeg.exe` still running afterward; click Resume -> the download continues from roughly where it paused, not from 0%
+- [ ] Start a download, cancel it normally from the UI, relaunch -> no resume prompt appears for it (cancelling is not the same as the app being killed), and Task Manager shows no `yt-dlp.exe`/`ffmpeg.exe` still running after the modal closes
 
 ### Instagram
 - [ ] Paste a public post/reel URL -> downloads without login

@@ -13,6 +13,13 @@ Nothing yet.
 
 ---
 
+## [1.5.1] - 2026-07-27
+
+### Fixed
+- **Pause (and Cancel) didn't actually stop a YouTube download** - clicking Pause while a video or audio stream was downloading appeared to do nothing until the download reached the merge step, at which point the UI reported "Paused" even though the file had actually finished downloading and merging in full in the background. Root cause: yt-dlp's release binaries are PyInstaller "onefile" builds - the process Node spawns is a launcher that starts a second, separate process to do the real download and just waits on it, so killing only the launcher PID left the real work running as an orphan. `backend/utils/processTree.js` now kills the entire process tree (`taskkill /pid <pid> /t /f` on Windows, a POSIX process-group kill elsewhere) instead of a plain `proc.kill()`. Applied to every yt-dlp-spawning kill site in `backend/routes/download.js` and `backend/routes/instagram.js` - Cancel had the identical defect and is fixed by the same change. See `DECISIONS.md` ADR-021.
+
+---
+
 ## [1.5.0] - 2026-07-27
 
 ### Added

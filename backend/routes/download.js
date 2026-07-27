@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const { YTDLP_EXE_PATH, FFMPEG_EXE_PATH } = require('../utils/ytdlpManager');
 const { parseYouTubeUrl } = require('../utils/urlParser');
+const { killProcessTree } = require('../utils/processTree');
 const {
   addPendingDownload,
   updatePendingDownloadTitle,
@@ -245,19 +246,25 @@ router.get('/download', (req, res) => {
   send('start', { id: pendingId, url: parsed.cleanUrl, quality, audioOnly: isAudioOnly, willMerge });
 
   // ── Spawn ────────────────────────────────────────────────────────────────────
-  const proc = spawn(YTDLP_EXE_PATH, args, { windowsHide: true });
+  // detached (POSIX only) makes proc the leader of its own process group, so
+  // killProcessTree can reach every process yt-dlp spawns underneath itself -
+  // see processTree.js for why a plain kill() is not enough.
+  const proc = spawn(YTDLP_EXE_PATH, args, {
+    windowsHide: true,
+    detached: process.platform !== 'win32',
+  });
 
   // ── Pausing a download ────────────────────────────────────────────────────
   // "Pause" is not OS-level process suspension (SIGSTOP has no Windows
-  // equivalent without a native addon) - it is the same abrupt SIGTERM kill
-  // "Cancel" already used, just with the pending-download record deliberately
-  // kept instead of cleared. yt-dlp already writes its .part file
-  // incrementally, so an abrupt kill here is exactly as resumable as the
-  // crash-recovery path in pendingDownloads.js (see DECISIONS.md ADR-020).
+  // equivalent without a native addon) - it is the same abrupt kill "Cancel"
+  // already used, just with the pending-download record deliberately kept
+  // instead of cleared. yt-dlp already writes its .part file incrementally,
+  // so an abrupt kill here is exactly as resumable as the crash-recovery path
+  // in pendingDownloads.js (see DECISIONS.md ADR-020).
   activeDownloads.set(pendingId, {
     pause: () => {
       isPaused = true;
-      if (proc.exitCode === null) proc.kill('SIGTERM');
+      killProcessTree(proc);
     },
   });
 
@@ -358,7 +365,7 @@ router.get('/download', (req, res) => {
     clearInterval(keepAlive);
     activeDownloads.delete(pendingId);
     if (!isPaused) removePendingDownload(pendingId);
-    if (proc.exitCode === null) proc.kill('SIGTERM');
+    killProcessTree(proc);
   });
 });
 

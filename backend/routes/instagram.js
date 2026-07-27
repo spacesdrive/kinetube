@@ -73,6 +73,7 @@ const {
   registerLoginProc, getActiveLogin, clearActiveLogin,
 } = require('../utils/instaloaderManager');
 const { YTDLP_EXE_PATH, FFMPEG_EXE_PATH } = require('../utils/ytdlpManager');
+const { killProcessTree } = require('../utils/processTree');
 
 const { DOWNLOADS_DIR } = require('../utils/paths');
 
@@ -452,9 +453,9 @@ function classifyYtdlpError(stderr) {
 // Runs yt-dlp and retries once after a 4-second delay if rate-limited.
 function spawnYtdlpWithRetry(args, timeout = 30000) {
   const run = () => new Promise((resolve, reject) => {
-    const proc = spawn(YTDLP_EXE_PATH, args, { windowsHide: true });
+    const proc = spawn(YTDLP_EXE_PATH, args, { windowsHide: true, detached: process.platform !== 'win32' });
     let stdout = '', stderr = '';
-    const timer = setTimeout(() => { proc.kill(); reject(new Error('Metadata fetch timed out.')); }, timeout);
+    const timer = setTimeout(() => { killProcessTree(proc); reject(new Error('Metadata fetch timed out.')); }, timeout);
 
     proc.stdout.on('data', (d) => stdout += d.toString());
     proc.stderr.on('data', (d) => stderr += d.toString());
@@ -874,7 +875,7 @@ router.get('/instagram/download', (req, res) => {
 
   const PROGRESS_RE = /^\[download\]\s+([\d.]+)%\s+of\s+~?[\d.]+\s*\S+\s+at\s+~?([\d.]+\s*\S+\/s)\s+ETA\s+(\S+)/;
 
-  const proc = spawn(YTDLP_EXE_PATH, ytdlpArgs, { windowsHide: true });
+  const proc = spawn(YTDLP_EXE_PATH, ytdlpArgs, { windowsHide: true, detached: process.platform !== 'win32' });
   let videoTitle = '';
   let firstDestPath = '';
   let isMultiFile = false;
@@ -923,7 +924,7 @@ router.get('/instagram/download', (req, res) => {
   });
 
   proc.on('error', (err) => done(false, `Failed to start download: ${err.message}`));
-  res.on('close', () => { clearInterval(keepAlive); if (proc.exitCode === null) proc.kill('SIGTERM'); });
+  res.on('close', () => { clearInterval(keepAlive); killProcessTree(proc); });
 });
 
 // ── Bulk download ─────────────────────────────────────────────────────────────
@@ -990,7 +991,7 @@ router.get('/instagram/bulk-download', (req, res) => {
     ytdlpArgs.push(item.url);
 
     const PROGRESS_RE = /^\[download\]\s+([\d.]+)%/;
-    const proc = spawn(YTDLP_EXE_PATH, ytdlpArgs, { windowsHide: true });
+    const proc = spawn(YTDLP_EXE_PATH, ytdlpArgs, { windowsHide: true, detached: process.platform !== 'win32' });
 
     let stderrBuf = '';
     let itemFirstDest = '';
@@ -1026,7 +1027,7 @@ router.get('/instagram/bulk-download', (req, res) => {
       setTimeout(downloadNext, 2500);
     });
 
-    res.on('close', () => { clearInterval(keepAlive); if (proc.exitCode === null) proc.kill('SIGTERM'); });
+    res.on('close', () => { clearInterval(keepAlive); killProcessTree(proc); });
   };
 
   downloadNext();

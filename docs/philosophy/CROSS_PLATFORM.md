@@ -35,6 +35,8 @@ All three are raw standalone binaries on the same pinned GitHub release (no zip 
 
 **Known narrower scope:** only x86_64 Linux is targeted (matching the Windows build's implicit x64-only assumption); `yt-dlp_linux_aarch64` exists upstream but is not wired up.
 
+**Stopping a running yt-dlp process requires killing its whole tree, not just the spawned PID.** All three platform builds are PyInstaller "onefile" binaries: the process Node's `spawn()` gets a handle to is a launcher that unpacks itself and execs a second, separate process to do the real work, then waits on it. A plain `proc.kill()` only ends the launcher, leaving the real download running orphaned - confirmed on Windows by reproduction (see `DECISIONS.md` ADR-021). `backend/utils/processTree.js`'s `killProcessTree()` is the fix: `taskkill /pid <pid> /t /f` on Windows, a POSIX process-group kill (`process.kill(-pid, 'SIGTERM')` against a process spawned with `detached: true`) elsewhere. The POSIX path is implemented on the same reasoning that the Windows bug applies there too, but - like the rest of this table - is not yet hardware-verified on real macOS/Linux.
+
 ## ffmpeg: implemented for all three platforms
 
 `backend/utils/ytdlpManager.js`'s `getFfmpegDownloadInfo(platform)` selects the source used by the same community-standard sources the popular `ffmpeg-static` npm package (1,300+ stars) relies on:

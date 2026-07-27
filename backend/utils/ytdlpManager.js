@@ -1,5 +1,4 @@
 
-const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -7,6 +6,7 @@ const { spawn, execSync } = require('child_process');
 const unzipper = require('unzipper');
 
 const { DOWNLOADS_DIR } = require('./paths');
+const { downloadFileWithProgress } = require('./download');
 
 const PLATFORM = process.platform; // 'win32' | 'darwin' | 'linux' | ...
 
@@ -75,78 +75,6 @@ function getFfmpegDownloadInfo(platform) {
 
 const FFMPEG_BINARY_NAME = getFfmpegBinaryName(PLATFORM);
 const FFMPEG_EXE_PATH = path.join(DOWNLOADS_DIR, FFMPEG_BINARY_NAME);
-
-// ── Basic download (no progress) — kept for backwards compat ────────────────
-
-function downloadFile(url, dest, maxRedirects = 5) {
-  return new Promise((resolve, reject) => {
-    function requestUrl(currentUrl, redirectsLeft) {
-      https.get(currentUrl, (response) => {
-        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-          if (redirectsLeft === 0) { reject(new Error(`Too many redirects for ${url}`)); return; }
-          const loc = response.headers.location.startsWith('http')
-            ? response.headers.location
-            : new URL(response.headers.location, currentUrl).toString();
-          requestUrl(loc, redirectsLeft - 1);
-        } else if (response.statusCode === 200) {
-          const file = fs.createWriteStream(dest);
-          response.pipe(file);
-          file.on('finish', () => file.close(resolve));
-          file.on('error', reject);
-        } else {
-          reject(new Error(`HTTP ${response.statusCode} for ${currentUrl}`));
-        }
-      }).on('error', (err) => { try { fs.unlinkSync(dest); } catch {} reject(err); });
-    }
-    requestUrl(url, maxRedirects);
-  });
-}
-
-// ── Progress-aware download ──────────────────────────────────────────────────
-// onProgress({ downloaded, total, percent, speed })
-
-function downloadFileWithProgress(url, dest, onProgress, maxRedirects = 10) {
-  return new Promise((resolve, reject) => {
-    function requestUrl(currentUrl, redirectsLeft) {
-      https.get(currentUrl, (response) => {
-        if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-          if (redirectsLeft === 0) { reject(new Error('Too many redirects')); return; }
-          const loc = response.headers.location.startsWith('http')
-            ? response.headers.location
-            : new URL(response.headers.location, currentUrl).toString();
-          requestUrl(loc, redirectsLeft - 1);
-        } else if (response.statusCode === 200) {
-          const total      = parseInt(response.headers['content-length'], 10) || 0;
-          let downloaded   = 0;
-          const startTime  = Date.now();
-
-          const file = fs.createWriteStream(dest);
-
-          response.on('data', (chunk) => {
-            downloaded += chunk.length;
-            const elapsedSec = (Date.now() - startTime) / 1000 || 0.001;
-            const speed      = downloaded / elapsedSec; // bytes/s
-            if (onProgress) {
-              onProgress({
-                downloaded,
-                total,
-                percent: total > 0 ? (downloaded / total) * 100 : 0,
-                speed,
-              });
-            }
-          });
-
-          response.pipe(file);
-          file.on('finish', () => file.close(resolve));
-          file.on('error', reject);
-        } else {
-          reject(new Error(`HTTP ${response.statusCode} for ${currentUrl}`));
-        }
-      }).on('error', (err) => { try { fs.unlinkSync(dest); } catch {} reject(err); });
-    }
-    requestUrl(url, maxRedirects);
-  });
-}
 
 // ── ffmpeg extraction helpers ─────────────────────────────────────────────────
 

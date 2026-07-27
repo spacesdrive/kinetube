@@ -16,8 +16,6 @@
 
 'use strict';
 
-const https   = require('https');
-const http    = require('http');
 const fs      = require('fs');
 const path    = require('path');
 const { spawn, execFile } = require('child_process');
@@ -26,6 +24,7 @@ const os        = require('os');
 
 const { FFMPEG_EXE_PATH } = require('./ytdlpManager');
 const { DOWNLOADS_DIR, MODELS_DIR } = require('./paths');
+const { downloadFileWithProgress } = require('./download');
 
 const WHISPER_VERSION = '1.8.4';
 
@@ -71,48 +70,6 @@ function getAvailableModels()   {
     sizeMB:  m.sizeMB,
     ready:   fs.existsSync(path.join(MODELS_DIR, m.file)),
   }));
-}
-
-// ── Generic download with progress + redirect following ───────────────────────
-
-function downloadFileWithProgress(url, dest, onProgress, maxRedirects = 12) {
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    const done = (err) => { if (!settled) { settled = true; err ? reject(err) : resolve(); } };
-
-    function go(currentUrl, left) {
-      const mod = currentUrl.startsWith('https') ? https : http;
-      const req = mod.get(currentUrl, (res) => {
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          res.resume();
-          if (left === 0) return done(new Error('Too many redirects'));
-          const next = res.headers.location.startsWith('http')
-            ? res.headers.location
-            : new URL(res.headers.location, currentUrl).toString();
-          return go(next, left - 1);
-        }
-        if (res.statusCode !== 200) {
-          res.resume();
-          return done(new Error(`HTTP ${res.statusCode} for ${currentUrl}`));
-        }
-        const total = parseInt(res.headers['content-length'], 10) || 0;
-        let downloaded = 0;
-        const t0 = Date.now();
-        const file = fs.createWriteStream(dest);
-        res.on('data', (chunk) => {
-          downloaded += chunk.length;
-          const speed = downloaded / ((Date.now() - t0) / 1000 || 0.001);
-          onProgress?.({ downloaded, total, percent: total ? (downloaded / total) * 100 : 0, speed });
-        });
-        res.on('error', (err) => { file.destroy(); done(err); });
-        file.on('error', done);
-        file.on('finish', () => file.close(() => done()));
-        res.pipe(file);
-      });
-      req.on('error', done);
-    }
-    go(url, maxRedirects);
-  });
 }
 
 // ── Build from source (macOS / Linux) ─────────────────────────────────────────

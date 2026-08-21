@@ -56,7 +56,7 @@ frontend/src/
     DownloadSettings.jsx     Quality/format/filename-template controls
     SetupScreen.jsx          First-run tool installation flow
     TranscribePage.jsx       Whisper model picker + transcription UI
-    SettingsPage.jsx         Persisted app settings (localStorage), exports loadSettings(); About card shows app version and a manual "Check for Updates" button (window.electronAPI, see DECISIONS.md ADR-019)
+    SettingsPage.jsx         Persisted app settings (localStorage), exports loadSettings(); About card shows app version and a manual "Check for Updates" button (window.electronAPI, see DECISIONS.md ADR-019), plus a yt-dlp version row with its own live "Check for Updates"/"Update to <version>" flow against GitHub (see DECISIONS.md ADR-022)
     UpdateDialog.jsx         Consumes window.electronAPI.onUpdateStatus()
     YtdlpAlert.jsx           Banner shown when yt-dlp/ffmpeg is missing or outdated
     ModeToggle.jsx           Light/dark theme toggle (next-themes)

@@ -26,6 +26,8 @@ All routes are mounted under `/api` (plus the top-level `/health` and the inline
 |---|---|---|
 | GET | `/api/setup` | SSE stream that runs `ytdlpManager.setupToolsWithProgress()` - downloads yt-dlp and ffmpeg if missing |
 | GET | `/api/setup/check` | Returns current install status for yt-dlp and ffmpeg without downloading anything |
+| GET | `/api/ytdlp-update-check` | Live check against yt-dlp's latest GitHub release (`ytdlpManager.checkForYtdlpUpdate()`) - distinct from `/api/ytdlp-status`'s `needsUpdate`, which only compares against the version pinned in code. `{ checked: false, error }` on a network failure or if yt-dlp isn't installed yet; never a 5xx. See `DECISIONS.md` ADR-022. |
+| GET | `/api/ytdlp-update` | SSE stream that re-downloads yt-dlp's latest release over the current binary (`ytdlpManager.updateYtdlp()`), same `progress`/`done` shape as `/api/setup`. Rejects a second concurrent request with `done: { success: false }` while one is already running. |
 
 ## Transcribe (`backend/routes/transcribe.js`)
 

@@ -1,9 +1,10 @@
 const express = require('express');
 const router  = express.Router();
-const { setupToolsWithProgress, checkYtdlpStatus } = require('../utils/ytdlpManager');
+const { setupToolsWithProgress, checkYtdlpStatus, checkForYtdlpUpdate, updateYtdlp } = require('../utils/ytdlpManager');
 
 // Track whether a setup run is already in progress to prevent parallel downloads.
 let setupRunning = false;
+let ytdlpUpdateRunning = false;
 
 // GET /api/setup — SSE stream that downloads yt-dlp + ffmpeg with live progress.
 // If both tools are already present it immediately signals 'done' without
@@ -74,6 +75,57 @@ router.get('/setup/check', (req, res) => {
     ffmpegReady: status.ffmpegAvailable,
     allReady:    status.exists && status.ffmpegAvailable,
   });
+});
+
+// GET /api/ytdlp-update-check — live check against yt-dlp's latest GitHub
+// release (distinct from /setup/check, which only checks local presence).
+// Best-effort: network failure resolves to checked:false, not a 5xx - this
+// is a background "is anything new" check, not a required capability.
+router.get('/ytdlp-update-check', async (req, res) => {
+  res.json(await checkForYtdlpUpdate());
+});
+
+// GET /api/ytdlp-update — SSE stream that re-downloads yt-dlp's latest
+// release over the current binary. Mirrors /api/setup's event shape.
+router.get('/ytdlp-update', (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+  if (res.socket) res.socket.setNoDelay(true);
+
+  const send = (event, data) => {
+    if (res.writableEnded) return;
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    if (typeof res.flush === 'function') res.flush();
+  };
+
+  const keepAlive = setInterval(() => {
+    if (!res.writableEnded) {
+      res.write(': keepalive\n\n');
+      if (typeof res.flush === 'function') res.flush();
+    }
+  }, 15000);
+
+  const finish = (success, message) => {
+    clearInterval(keepAlive);
+    ytdlpUpdateRunning = false;
+    send('done', { success, message });
+    if (!res.writableEnded) res.end();
+  };
+
+  if (ytdlpUpdateRunning) {
+    finish(false, 'An update is already in progress.');
+    return;
+  }
+  ytdlpUpdateRunning = true;
+
+  updateYtdlp((prog) => send('progress', prog))
+    .then((version) => finish(true, `Updated to yt-dlp ${version}.`))
+    .catch((err) => finish(false, err.message));
+
+  res.on('close', () => clearInterval(keepAlive));
 });
 
 module.exports = router;

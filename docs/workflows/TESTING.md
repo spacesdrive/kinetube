@@ -26,7 +26,7 @@ Automated coverage focuses on **pure, deterministic logic** (URL parsing, text c
 | `backend/utils/instagramUrlParser.js` | `backend/test/instagramUrlParser.test.js` | Post, reel, story, profile, profile `/reels`, `/tagged`, reserved-path rejection, tracking-param stripping, invalid input |
 | `backend/utils/whisperManager.js` | `backend/test/whisperManager.test.js` | `cleanTranscription()` timestamp stripping and paragraph collapsing; `MODELS` registry shape; `getModelPath()`; `getWhisperBinaryName()` per platform |
 | `backend/utils/paths.js` | `backend/test/paths.test.js` | `DOWNLOADS_DIR`/`MODELS_DIR`/`SESSIONS_DIR` resolve under `ELECTRON_USER_DATA` when set, and fall back to the backend-relative default when it is not |
-| `backend/utils/ytdlpManager.js` (platform resolution) | `backend/test/ytdlpManager.platform.test.js` | `getYtdlpAssetName`/`getYtdlpBinaryName`/`getYtdlpDownloadUrl` and `getFfmpegBinaryName`/`getFfmpegDownloadInfo` for `win32`/`darwin`/`linux`, and the rejection error for an unsupported platform |
+| `backend/utils/ytdlpManager.js` (platform resolution) | `backend/test/ytdlpManager.platform.test.js` | `getYtdlpAssetName`/`getYtdlpBinaryName`/`getYtdlpDownloadUrl` and `getFfmpegBinaryName`/`getFfmpegDownloadInfo` for `win32`/`darwin`/`linux`, and the rejection error for an unsupported platform; `isNewerYtdlpVersion()`'s numeric (not string) part-by-part comparison, patch suffixes, and missing input |
 | `backend/utils/download.js` | `backend/test/download.test.js` | Redirect-following, progress callback values, redirect-limit exhaustion, non-200 responses, a mid-stream connection drop, and a non-existent destination directory - driven against a throwaway local `http` server, no real network calls |
 | `backend/utils/pendingDownloads.js` | `backend/test/pendingDownloads.test.js` | Id stability for identical params (no duplicate record) vs. different params (separate records), title updates, removal, and a missing/corrupt state file both resolving to an empty list |
 | `backend/server.js` (Express routes) | `backend/test/routes.test.js` | `GET /health`, `GET /api/ytdlp-status` (real local check, no network), `POST /api/info` validation errors, `GET /api/validate-path`, `GET /api/transcribe/setup/check`, `GET /api/transcribe/models`, `GET /api/instagram/accounts`, `GET /api/proxy/img` allow-list enforcement, `GET /api/download/pending` + `DELETE /api/download/pending/:id`, `POST /api/download/:id/pause` (404 case) - driven with `supertest` against the exported `app` (see `docs/architecture/backend/EXPRESS.md`) |
@@ -45,6 +45,7 @@ When adding a new pure function (a new parser, a new text-cleanup helper, a new 
 - **Electron main process** (`main.js`) - window lifecycle and IPC are exercised by running the app, not by a headless test harness.
 - **Most React components** - only `ProgressModal.jsx` and `ResumeDownloadsBanner.jsx` have test suites so far. Extending coverage to other components (`VideoView.jsx`, `SettingsPage.jsx`, etc.) is tracked in `ROADMAP.md`.
 - **Actually resuming a partial download** - `pendingDownloads.js`'s record-keeping is unit tested and the two routes are covered by `supertest`, but whether yt-dlp truly resumes a `.part` file byte-for-byte when re-invoked (rather than restarting) is yt-dlp's own behavior, not this app's code, and is verified manually (see the checklist below).
+- **`checkForYtdlpUpdate()`/`updateYtdlp()`** - both require a real call to GitHub's API (and the latter a real binary download), so only the pure comparison logic (`isNewerYtdlpVersion()`) is unit tested; the live check and update flow were verified manually end-to-end during development (see `DECISIONS.md` ADR-022) and are covered by the manual checklist below.
 
 ## Manual Verification Checklist
 
@@ -55,6 +56,7 @@ Run before shipping any change that isn't purely covered by the automated tests 
 - [ ] Backend `/health` responds before the Electron window shows content (watch the console log order)
 - [ ] `npm run dev` from a terminal inside an Electron-based editor (VS Code's integrated terminal is the common case) still opens the window - this is the scenario `ELECTRON_RUN_AS_NODE` leaks into, see `DECISIONS.md` ADR-018
 - [ ] Settings -> About shows the running version and "Check for Updates" works: shows "only runs in a packaged build" in dev, and (on a packaged build) either finds/offers an update or reports up to date
+- [ ] Settings -> About shows the installed yt-dlp version; "Check for Updates" reports up to date or offers an "Update to `<version>`" button when a newer release exists; clicking it shows a progress bar and finishes with the new version reflected in the badge - confirm with `yt-dlp --version` from a terminal that the on-disk binary actually changed
 
 ### YouTube
 - [ ] Paste a video URL -> metadata and quality picker appear

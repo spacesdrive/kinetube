@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Save, RotateCcw, Folder, CheckCircle, RefreshCw } from 'lucide-react';
+import { Save, RotateCcw, Folder, CheckCircle, RefreshCw, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { getJSON } from '@/lib/api';
 
 // ── Persisted settings schema ─────────────────────────────────────────────────
@@ -104,8 +105,21 @@ export default function SettingsPage({ onSave }) {
   // 'idle' | 'checking' | 'up-to-date' | 'dev-mode' | 'error'
   const [updateCheckState, setUpdateCheckState] = useState('idle');
 
+  // yt-dlp version + live update check (distinct from the app's own updater
+  // above - this checks yt-dlp's GitHub releases, not KineTube's).
+  const [ytdlpVersion, setYtdlpVersion]     = useState(null);
+  // 'idle' | 'checking' | 'up-to-date' | 'available' | 'updating' | 'updated' | 'error'
+  const [ytdlpUpdateState, setYtdlpUpdateState] = useState('idle');
+  const [ytdlpLatestVersion, setYtdlpLatestVersion] = useState(null);
+  const [ytdlpUpdateError, setYtdlpUpdateError]     = useState('');
+  const [ytdlpUpdatePercent, setYtdlpUpdatePercent] = useState(0);
+
   useEffect(() => {
     window.electronAPI?.getAppVersion?.().then(setAppVersion).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    getJSON('/api/ytdlp-status').then((s) => setYtdlpVersion(s.currentVersion || null)).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -127,6 +141,58 @@ export default function SettingsPage({ onSave }) {
     } catch {
       setUpdateCheckState('error');
     }
+  }, []);
+
+  const checkForYtdlpUpdate = useCallback(async () => {
+    setYtdlpUpdateState('checking');
+    setYtdlpUpdateError('');
+    try {
+      const result = await getJSON('/api/ytdlp-update-check');
+      if (!result.checked) {
+        setYtdlpUpdateError(result.error || 'Could not check for updates.');
+        setYtdlpUpdateState('error');
+        return;
+      }
+      setYtdlpVersion(result.currentVersion);
+      if (result.updateAvailable) {
+        setYtdlpLatestVersion(result.latestVersion);
+        setYtdlpUpdateState('available');
+      } else {
+        setYtdlpUpdateState('up-to-date');
+      }
+    } catch {
+      setYtdlpUpdateError('Could not check for updates.');
+      setYtdlpUpdateState('error');
+    }
+  }, []);
+
+  const updateYtdlpNow = useCallback(() => {
+    setYtdlpUpdateState('updating');
+    setYtdlpUpdatePercent(0);
+    const es = new EventSource('/api/ytdlp-update');
+    es.addEventListener('progress', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.percent) setYtdlpUpdatePercent(data.percent);
+      } catch { /* ignore malformed progress event */ }
+    });
+    es.addEventListener('done', (e) => {
+      es.close();
+      let data = {};
+      try { data = JSON.parse(e.data); } catch { /* ignore malformed done event */ }
+      if (data.success) {
+        setYtdlpUpdateState('updated');
+        getJSON('/api/ytdlp-status').then((s) => setYtdlpVersion(s.currentVersion || null)).catch(() => {});
+      } else {
+        setYtdlpUpdateError(data.message || 'Update failed.');
+        setYtdlpUpdateState('error');
+      }
+    });
+    es.onerror = () => {
+      es.close();
+      setYtdlpUpdateError('Connection lost during update.');
+      setYtdlpUpdateState('error');
+    };
   }, []);
 
   const update = useCallback((section, key, value) => {
@@ -363,6 +429,56 @@ export default function SettingsPage({ onSave }) {
                 <Separator />
               </>
             )}
+
+            {ytdlpVersion && (
+              <>
+                <SettingRow
+                  label="yt-dlp"
+                  hint={
+                    ytdlpUpdateState === 'up-to-date' ? "You're on the latest yt-dlp release."
+                    : ytdlpUpdateState === 'available' ? `yt-dlp ${ytdlpLatestVersion} is available.`
+                    : ytdlpUpdateState === 'updated' ? 'yt-dlp updated successfully.'
+                    : ytdlpUpdateState === 'error' ? ytdlpUpdateError
+                    : 'YouTube downloads depend on yt-dlp staying current with site changes.'
+                  }
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="font-mono text-xs">{ytdlpVersion}</Badge>
+                    {ytdlpUpdateState === 'available' ? (
+                      <Button
+                        size="sm"
+                        onClick={updateYtdlpNow}
+                        className="gap-1.5 bg-amber-500 hover:bg-amber-600"
+                      >
+                        <Download size={13} />
+                        Update to {ytdlpLatestVersion}
+                      </Button>
+                    ) : ytdlpUpdateState === 'updating' ? (
+                      <Button size="sm" variant="outline" disabled className="gap-1.5">
+                        <RefreshCw size={13} className="animate-spin" />
+                        Updating… {ytdlpUpdatePercent > 0 ? `${Math.round(ytdlpUpdatePercent)}%` : ''}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={checkForYtdlpUpdate}
+                        disabled={ytdlpUpdateState === 'checking'}
+                        className="gap-1.5"
+                      >
+                        <RefreshCw size={13} className={ytdlpUpdateState === 'checking' ? 'animate-spin' : ''} />
+                        {ytdlpUpdateState === 'checking' ? 'Checking…' : 'Check for Updates'}
+                      </Button>
+                    )}
+                  </div>
+                </SettingRow>
+                {ytdlpUpdateState === 'updating' && (
+                  <Progress value={ytdlpUpdatePercent} className="h-1.5" />
+                )}
+                <Separator />
+              </>
+            )}
+
             <div className="text-sm text-muted-foreground space-y-1">
               <p>
                 <span className="font-semibold text-foreground">KineTube</span> — local YouTube &amp; Instagram downloader

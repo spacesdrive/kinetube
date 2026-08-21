@@ -6,6 +6,7 @@ const {
   getYtdlpDownloadUrl,
   getFfmpegBinaryName,
   getFfmpegDownloadInfo,
+  isNewerYtdlpVersion,
 } = require('../utils/ytdlpManager');
 
 describe('yt-dlp platform resolution', () => {
@@ -38,6 +39,33 @@ describe('yt-dlp platform resolution', () => {
       getYtdlpDownloadUrl('win32'),
       'https://github.com/yt-dlp/yt-dlp/releases/download/2026.03.17/yt-dlp.exe',
     );
+  });
+});
+
+describe('yt-dlp version comparison', () => {
+  test('a numerically greater calendar version is newer', () => {
+    assert.equal(isNewerYtdlpVersion('2026.08.19', '2026.03.17'), true);
+    assert.equal(isNewerYtdlpVersion('2026.03.17', '2026.08.19'), false);
+  });
+
+  test('compares parts numerically, not as strings ("10" > "9")', () => {
+    assert.equal(isNewerYtdlpVersion('2026.3.10', '2026.3.9'), true);
+    assert.equal(isNewerYtdlpVersion('2026.3.9', '2026.3.10'), false);
+  });
+
+  test('identical versions are not "newer"', () => {
+    assert.equal(isNewerYtdlpVersion('2026.03.17', '2026.03.17'), false);
+  });
+
+  test('a patch suffix makes a version newer than its base', () => {
+    assert.equal(isNewerYtdlpVersion('2026.03.17.1', '2026.03.17'), true);
+    assert.equal(isNewerYtdlpVersion('2026.03.17', '2026.03.17.1'), false);
+  });
+
+  test('missing input never counts as newer', () => {
+    assert.equal(isNewerYtdlpVersion(null, '2026.03.17'), false);
+    assert.equal(isNewerYtdlpVersion('2026.03.17', null), false);
+    assert.equal(isNewerYtdlpVersion(undefined, undefined), false);
   });
 });
 

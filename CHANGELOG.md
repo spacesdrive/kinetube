@@ -13,6 +13,19 @@ Nothing yet.
 
 ---
 
+## [1.6.0] - 2026-07-27
+
+### Added
+
+**Live yt-dlp update check in Settings**
+- Settings' About card now shows the installed yt-dlp version with its own "Check for Updates" button, alongside the app's own version/update row. The check calls GitHub's latest-release API directly, so it can tell you about a newer yt-dlp release even if KineTube's own pinned baseline hasn't been bumped yet.
+- When a newer release is found, the button becomes "Update to `<version>`" - clicking it re-downloads that release in place, with a live progress bar, no manual file swap required. Works the same way across Windows, macOS, and Linux (each platform's own yt-dlp release asset).
+- New routes: `GET /api/ytdlp-update-check` (JSON), `GET /api/ytdlp-update` (SSE download stream).
+- Fixed a related bug this surfaced: the existing pinned-version "outdated" check used a plain inequality, so a binary updated *past* the pinned baseline via this new feature was incorrectly flagged as outdated again. It now only flags a binary that is genuinely older.
+- See `DECISIONS.md` ADR-022.
+
+---
+
 ## [1.5.1] - 2026-07-27
 
 ### Fixed

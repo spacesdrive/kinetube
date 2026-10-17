@@ -5,7 +5,7 @@ import MediaThumbnail from '@/components/patterns/MediaThumbnail';
 import StatusBadge from '@/components/patterns/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { formatDuration, formatUploadDate, formatViews } from '@/lib/format';
 import { QUALITY_LABELS, VIDEO_QUALITIES } from '@/lib/qualities';
 import { cn } from '@/lib/utils';
@@ -30,10 +30,13 @@ function QualityMenu({ video, onDownload }: Pick<VideoEntryRowProps, 'video' | '
         <Download />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuLabel>Download as</DropdownMenuLabel>
-        {VIDEO_QUALITIES.map((quality) => (
-          <DropdownMenuItem key={quality} onClick={() => onDownload(video, quality, false)}>{QUALITY_LABELS[quality]}</DropdownMenuItem>
-        ))}
+        {/* Base UI throws when a menu label sits outside a group, which blanks the whole app */}
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>Download as</DropdownMenuLabel>
+          {VIDEO_QUALITIES.map((quality) => (
+            <DropdownMenuItem key={quality} onClick={() => onDownload(video, quality, false)}>{QUALITY_LABELS[quality]}</DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => onDownload(video, 'best', true)}><Music /> Audio only (MP3)</DropdownMenuItem>
       </DropdownMenuContent>

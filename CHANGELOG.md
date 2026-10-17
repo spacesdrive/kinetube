@@ -15,6 +15,10 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 ### Changed
 - Both GitHub Actions workflows use `actions/checkout@v7`, `actions/setup-node@v7` and, for releases, `softprops/action-gh-release@v3`, which run on Node 24 instead of the deprecated Node 20 (issue #19).
 - The README animations are animated WebP files instead of GIFs, about 4.7 MB in total instead of 23 MB, so the README loads much faster on GitHub. `npm run demos` now runs `scripts/make-demos.mts` (issue #13, ADR-039).
+- The README badges come from badgen.net. shields.io had run out of GitHub tokens and showed an error instead of the star count (issue #20).
+
+### Fixed
+- Opening the Theme menu in the sidebar, or the Download menu on a video in a playlist or channel, no longer leaves an empty window. Base UI throws when a menu label sits outside a menu group, and that error unmounted the whole app (issue #23).
 
 ## [2.0.0] - 2026-10-17
 

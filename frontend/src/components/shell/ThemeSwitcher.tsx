@@ -28,8 +28,9 @@ export default function ThemeSwitcher() {
           <span className="ml-auto text-xs text-ink-faint group-data-[collapsible=icon]:hidden">{current?.label}</span>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="start" className="w-56">
-          <DropdownMenuLabel>Theme</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={asThemeChoice(theme)} onValueChange={(value) => setTheme(asThemeChoice(String(value)))}>
+            {/* the label belongs inside the group: Base UI throws otherwise */}
+            <DropdownMenuLabel>Theme</DropdownMenuLabel>
             {THEMES.map(({ value, label, Icon }) => (
               <DropdownMenuRadioItem key={value} value={value}>
                 <Icon />

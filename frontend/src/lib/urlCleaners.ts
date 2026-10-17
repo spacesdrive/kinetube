@@ -1,5 +1,6 @@
 const VIDEO_ID_PATTERN = /^[a-zA-Z0-9_-]{11}$/;
-const CHANNEL_PATH_PATTERN = /^\/(@[\w.-]+|channel\/UC[\w-]+|c\/[\w-]+|user\/[\w-]+)/;
+const PLAYLIST_ID_PATTERN = /^[a-zA-Z0-9_-]{10,64}$/;
+const CHANNEL_PATH_PATTERN = /^\/(@[\w.-]+|channel\/UC[\w-]+|c\/[\w-]+|user\/[\w-]+)(\/(videos|shorts|streams|playlists))?/;
 
 function readUrl(text: string): URL | null {
   try {
@@ -9,25 +10,39 @@ function readUrl(text: string): URL | null {
   }
 }
 
-const bareHost = (url: URL): string => url.hostname.replace(/^(www\.|m\.)/, '');
+const bareHost = (url: URL): string => url.hostname.replace(/^(www\.|m\.|music\.)/, '');
+
+function playlistIdOf(url: URL): string | null {
+  const listId = url.searchParams.get('list') ?? '';
+  return PLAYLIST_ID_PATTERN.test(listId) ? listId : null;
+}
+
+// a watch link keeps its playlist, so the page can offer to load the whole list
+function watchUrl(videoId: string, playlistId: string | null): string {
+  const base = `https://www.youtube.com/watch?v=${videoId}`;
+  return playlistId ? `${base}&list=${playlistId}` : base;
+}
 
 function cleanYouTubePath(url: URL): string | null {
   const host = bareHost(url);
   const pathname = url.pathname.replace(/\/$/, '');
+  const playlistId = playlistIdOf(url);
 
   if (host === 'youtu.be') {
     const videoId = pathname.slice(1).split('/')[0] ?? '';
-    return VIDEO_ID_PATTERN.test(videoId) ? `https://youtu.be/${videoId}` : null;
+    if (!VIDEO_ID_PATTERN.test(videoId)) return null;
+    return playlistId ? watchUrl(videoId, playlistId) : `https://youtu.be/${videoId}`;
   }
   if (pathname === '/watch') {
     const videoId = url.searchParams.get('v') ?? '';
-    return VIDEO_ID_PATTERN.test(videoId) ? `https://www.youtube.com/watch?v=${videoId}` : null;
+    return VIDEO_ID_PATTERN.test(videoId) ? watchUrl(videoId, playlistId) : null;
   }
+  if (pathname === '/playlist') return playlistId ? `https://www.youtube.com/playlist?list=${playlistId}` : null;
 
   const shortsId = pathname.match(/^\/shorts\/([a-zA-Z0-9_-]{11})/)?.[1];
   if (shortsId) return `https://www.youtube.com/shorts/${shortsId}`;
-  if (CHANNEL_PATH_PATTERN.test(pathname)) return `https://www.youtube.com${pathname}`;
-  return null;
+  const channelPath = pathname.match(CHANNEL_PATH_PATTERN)?.[0];
+  return channelPath ? `https://www.youtube.com${channelPath}` : null;
 }
 
 // shows a clean link the moment it is pasted: "youtu.be/ID?si=xyz" -> "https://youtu.be/ID"
@@ -60,4 +75,10 @@ export function cleanInstagramUrl(raw: string): string {
 
 export function isInstagramLink(text: string): boolean {
   return /instagram\.com/i.test(text);
+}
+
+export function looksLikeLink(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || /\s/.test(trimmed)) return false;
+  return /^(https?:\/\/)?([\w-]+\.)*(youtube\.com|youtu\.be|instagram\.com)\//i.test(trimmed);
 }

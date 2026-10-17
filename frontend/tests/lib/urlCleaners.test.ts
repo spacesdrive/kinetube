@@ -7,13 +7,25 @@ describe('cleanYouTubeUrl', () => {
     expect(cleanYouTubeUrl('https://youtu.be/dQw4w9WgXcQ?si=xyz&pp=abc')).toBe('https://youtu.be/dQw4w9WgXcQ');
   });
 
-  it('keeps only the v parameter of a watch link', () => {
-    expect(cleanYouTubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=xyz&list=PL123')).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  it('keeps the v and list parameters of a watch link and drops the rest', () => {
+    expect(cleanYouTubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=xyz&list=PLuhl9TnQPDCnWIhy&index=4')).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLuhl9TnQPDCnWIhy');
+    expect(cleanYouTubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ&si=xyz')).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
   });
 
-  it('cleans a Shorts link and a channel link', () => {
+  it('turns a youtu.be link with a playlist into a watch link that keeps it', () => {
+    expect(cleanYouTubeUrl('https://youtu.be/dQw4w9WgXcQ?list=PLuhl9TnQPDCnWIhy&si=xyz')).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLuhl9TnQPDCnWIhy');
+  });
+
+  it('cleans a playlist link', () => {
+    expect(cleanYouTubeUrl('https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI&si=xyz')).toBe('https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI');
+    expect(cleanYouTubeUrl('https://music.youtube.com/playlist?list=PLuhl9TnQPDCnWIhy')).toBe('https://www.youtube.com/playlist?list=PLuhl9TnQPDCnWIhy');
+  });
+
+  it('cleans a Shorts link and a channel link, keeping the channel tab', () => {
     expect(cleanYouTubeUrl('https://www.youtube.com/shorts/dQw4w9WgXcQ?si=xyz')).toBe('https://www.youtube.com/shorts/dQw4w9WgXcQ');
     expect(cleanYouTubeUrl('https://www.youtube.com/@somechannel/videos?si=xyz')).toBe('https://www.youtube.com/@somechannel/videos');
+    expect(cleanYouTubeUrl('https://www.youtube.com/@somechannel/streams?si=xyz')).toBe('https://www.youtube.com/@somechannel/streams');
+    expect(cleanYouTubeUrl('https://www.youtube.com/@somechannel/playlists')).toBe('https://www.youtube.com/@somechannel/playlists');
   });
 
   it('adds a missing https', () => {

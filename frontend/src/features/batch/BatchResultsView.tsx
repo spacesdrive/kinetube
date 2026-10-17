@@ -1,7 +1,8 @@
 import { X } from 'lucide-react';
 
+import MetricBox from '@/components/patterns/MetricBox';
+import SectionHeader from '@/components/patterns/SectionHeader';
 import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
 import { countSelected, isCollection } from './batchResults';
 import BatchDownloadBar from './BatchDownloadBar';
 import { ErrorCard, WaitingCard } from './BatchStatusCards';
@@ -33,20 +34,22 @@ export default function BatchResultsView({ results, defaultQuality, onSelectionC
   const waitingCount = results.length - readyCount - errorCount;
 
   return (
-    <div className="mx-auto mt-4 w-full max-w-3xl">
-      <div className="mb-4 flex items-center justify-between px-1">
-        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          {waitingCount > 0 && <span className="flex items-center gap-1.5"><Spinner className="size-3" /> {waitingCount} to read</span>}
-          {readyCount > 0 && <span className="font-medium text-green-600">{readyCount} ready</span>}
-          {errorCount > 0 && <span className="text-red-500">{errorCount} failed</span>}
-        </div>
-        <Button type="button" variant="ghost" size="sm" onClick={onReset} className="gap-1 text-xs"><X size={12} /> Clear</Button>
+    <section className="space-y-4">
+      <SectionHeader title="Links" actions={<Button type="button" variant="ghost" size="sm" onClick={onReset}><X /> Clear</Button>} />
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <MetricBox label="To read" value={waitingCount} />
+        <MetricBox label="Ready" value={readyCount} tone="success" />
+        <MetricBox label="Failed" value={errorCount} tone={errorCount > 0 ? 'error' : 'neutral'} />
+        <MetricBox label="Selected" value={selectedCount} tone="accent" />
       </div>
-
-      {results.map((result, index) => (
-        <ResultCard key={result.url} result={result} onSelectionChange={(selectedIds) => onSelectionChange(index, selectedIds)} />
-      ))}
+      <ul className="space-y-2">
+        {results.map((result, index) => (
+          <li key={result.url}>
+            <ResultCard result={result} onSelectionChange={(selectedIds) => onSelectionChange(index, selectedIds)} />
+          </li>
+        ))}
+      </ul>
       {selectedCount > 0 && <BatchDownloadBar selectedCount={selectedCount} defaultQuality={defaultQuality} onDownload={onDownload} />}
-    </div>
+    </section>
   );
 }

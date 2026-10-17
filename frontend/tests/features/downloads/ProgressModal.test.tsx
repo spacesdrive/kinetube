@@ -74,8 +74,8 @@ describe('ProgressModal for a bulk download', () => {
 
     expect(screen.getByText('Bulk download')).toBeTruthy();
     expect(screen.getByText('2 / 3')).toBeTruthy();
-    expect(screen.getByText(/1 done/)).toBeTruthy();
-    expect(screen.getByText(/1 failed/)).toBeTruthy();
+    expect(screen.getByText('Saved').nextElementSibling?.textContent).toBe('1');
+    expect(screen.getByText('Failed').nextElementSibling?.textContent).toBe('1');
     expect(screen.getAllByText('Video C').length).toBe(2);
   });
 

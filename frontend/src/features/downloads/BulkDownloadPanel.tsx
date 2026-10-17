@@ -1,6 +1,5 @@
-import { AlertTriangle, ArrowDown, Check, XCircle } from 'lucide-react';
-
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import MetricBox from '@/components/patterns/MetricBox';
+import Notice from '@/components/patterns/Notice';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { summarizeBulk } from './bulkDownloadState';
@@ -17,9 +16,9 @@ export interface BulkDownloadPanelProps {
 
 function CurrentItem({ item }: { item: BulkItemState }) {
   return (
-    <div className="space-y-2 rounded-2xl bg-blue-50 p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Now downloading</p>
-      <p className="line-clamp-1 text-sm font-medium">{item.title}</p>
+    <div className="space-y-2 rounded-control bg-app p-4">
+      <p className="text-label text-ink-faint">Now downloading</p>
+      <p className="line-clamp-1 text-sm font-medium text-ink">{item.title}</p>
       <DownloadProgressBar percent={item.percent} isMerging={false} />
     </div>
   );
@@ -31,35 +30,25 @@ export default function BulkDownloadPanel({ download, onClose, onCancel }: BulkD
   const isAllDone = download.isFinished || doneCount === total;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <div className="mb-2 flex items-center justify-between text-sm font-semibold">
-          <span>Bulk download</span>
-          <span className="tabular-nums text-muted-foreground">{doneCount} / {total}</span>
+    <div className="space-y-5">
+      <div className="pr-8">
+        <div className="mb-2.5 flex items-center justify-between">
+          <p className="text-[15px] font-semibold text-ink">Bulk download</p>
+          <span className="text-[13px] text-ink-muted tabular-nums">{doneCount} / {total}</span>
         </div>
-        <Progress value={overallPercent} className="h-2" />
-        <div className="mt-2 flex gap-4 text-xs">
-          {succeededCount > 0 && <span className="flex items-center gap-1 font-medium text-green-600"><Check size={11} /> {succeededCount} done</span>}
-          {failedCount > 0 && <span className="flex items-center gap-1 font-medium text-red-600"><XCircle size={11} /> {failedCount} failed</span>}
-          {!isAllDone && <span className="flex items-center gap-1 font-medium text-blue-600"><ArrowDown size={11} /> Downloading...</span>}
-        </div>
+        <Progress value={overallPercent} aria-label="Overall progress" />
       </div>
-
-      {download.warning && (
-        <Alert variant="default" className="border-amber-200 bg-amber-50 py-2">
-          <AlertTriangle className="h-4 w-4 text-amber-500" />
-          <AlertDescription className="text-xs text-amber-700">{download.warning}</AlertDescription>
-        </Alert>
-      )}
+      <div className="grid grid-cols-2 gap-2">
+        <MetricBox label="Saved" value={succeededCount} tone="success" />
+        <MetricBox label="Failed" value={failedCount} tone={failedCount > 0 ? 'error' : 'neutral'} />
+      </div>
+      {download.warning && <Notice tone="warning">{download.warning}</Notice>}
       {current && <CurrentItem item={current} />}
       <BulkQueueList items={download.items} />
-
       {isAllDone ? (
-        <Button type="button" variant="outline" className="w-full" onClick={onClose}>Close</Button>
+        <Button type="button" variant="inverse" className="w-full" onClick={onClose}>Close</Button>
       ) : (
-        <Button type="button" variant="outline" className="w-full border-red-200 text-red-600 hover:bg-red-50" onClick={onCancel}>
-          Cancel downloads
-        </Button>
+        <Button type="button" variant="destructive" className="w-full" onClick={onCancel}>Cancel downloads</Button>
       )}
     </div>
   );

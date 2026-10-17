@@ -19,7 +19,7 @@ export default function FileNameFields({ settings, onChange }: FileNameFieldsPro
 
   return (
     <section>
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">File names</p>
+      <p className="mb-3 text-label text-ink-faint">File names</p>
       <FileNameTemplateField
         useCustomFilename={settings.useCustomFilename}
         template={settings.customFilenameTemplate}
@@ -29,11 +29,11 @@ export default function FileNameFields({ settings, onChange }: FileNameFieldsPro
 
       <div className="mb-3 grid grid-cols-2 gap-3">
         <div>
-          <Label htmlFor="file-prefix" className="mb-1 block text-xs">Prefix</Label>
+          <Label htmlFor="file-prefix" className="mb-1.5 block text-[13px] text-ink-muted">Prefix</Label>
           <Input id="file-prefix" value={settings.prefix} onChange={(event) => update({ prefix: event.target.value })} placeholder="For example [2024]" />
         </div>
         <div>
-          <Label htmlFor="file-suffix" className="mb-1 block text-xs">Suffix</Label>
+          <Label htmlFor="file-suffix" className="mb-1.5 block text-[13px] text-ink-muted">Suffix</Label>
           <Input id="file-suffix" value={settings.suffix} onChange={(event) => update({ suffix: event.target.value })} placeholder="For example [HD]" />
         </div>
       </div>
@@ -42,12 +42,12 @@ export default function FileNameFields({ settings, onChange }: FileNameFieldsPro
         <div className="flex items-center gap-2">
           <Switch id="auto-number" checked={settings.useNumbering} onCheckedChange={(useNumbering) => update({ useNumbering })} />
           <Label htmlFor="auto-number" className="flex cursor-pointer items-center gap-1.5">
-            <Hash size={12} className="text-muted-foreground" />
+            <Hash size={12} className="text-ink-faint" />
             Number the files
           </Label>
         </div>
         {settings.useNumbering && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-ink-muted">
             <label htmlFor="start-number">Start at</label>
             <Input
               id="start-number"
@@ -62,9 +62,9 @@ export default function FileNameFields({ settings, onChange }: FileNameFieldsPro
       </div>
 
       {hasNamingChange && (
-        <div className="mt-3 rounded-xl bg-blue-50 px-3 py-2.5">
-          <span className="mr-1.5 text-xs font-medium text-blue-500">Preview:</span>
-          <span className="break-all font-mono text-xs text-blue-700">{previewFileName(settings)}</span>
+        <div className="mt-4 rounded-control bg-spin-soft px-3 py-2.5">
+          <span className="mr-1.5 text-xs font-medium text-spin-text">Preview:</span>
+          <span className="break-all font-mono text-xs text-ink">{previewFileName(settings)}</span>
         </div>
       )}
     </section>

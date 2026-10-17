@@ -1,6 +1,8 @@
 import { RotateCcw, X } from 'lucide-react';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import ListRow from '@/components/patterns/ListRow';
+import SectionHeader from '@/components/patterns/SectionHeader';
+import StatusBadge from '@/components/patterns/StatusBadge';
 import { Button } from '@/components/ui/button';
 
 import type { Download } from '@shared/downloads.ts';
@@ -20,28 +22,23 @@ export default function ResumeDownloadsBanner({ downloads, onResume, onDismiss }
   if (downloads.length === 0) return null;
 
   return (
-    <Alert className="border-blue-200 bg-blue-50 text-blue-900 [&>svg]:text-blue-500">
-      <RotateCcw className="h-4 w-4" />
-      <AlertTitle>{bannerTitle(downloads.length)}</AlertTitle>
-      <AlertDescription className="space-y-2">
-        <p>These stopped before they finished. yt-dlp can pick up where it left off.</p>
-        <ul className="space-y-1.5">
-          {downloads.map((download) => (
-            <li key={download.id} className="flex items-center justify-between gap-2 rounded-md bg-white/60 px-2.5 py-1.5">
-              <span className="truncate text-sm" title={download.title || download.url}>{download.title || download.url}</span>
-              <div className="flex shrink-0 gap-1.5">
-                <Button type="button" size="sm" variant="secondary" onClick={() => onResume(download)}>
-                  <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
-                  Resume
-                </Button>
-                <Button type="button" size="sm" variant="ghost" aria-label="Dismiss" onClick={() => onDismiss(download)}>
-                  <X className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </AlertDescription>
-    </Alert>
+    <section className="rounded-card bg-surface p-5">
+      <SectionHeader title={bannerTitle(downloads.length)} description="These stopped before they finished. yt-dlp picks up where it left off." />
+      <ul className="-mx-2 mt-3 space-y-0.5">
+        {downloads.map((download) => (
+          <ListRow
+            key={download.id}
+            title={<span title={download.title || download.url}>{download.title || download.url}</span>}
+            meta={<StatusBadge tone={download.status === 'paused' ? 'warning' : 'neutral'}>{download.status === 'paused' ? 'Paused' : 'Interrupted'}</StatusBadge>}
+            trailing={(
+              <>
+                <Button type="button" size="sm" variant="secondary" onClick={() => onResume(download)}><RotateCcw /> Resume</Button>
+                <Button type="button" size="icon-sm" variant="ghost" aria-label="Dismiss" title="Dismiss" onClick={() => onDismiss(download)}><X /></Button>
+              </>
+            )}
+          />
+        ))}
+      </ul>
+    </section>
   );
 }

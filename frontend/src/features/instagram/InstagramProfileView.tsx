@@ -1,14 +1,16 @@
-import { Download, Mic, MicOff, Search } from 'lucide-react';
+import { SearchX } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import QualitySelect from '@/components/QualitySelect';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import CollectionHeader from '@/components/patterns/CollectionHeader';
+import EmptyState from '@/components/patterns/EmptyState';
+import Notice from '@/components/patterns/Notice';
+import SearchField from '@/components/patterns/SearchField';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { useIdSet } from '@/hooks/useIdSet';
+import { pluralize } from '@/lib/format';
 import { SHORT_QUALITY_LIST } from '@/lib/qualities';
-import ProfileHeader from './ProfileHeader';
+import { api } from '@/services/api';
+import SelectionBar from '../downloads/SelectionBar';
 import ProfilePostCard from './ProfilePostCard';
 
 import type { VideoQuality } from '@shared/downloads.ts';
@@ -32,17 +34,11 @@ export default function InstagramProfileView({ profile, defaultQuality, onDownlo
   }, [profile.entries, search]);
 
   const selected = profile.entries.filter((post) => selection.ids.has(post.id));
+  const targets = selected.length > 0 ? selected : filtered;
   const isAllSelected = filtered.length > 0 && filtered.every((post) => selection.ids.has(post.id));
-  const transcribeCount = selected.filter((post) => transcribeIds.ids.has(post.id)).length;
 
-  function downloadSelected() {
-    const items = selected.map((post) => ({
-      key: post.id,
-      url: post.url,
-      title: post.title,
-      platform: 'instagram' as const,
-      shouldTranscribe: transcribeIds.ids.has(post.id),
-    }));
+  function downloadTargets() {
+    const items = targets.map((post) => ({ key: post.id, url: post.url, title: post.title, platform: 'instagram' as const, shouldTranscribe: transcribeIds.ids.has(post.id) }));
     onBulkDownload({ items, quality, isAudioOnly: false });
   }
 
@@ -51,34 +47,21 @@ export default function InstagramProfileView({ profile, defaultQuality, onDownlo
   }
 
   return (
-    <div className="mx-auto mt-6 w-full max-w-5xl animate-fade-slide-up">
-      <ProfileHeader profile={profile} />
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[160px] flex-1">
-          <Search size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input aria-label="Filter posts" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filter posts..." className="h-9 pl-8 text-sm" />
-        </div>
-        <QualitySelect value={quality} options={SHORT_QUALITY_LIST} onChange={setQuality} className="h-9 w-36 text-sm" />
-        <label className="flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border px-3 text-sm">
+    <div className="space-y-6">
+      <CollectionHeader title={`@${profile.username}`} imageUrl={api.imageUrl(profile.avatarUrl)} isRound facts={[profile.name, pluralize(profile.postCount, 'post')].filter(Boolean)} />
+      {profile.isTruncated && <Notice tone="info">Showing the first {profile.entries.length} posts. Instagram limits how many one lookup can read.</Notice>}
+      <div className="flex flex-wrap items-center gap-3">
+        <SearchField value={search} label="Search the posts" onChange={setSearch} className="min-w-[220px] flex-1" />
+        <label className="flex h-10 cursor-pointer items-center gap-2 rounded-control border border-line-strong px-3 text-[13px] text-ink-muted">
           <Checkbox checked={isAllSelected} onCheckedChange={() => selection.toggleMany(filtered.map((post) => post.id))} />
-          {isAllSelected ? 'Clear selection' : 'Select all'}
+          {isAllSelected ? 'Clear the selection' : 'Select everything shown'}
         </label>
-        {transcribeCount > 0 && (
-          <Badge variant="secondary" className="gap-1 border border-purple-100 bg-purple-50 px-3 py-1.5 text-purple-600"><Mic size={11} /> {transcribeCount} to transcribe</Badge>
-        )}
-        <Button type="button" size="sm" onClick={downloadSelected} disabled={selected.length === 0} className="h-9 border-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700">
-          <Download size={13} className="mr-1.5" />
-          Download {selected.length > 0 ? `(${selected.length})` : 'selected'}
-        </Button>
       </div>
-      <p className="mb-3 flex items-center gap-1 px-1 text-xs text-muted-foreground">
-        <MicOff size={11} /> Select the microphone on a post to save a transcript when it downloads.
-      </p>
 
       {filtered.length === 0 ? (
-        <div className="py-16 text-center text-sm text-muted-foreground">{search ? 'No posts match the filter.' : 'This profile has no posts KineTube can read.'}</div>
+        <EmptyState icon={SearchX} title={search ? `Nothing matches "${search}"` : 'No posts to show'} description={search ? 'Try a shorter search.' : 'This profile has no posts kinetube can read.'} />
       ) : (
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filtered.map((post) => (
             <ProfilePostCard
               key={post.id}
@@ -92,6 +75,17 @@ export default function InstagramProfileView({ profile, defaultQuality, onDownlo
           ))}
         </ul>
       )}
+
+      <SelectionBar
+        noun="post"
+        selectedCount={selected.length}
+        targetCount={targets.length}
+        transcribeCount={targets.filter((post) => transcribeIds.ids.has(post.id)).length}
+        quality={quality}
+        qualities={SHORT_QUALITY_LIST}
+        onQualityChange={setQuality}
+        onDownload={downloadTargets}
+      />
     </div>
   );
 }

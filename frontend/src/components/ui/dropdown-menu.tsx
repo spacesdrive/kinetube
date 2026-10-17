@@ -41,7 +41,7 @@ function DropdownMenuContent({
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
           className={cn(
-            "z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 outline-none data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:overflow-hidden data-closed:fade-out-0 data-closed:zoom-out-95",
+            "z-50 max-h-(--available-height) w-(--anchor-width) min-w-32 origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-control bg-surface-elevated p-1 text-ink shadow-popover outline-none transition-[opacity,scale,translate] duration-150 ease-[cubic-bezier(0.2,0.8,0.2,1)] data-starting-style:scale-[0.97] data-starting-style:opacity-0 data-[side=bottom]:data-starting-style:-translate-y-1 data-[side=top]:data-starting-style:translate-y-1 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-ending-style:duration-100",
             className
           )}
           {...props} />
@@ -66,7 +66,7 @@ function DropdownMenuLabel({
       data-slot="dropdown-menu-label"
       data-inset={inset}
       className={cn(
-        "px-1.5 py-1 text-xs font-medium text-muted-foreground data-inset:pl-7",
+        "px-2 pt-1.5 pb-1 text-xs font-medium text-ink-faint data-inset:pl-7",
         className
       )}
       {...props} />
@@ -85,7 +85,7 @@ function DropdownMenuItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/dropdown-menu-item relative flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
+        "group/dropdown-menu-item relative flex h-9 cursor-default items-center gap-2 rounded-row px-2.5 text-sm outline-hidden transition-colors duration-100 select-none focus:bg-surface-hover focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 data-[variant=destructive]:*:[svg]:text-destructive",
         className
       )}
       {...props} />

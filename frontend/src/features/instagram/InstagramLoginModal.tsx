@@ -1,9 +1,8 @@
-import { CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 import { InstagramIcon } from '@/components/icons/BrandIcons';
-import { Badge } from '@/components/ui/badge';
+import StatusBadge from '@/components/patterns/StatusBadge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Separator } from '@/components/ui/separator';
 import InstaloaderSetup from './InstaloaderSetup';
 import LoginForm from './LoginForm';
 import TwoFactorForm from './TwoFactorForm';
@@ -21,41 +20,29 @@ export default function InstagramLoginModal({ onClose, onLoggedIn }: InstagramLo
   const isReady = setup.status === 'ready';
 
   return (
-    <Dialog
-      open
-      onOpenChange={(isOpen) => {
-        if (!isOpen) onClose();
-      }}
-    >
-      <DialogContent className="max-w-sm">
-        <DialogHeader className="items-center text-center">
-          <div className="mb-1 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow-lg shadow-pink-200">
-            <InstagramIcon className="h-6 w-6" />
+    <Dialog open onOpenChange={(isOpen) => { if (!isOpen) onClose(); }}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader className="items-start">
+          <span className="mb-1 flex size-10 items-center justify-center rounded-pill bg-surface text-ink"><InstagramIcon className="size-5" /></span>
+          <div className="flex items-center gap-2">
+            <DialogTitle>Log in to Instagram</DialogTitle>
+            {isReady && <StatusBadge tone="success">Ready</StatusBadge>}
           </div>
-          <DialogTitle>Instagram account</DialogTitle>
-          {isReady && <Badge variant="outline" className="gap-1 border-green-200 bg-green-50 text-green-600"><CheckCircle2 size={11} /> Ready</Badge>}
-          <DialogDescription className="sr-only">Log in to an Instagram account</DialogDescription>
+          <DialogDescription>A saved login helps profiles load. Posts and reels download without one.</DialogDescription>
         </DialogHeader>
 
         {!isReady && <InstaloaderSetup setup={setup} />}
         {isReady && login.step === 'credentials' && (
-          <LoginForm
-            username={login.username}
-            isSending={login.isSending}
-            error={login.error}
-            onUsernameChange={login.setUsername}
-            onSubmit={login.submitCredentials}
-          />
+          <LoginForm username={login.username} isSending={login.isSending} error={login.error} onUsernameChange={login.setUsername} onSubmit={login.submitCredentials} />
         )}
         {isReady && login.step === 'twoFactor' && (
           <TwoFactorForm isSending={login.isSending} error={login.error} onSubmit={login.submitCode} onBack={login.goBack} />
         )}
 
-        <Separator />
-        <div className="flex items-start gap-2 rounded-xl bg-muted p-3 text-xs text-muted-foreground">
-          <ShieldCheck size={13} className="mt-0.5 flex-shrink-0 text-green-500" />
-          Your password goes only to KineTube on this computer, and the login session is saved here too.
-        </div>
+        <p className="flex items-start gap-2 border-t border-divider pt-4 text-xs text-ink-muted">
+          <ShieldCheck size={14} className="mt-px flex-shrink-0 text-success" />
+          Your password goes only to kinetube on this computer, and the login session is saved here too.
+        </p>
       </DialogContent>
     </Dialog>
   );

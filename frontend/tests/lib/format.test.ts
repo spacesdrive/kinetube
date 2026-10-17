@@ -19,6 +19,8 @@ describe('format helpers', () => {
 
   it('writes durations as minutes and padded seconds', () => {
     expect(formatDuration(125)).toBe('2:05');
+    expect(formatDuration(19)).toBe('0:19');
+    expect(formatDuration(3725)).toBe('1:02:05');
     expect(formatDuration(0)).toBeNull();
   });
 

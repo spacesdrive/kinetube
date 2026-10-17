@@ -1,93 +1,51 @@
-import { MicOff, Search } from 'lucide-react';
-import { useMemo, useState } from 'react';
-
-import { Input } from '@/components/ui/input';
-import { useIdSet } from '@/hooks/useIdSet';
-import ChannelHeader from './ChannelHeader';
-import ChannelToolbar from './ChannelToolbar';
-import ChannelVideoRow from './ChannelVideoRow';
+import CollectionHeader from '@/components/patterns/CollectionHeader';
+import LoadingState from '@/components/patterns/LoadingState';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { pluralize } from '@/lib/format';
+import { api } from '@/services/api';
+import PlaylistGrid from './PlaylistGrid';
+import VideoCollection from './VideoCollection';
 
 import type { VideoQuality } from '@shared/downloads.ts';
-import type { ChannelEntry, YouTubeChannel } from '@shared/youtube.ts';
+import type { ChannelTab, YouTubeChannel } from '@shared/youtube.ts';
 import type { MediaDownloadHandlers } from '../downloads/downloadRequests';
 
 export interface ChannelViewProps extends MediaDownloadHandlers {
   channel: YouTubeChannel;
   defaultQuality: VideoQuality;
+  isRefreshing: boolean;
+  onOpenLink(url: string): void;
 }
 
-export default function ChannelView({ channel, defaultQuality, onDownload, onBulkDownload }: ChannelViewProps) {
-  const selection = useIdSet();
-  const transcribeIds = useIdSet();
-  const [search, setSearch] = useState('');
-  const [quality, setQuality] = useState<VideoQuality>(defaultQuality);
-  const isShorts = channel.urlType === 'channel-shorts';
+const TABS: { tab: ChannelTab; label: string; noun: string }[] = [
+  { tab: 'videos', label: 'Videos', noun: 'video' },
+  { tab: 'shorts', label: 'Shorts', noun: 'short' },
+  { tab: 'streams', label: 'Live', noun: 'stream' },
+  { tab: 'playlists', label: 'Playlists', noun: 'playlist' },
+];
 
-  const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return query ? channel.entries.filter((video) => video.title.toLowerCase().includes(query)) : channel.entries;
-  }, [channel.entries, search]);
+function isChannelTab(value: unknown): value is ChannelTab {
+  return TABS.some(({ tab }) => tab === value);
+}
 
-  // nothing ticked means "everything the search shows"
-  const selected = channel.entries.filter((video) => selection.ids.has(video.id));
-  const targets = selected.length > 0 ? selected : filtered;
-  const isAllSelected = filtered.length > 0 && filtered.every((video) => selection.ids.has(video.id));
-
-  function downloadAll(isAudioOnly: boolean) {
-    const items = targets.map((video) => ({
-      key: video.id,
-      url: video.url,
-      title: video.title,
-      platform: 'youtube' as const,
-      shouldTranscribe: !isAudioOnly && transcribeIds.ids.has(video.id),
-    }));
-    onBulkDownload({ items, quality: isAudioOnly ? 'best' : quality, isAudioOnly });
-  }
-
-  function downloadOne(video: ChannelEntry, chosenQuality: VideoQuality, isAudioOnly: boolean) {
-    onDownload({ url: video.url, title: video.title, quality: chosenQuality, isAudioOnly, shouldTranscribe: transcribeIds.ids.has(video.id) });
-  }
+// each tab is its own yt-dlp listing, so switching tabs fetches that tab's link
+export default function ChannelView({ channel, defaultQuality, isRefreshing, onOpenLink, onDownload, onBulkDownload }: ChannelViewProps) {
+  const current = TABS.find(({ tab }) => tab === channel.tab) ?? TABS[0];
+  const noun = current?.noun ?? 'video';
+  const count = channel.tab === 'playlists' ? channel.playlists.length : channel.videoCount;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-4">
-      <ChannelHeader channel={channel} />
-      <ChannelToolbar
-        isAllSelected={isAllSelected}
-        selectedCount={selected.length}
-        transcribeCount={targets.filter((video) => transcribeIds.ids.has(video.id)).length}
-        downloadCount={targets.length}
-        quality={quality}
-        onToggleAll={() => selection.toggleMany(filtered.map((video) => video.id))}
-        onQualityChange={setQuality}
-        onDownloadVideos={() => downloadAll(false)}
-        onDownloadAudio={() => downloadAll(true)}
-      />
-      <div className="relative">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input aria-label={`Search ${isShorts ? 'shorts' : 'videos'}`} placeholder={`Search ${isShorts ? 'shorts' : 'videos'}...`} value={search} onChange={(event) => setSearch(event.target.value)} className="rounded-2xl pl-10" />
-      </div>
-      <p className="flex items-center gap-1 px-1 text-xs text-muted-foreground">
-        <MicOff size={11} /> Select the microphone on a video to save a transcript when it downloads.
-      </p>
-      {filtered.length === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
-          <Search size={32} className="mx-auto mb-3 opacity-40" />
-          <p>Nothing matches "{search}".</p>
-        </div>
-      ) : (
-        <ul className="space-y-2">
-          {filtered.map((video) => (
-            <ChannelVideoRow
-              key={video.id}
-              video={video}
-              isSelected={selection.ids.has(video.id)}
-              shouldTranscribe={transcribeIds.ids.has(video.id)}
-              onToggle={selection.toggle}
-              onToggleTranscribe={transcribeIds.toggle}
-              onDownload={downloadOne}
-            />
-          ))}
-        </ul>
+    <div className="space-y-6">
+      <CollectionHeader title={channel.name} imageUrl={api.imageUrl(channel.avatarUrl)} isRound facts={['Channel', pluralize(count, noun)]} />
+      <Tabs value={channel.tab} onValueChange={(value) => { if (isChannelTab(value) && value !== channel.tab) onOpenLink(`https://www.youtube.com/${channel.channelPath}/${value}`); }}>
+        <TabsList variant="line" className="w-full justify-start">
+          {TABS.map(({ tab, label }) => <TabsTrigger key={tab} value={tab} disabled={isRefreshing}>{label}</TabsTrigger>)}
+        </TabsList>
+      </Tabs>
+      {isRefreshing && <LoadingState label="Loading this tab from YouTube" rows={4} />}
+      {!isRefreshing && channel.tab === 'playlists' && <PlaylistGrid playlists={channel.playlists} onOpen={onOpenLink} />}
+      {!isRefreshing && channel.tab !== 'playlists' && (
+        <VideoCollection key={channel.url} entries={channel.entries} noun={noun} defaultQuality={defaultQuality} onDownload={onDownload} onBulkDownload={onBulkDownload} />
       )}
     </div>
   );

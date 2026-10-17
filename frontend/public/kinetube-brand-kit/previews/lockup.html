@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<title>kinetube lockup</title>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../tokens/tokens.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,600&display=swap">
+<style>
+  /* Grounds are fixed brand values on purpose: each tile shows one approved pairing in either theme. */
+  html, body { margin:0; }
+  body { background:var(--paper); color:var(--ink); font-family:var(--font-sans); padding:var(--space-4); }
+  .grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:var(--space-4); }
+  .tile { border-radius:var(--radius-lg); height:180px; display:flex; align-items:center; justify-content:center; }
+  .t-paper { background:#f6f3f1; }
+  .t-spin { background:var(--spin); }
+  .t-dark { background:#2d292d; }
+  .lockup { --m:56px; display:flex; align-items:center; gap:calc(var(--m) * .3); }
+  .lockup img { width:var(--m); height:var(--m); display:block; }
+  .word { font-family:var(--font-display); font-weight:600; font-size:calc(var(--m) * .62); line-height:1; letter-spacing:-.02em; }
+  .t-paper .word { color:#2d292d; }
+  .t-spin .word { color:var(--on-spin); }
+  .t-dark .word { color:#ffffff; }
+  .cap { margin:var(--space-2) 0 0; font-size:14px; line-height:20px; color:var(--ink-muted); }
+</style>
+</head>
+<body>
+<div class="grid">
+  <div>
+    <div class="tile t-paper"><div class="lockup">
+      <img src="../logos/kinetube-mark-ink.png" alt="">
+      <span class="word">kinetube</span></div></div>
+    <p class="cap">On light grounds</p>
+  </div>
+  <div>
+    <div class="tile t-spin"><div class="lockup">
+      <img src="../logos/kinetube-mark-ink.png" alt="">
+      <span class="word">kinetube</span></div></div>
+    <p class="cap">On spin</p>
+  </div>
+  <div>
+    <div class="tile t-dark"><div class="lockup">
+      <img src="../logos/kinetube-mark-white.png" alt="">
+      <span class="word">kinetube</span></div></div>
+    <p class="cap">On dark grounds and photography</p>
+  </div>
+</div>
+</body>
+</html>

@@ -2,9 +2,9 @@ import { Download } from 'lucide-react';
 import { useState } from 'react';
 
 import QualitySelect from '@/components/QualitySelect';
-import TranscribeToggle from '@/components/TranscribeToggle';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { pluralize } from '@/lib/format';
 import { SHORT_QUALITY_LIST } from '@/lib/qualities';
 
@@ -22,20 +22,14 @@ export default function BatchDownloadBar({ selectedCount, defaultQuality, onDown
   const [shouldTranscribe, setShouldTranscribe] = useState(false);
 
   return (
-    <Card className="sticky bottom-6 z-20 mt-4 shadow-xl">
-      <CardContent className="space-y-2.5 px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-sm font-semibold">{pluralize(selectedCount, 'item')} selected</span>
-          <div className="flex items-center gap-2">
-            <QualitySelect value={quality} options={SHORT_QUALITY_LIST} onChange={setQuality} className="h-8 w-32 text-sm" />
-            <Button type="button" size="sm" onClick={() => onDownload(quality, shouldTranscribe)}>
-              <Download size={14} className="mr-1.5" />
-              Download
-            </Button>
-          </div>
-        </div>
-        <TranscribeToggle id="batch-transcribe" isOn={shouldTranscribe} onChange={setShouldTranscribe} />
-      </CardContent>
-    </Card>
+    <div className="sticky bottom-4 z-10 flex flex-wrap items-center gap-3 rounded-card bg-surface-elevated px-4 py-3 shadow-bar">
+      <span className="flex-1 text-sm font-semibold text-ink">{pluralize(selectedCount, 'item')} selected</span>
+      <span className="flex items-center gap-2">
+        <Switch id="batch-transcribe" checked={shouldTranscribe} onCheckedChange={setShouldTranscribe} />
+        <Label htmlFor="batch-transcribe" className="text-[13px] text-ink-muted">Transcribe</Label>
+      </span>
+      <QualitySelect value={quality} options={SHORT_QUALITY_LIST} onChange={setQuality} className="w-36" />
+      <Button type="button" onClick={() => onDownload(quality, shouldTranscribe)}><Download /> Download</Button>
+    </div>
   );
 }

@@ -1,8 +1,8 @@
-import { Check, Download, Mic, MicOff, Play } from 'lucide-react';
-import { useState } from 'react';
+import { Check, Download, Mic, MicOff } from 'lucide-react';
 
+import MediaThumbnail from '@/components/patterns/MediaThumbnail';
 import { Button } from '@/components/ui/button';
-import { formatCount, formatDuration } from '@/lib/format';
+import { formatDuration, formatViews } from '@/lib/format';
 import { cn } from '@/lib/utils';
 import { api } from '@/services/api';
 
@@ -17,51 +17,34 @@ export interface ProfilePostCardProps {
   onDownload(post: ProfileEntry): void;
 }
 
-const OVERLAY_BUTTON = 'absolute top-2 z-10 rounded-md p-1 shadow-sm transition-opacity';
-
 export default function ProfilePostCard({ post, isSelected, shouldTranscribe, onToggle, onToggleTranscribe, onDownload }: ProfilePostCardProps) {
-  const [hasImageError, setHasImageError] = useState(false);
-  const thumbnail = hasImageError ? null : api.imageUrl(post.thumbnailUrl);
-  const duration = formatDuration(post.duration);
-  const views = formatCount(post.viewCount);
+  const views = formatViews(post.viewCount);
 
   return (
-    <li className={cn('group relative overflow-hidden rounded-xl border bg-card transition-all duration-200', isSelected ? 'border-purple-400 shadow-sm ring-1 ring-purple-300' : 'border-border hover:border-muted-foreground/30')}>
-      <button
-        type="button"
-        aria-pressed={isSelected}
-        aria-label={isSelected ? 'Unselect post' : 'Select post'}
-        onClick={() => onToggle(post.id)}
-        className={cn(OVERLAY_BUTTON, 'left-2', isSelected ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white' : 'border bg-background/80 text-transparent opacity-0 group-hover:opacity-100')}
-      >
-        <Check size={12} />
+    <li className={cn('group relative rounded-card p-2 transition-quiet', isSelected ? 'bg-spin-soft' : 'bg-surface hover:bg-surface-selected')}>
+      <button type="button" aria-pressed={isSelected} aria-label={isSelected ? 'Unselect post' : 'Select post'} onClick={() => onToggle(post.id)} className="block w-full rounded-control">
+        <MediaThumbnail src={api.imageUrl(post.thumbnailUrl)} duration={formatDuration(post.duration)} className="aspect-square w-full rounded-control" />
       </button>
-      <button
-        type="button"
-        aria-pressed={shouldTranscribe}
-        aria-label={shouldTranscribe ? 'Stop transcribing this post' : 'Transcribe this post after download'}
-        onClick={() => onToggleTranscribe(post.id)}
-        className={cn(OVERLAY_BUTTON, 'right-2', shouldTranscribe ? 'bg-purple-600 text-white' : 'border bg-background/80 text-muted-foreground opacity-0 group-hover:opacity-100')}
-      >
-        {shouldTranscribe ? <Mic size={11} /> : <MicOff size={11} />}
-      </button>
-
-      <button type="button" onClick={() => onToggle(post.id)} className="relative block aspect-square w-full overflow-hidden bg-muted">
-        {thumbnail ? (
-          <img src={thumbnail} alt="" loading="lazy" onError={() => setHasImageError(true)} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-        ) : (
-          <span className="flex h-full w-full items-center justify-center"><Play size={24} className="text-muted-foreground/30" /></span>
-        )}
-        {duration && <span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/60 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white">{duration}</span>}
-      </button>
-
-      <div className="p-2.5">
-        <p className="mb-1 line-clamp-2 text-xs leading-relaxed text-foreground">{post.title}</p>
-        {views && <p className="mb-2 text-[10px] text-muted-foreground">{views} views</p>}
-        <Button type="button" size="sm" onClick={() => onDownload(post)} className="h-7 w-full border-0 bg-gradient-to-r from-purple-600 to-pink-600 text-[11px] text-white hover:from-purple-700 hover:to-pink-700">
-          <Download size={11} className="mr-1" />
-          {shouldTranscribe ? 'Download and transcribe' : 'Download'}
-        </Button>
+      <span aria-hidden="true" className={cn('pointer-events-none absolute top-4 left-4 flex size-6 items-center justify-center rounded-pill transition-quiet', isSelected ? 'bg-spin text-on-spin' : 'bg-black/45 text-transparent opacity-0 group-hover:opacity-100')}>
+        <Check size={13} strokeWidth={3} />
+      </span>
+      <div className="px-1 pt-2.5 pb-1">
+        <p className="line-clamp-2 min-h-8 text-xs leading-4 text-ink">{post.title}</p>
+        <div className="mt-2 flex items-center gap-1">
+          <span className="flex-1 truncate text-[11px] text-ink-faint">{views ?? ' '}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-pressed={shouldTranscribe}
+            aria-label={shouldTranscribe ? 'Stop transcribing this post' : 'Transcribe this post after download'}
+            onClick={() => onToggleTranscribe(post.id)}
+            className={cn(shouldTranscribe ? 'bg-spin-soft text-spin-text' : 'text-ink-faint')}
+          >
+            {shouldTranscribe ? <Mic /> : <MicOff />}
+          </Button>
+          <Button type="button" variant="ghost" size="icon-xs" aria-label={`Download ${post.title}`} title="Download this one" onClick={() => onDownload(post)}><Download /></Button>
+        </div>
       </div>
     </li>
   );

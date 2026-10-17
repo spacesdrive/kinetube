@@ -1,0 +1,61 @@
+/* kinetube brand tokens, generated from tokens.json */
+@import url("https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,600&display=swap");
+
+:root, [data-theme="light"] {
+  --paper: #ffffff;
+  --surface: #f6f3f1;
+  --line: #e4dfdc;
+  --ink: #2d292d;
+  --ink-muted: #6b6469;
+  --spin: #e4572e;
+  --on-spin: #1a1719;
+  --spin-text: #b5401a;
+  --spin-soft: #fbe3d9;
+  --focus: var(--spin-text);
+}
+[data-theme="dark"] {
+  --paper: #161416;
+  --surface: #211e21;
+  --line: #36323a;
+  --ink: #f2eeea;
+  --ink-muted: #a8a1a6;
+  --spin: #f07045;
+  --on-spin: #1a1719;
+  --spin-text: #ff8a62;
+  --spin-soft: #3a2219;
+  --focus: var(--spin-text);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #161416;
+    --surface: #211e21;
+    --line: #36323a;
+    --ink: #f2eeea;
+    --ink-muted: #a8a1a6;
+    --spin: #f07045;
+    --on-spin: #1a1719;
+    --spin-text: #ff8a62;
+    --spin-soft: #3a2219;
+    --focus: var(--spin-text);
+  }
+}
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --radius-sm: 6px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
+  --font-display: "Unbounded", "DM Sans", system-ui, sans-serif;
+  --font-sans: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.display { font-family: var(--font-display); font-size: 56px; line-height: 60px; font-weight: 600; letter-spacing: -0.02em; }
+.h1 { font-family: var(--font-display); font-size: 36px; line-height: 42px; font-weight: 600; letter-spacing: -0.015em; }
+.h2 { font-family: var(--font-display); font-size: 24px; line-height: 30px; font-weight: 500; letter-spacing: -0.01em; }
+.title { font-family: var(--font-sans); font-size: 18px; line-height: 26px; font-weight: 600; }
+.body { font-family: var(--font-sans); font-size: 16px; line-height: 24px; font-weight: 400; }
+.small { font-family: var(--font-sans); font-size: 14px; line-height: 20px; font-weight: 400; }
+.label { font-family: var(--font-sans); font-size: 12px; line-height: 16px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; }

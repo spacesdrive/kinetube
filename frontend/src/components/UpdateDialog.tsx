@@ -1,7 +1,7 @@
 import { AlertCircle, CheckCircle2, Download, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
+import StatusBadge from '@/components/patterns/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
@@ -23,9 +23,9 @@ const TITLES: Record<UpdatePhase, string> = {
 };
 
 function descriptionFor(phase: UpdatePhase, version: string, errorMessage: string): string {
-  if (phase === 'available') return `KineTube ${version} is available, with the latest fixes.`;
-  if (phase === 'downloading') return 'Keep KineTube open until the download finishes.';
-  if (phase === 'downloaded') return 'KineTube restarts to install it.';
+  if (phase === 'available') return `kinetube ${version} is available, with the latest fixes.`;
+  if (phase === 'downloading') return 'Keep kinetube open until the download finishes.';
+  if (phase === 'downloaded') return 'kinetube restarts to install it.';
   return `${errorMessage} Try again, or download the installer from the GitHub releases page.`;
 }
 
@@ -75,18 +75,18 @@ export default function UpdateDialog({ version, onDismiss }: UpdateDialogProps) 
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {TITLES[phase]}
-            <Badge variant="secondary" className="font-mono text-xs">v{version}</Badge>
+            <StatusBadge className="font-mono">v{version}</StatusBadge>
           </DialogTitle>
           <DialogDescription>{descriptionFor(phase, version, errorMessage)}</DialogDescription>
         </DialogHeader>
         {phase === 'downloading' && (
           <div className="flex flex-col gap-1.5">
             <Progress value={percent} className="h-1.5" />
-            <div className="flex justify-between text-xs text-muted-foreground"><span>{percent}%</span>{speed && <span>{speed}</span>}</div>
+            <div className="flex justify-between text-xs text-ink-muted"><span>{percent}%</span>{speed && <span>{speed}</span>}</div>
           </div>
         )}
-        {phase === 'downloaded' && <div className="flex items-center gap-2 text-sm text-muted-foreground"><CheckCircle2 size={15} className="flex-shrink-0 text-green-500" /> Downloaded and ready to install.</div>}
-        {phase === 'error' && <div className="flex items-center gap-2 text-sm text-muted-foreground"><AlertCircle size={15} className="flex-shrink-0 text-destructive" /> The installed version keeps working in the meantime.</div>}
+        {phase === 'downloaded' && <div className="flex items-center gap-2 text-sm text-ink-muted"><CheckCircle2 size={15} className="flex-shrink-0 text-success" /> Downloaded and ready to install.</div>}
+        {phase === 'error' && <div className="flex items-center gap-2 text-sm text-ink-muted"><AlertCircle size={15} className="flex-shrink-0 text-error" /> The installed version keeps working in the meantime.</div>}
         <DialogFooter>
           {canClose && <Button type="button" variant="ghost" onClick={onDismiss}>Later</Button>}
           <Button type="button" onClick={handleAction} disabled={phase === 'downloading'}><ActionLabel phase={phase} /></Button>

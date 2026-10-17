@@ -32,15 +32,15 @@ export default function FileNameTemplateField({ useCustomFilename, template, onT
   return (
     <div className="mb-3">
       <div className="mb-2 flex items-center justify-between">
-        <Label htmlFor="custom-file-name" className="text-xs text-muted-foreground">Main file name</Label>
+        <Label htmlFor="custom-file-name" className="text-[13px] text-ink-muted">Main file name</Label>
         <div className="flex items-center gap-2">
-          <Type size={12} className="text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">{useCustomFilename ? 'Custom template' : 'Original title'}</span>
+          <Type size={12} className="text-ink-faint" />
+          <span className="text-[13px] text-ink-muted">{useCustomFilename ? 'Custom template' : 'Original title'}</span>
           <Switch id="custom-file-name" checked={useCustomFilename} onCheckedChange={onToggle} />
         </div>
       </div>
 
-      {!useCustomFilename && <p className="py-1 text-xs text-muted-foreground">Files are named after the original title.</p>}
+      {!useCustomFilename && <p className="py-1 text-xs text-ink-faint">Files are named after the original title.</p>}
       {useCustomFilename && (
         <div className="space-y-2">
           <Input
@@ -49,7 +49,7 @@ export default function FileNameTemplateField({ useCustomFilename, template, onT
             value={template}
             onChange={(event) => onChange(event.target.value)}
             placeholder="%(title)s"
-            className="border-blue-200 font-mono focus-visible:ring-blue-400"
+            className="font-mono"
           />
           <div className="flex flex-wrap gap-1.5">
             {TEMPLATE_FIELDS.map((field) => (
@@ -58,14 +58,14 @@ export default function FileNameTemplateField({ useCustomFilename, template, onT
                 type="button"
                 title={field.description}
                 onClick={() => insertField(field.value)}
-                className="inline-flex items-center gap-1 rounded-lg border border-transparent bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:border-blue-200 hover:bg-blue-100 hover:text-blue-700"
+                className="inline-flex h-7 items-center gap-1 rounded-pill border border-line-strong px-2.5 text-xs font-medium text-ink-muted transition-quiet hover:bg-surface-hover hover:text-ink"
               >
                 <Plus size={10} />
                 {field.label}
               </button>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground">Pick a field to insert it at the cursor.</p>
+          <p className="text-xs text-ink-faint">Pick a field to insert it at the cursor.</p>
         </div>
       )}
     </div>

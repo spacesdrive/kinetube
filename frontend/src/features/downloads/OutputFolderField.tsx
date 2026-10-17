@@ -44,12 +44,12 @@ export default function OutputFolderField({ value, onChange }: OutputFolderField
 
   return (
     <section>
-      <label htmlFor="output-folder" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <label htmlFor="output-folder" className="mb-2 block text-label text-ink-faint">
         Download folder
       </label>
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <FolderOpen size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <FolderOpen size={15} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-faint" />
           <Input
             id="output-folder"
             value={value}
@@ -66,7 +66,7 @@ export default function OutputFolderField({ value, onChange }: OutputFolderField
           {isBrowsing ? 'Opening...' : 'Browse'}
         </Button>
       </div>
-      {problem && <p className="mt-1.5 text-xs text-amber-600">{problem}</p>}
+      {problem && <p role="alert" className="mt-1.5 text-xs text-warning">{problem}</p>}
     </section>
   );
 }

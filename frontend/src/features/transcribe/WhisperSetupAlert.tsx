@@ -1,6 +1,6 @@
-import { AlertTriangle, Download } from 'lucide-react';
+import { AudioLines, Download } from 'lucide-react';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import SurfaceBox from '@/components/patterns/SurfaceBox';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 
@@ -14,21 +14,21 @@ export default function WhisperSetupAlert({ setup }: WhisperSetupAlertProps) {
   const { isInstalling, percent, phaseMessage, error, install } = setup;
 
   return (
-    <Alert variant="default" className="mb-6 border-amber-200 bg-amber-50">
-      <AlertTriangle className="h-4 w-4 text-amber-500" />
-      <AlertTitle className="text-amber-800">whisper.cpp isn't installed</AlertTitle>
-      <AlertDescription className="text-amber-700">
-        <p className="mb-3">The transcription engine is downloaded once, about 25 MB on Windows. On macOS and Linux it is built from source.</p>
+    <SurfaceBox className="mx-auto flex max-w-lg flex-col items-center px-8 py-10 text-center">
+      <span className="mb-4 flex size-12 items-center justify-center rounded-pill bg-spin-soft text-spin-text"><AudioLines size={20} /></span>
+      <h2 className="text-section text-ink">Install whisper.cpp to transcribe</h2>
+      <p className="mt-1.5 text-[13px] leading-5 text-ink-muted">The transcription engine downloads once, about 25 MB on Windows. On macOS and Linux it is built from source.</p>
+      <div className="mt-6 w-full max-w-xs">
         {isInstalling ? (
-          <div className="space-y-2">
-            <p className="text-sm">{phaseMessage}</p>
-            <Progress value={percent} className="h-2" />
+          <div className="space-y-2 text-left" aria-live="polite">
+            <p className="text-[13px] text-ink-muted">{phaseMessage}</p>
+            <Progress value={percent} aria-label="whisper.cpp install progress" />
           </div>
         ) : (
-          <Button type="button" size="sm" onClick={install}><Download size={14} className="mr-2" /> Install whisper.cpp</Button>
+          <Button type="button" size="lg" className="w-full" onClick={install}><Download /> Install whisper.cpp</Button>
         )}
-        {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
-      </AlertDescription>
-    </Alert>
+      </div>
+      {error && <p role="alert" className="mt-4 text-xs text-error">{error}</p>}
+    </SurfaceBox>
   );
 }

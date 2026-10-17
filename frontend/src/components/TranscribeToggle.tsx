@@ -9,10 +9,10 @@ export interface TranscribeToggleProps {
 
 export default function TranscribeToggle({ id, isOn, onChange }: TranscribeToggleProps) {
   return (
-    <div className="flex items-center justify-between border-t pt-3">
-      <div className="space-y-0.5">
-        <Label htmlFor={id} className="text-sm font-medium">Transcribe after download</Label>
-        <p className="text-xs text-muted-foreground">Writes a text transcript with Whisper, on this computer</p>
+    <div className="flex items-center justify-between gap-4 border-t border-divider pt-4">
+      <div className="min-w-0">
+        <Label htmlFor={id} className="text-sm font-medium text-ink">Transcribe after download</Label>
+        <p className="mt-0.5 text-xs text-ink-muted">Writes a text transcript with Whisper, on this computer</p>
       </div>
       <Switch id={id} checked={isOn} onCheckedChange={onChange} />
     </div>

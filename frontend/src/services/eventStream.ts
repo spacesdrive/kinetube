@@ -50,8 +50,7 @@ async function readBlocks(body: ReadableStream<Uint8Array>, onBlock: (block: str
   if (buffered.trim()) onBlock(buffered);
 }
 
-// fetch-based server-sent events: unlike EventSource it can POST a body and never reconnects on its own
-// endEvents names every event a stream may finish on; a paused download ends on "paused", not "done"
+// fetch-based server-sent events that can POST a body; endEvents lists every event that can end a stream, such as paused
 export function openStream<Events extends { done: StreamDone<object> }>(
   path: string,
   init: RequestInit,

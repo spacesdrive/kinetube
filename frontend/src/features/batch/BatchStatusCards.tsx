@@ -1,7 +1,5 @@
-import { AlertTriangle } from 'lucide-react';
-
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Card, CardContent } from '@/components/ui/card';
+import ErrorState from '@/components/patterns/ErrorState';
+import StatusBadge from '@/components/patterns/StatusBadge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 
@@ -12,13 +10,11 @@ export interface WaitingCardProps {
 
 export function WaitingCard({ url, isLoading }: WaitingCardProps) {
   return (
-    <Card className="mb-3">
-      <CardContent className="flex items-center gap-3 p-4">
-        {isLoading ? <Spinner className="size-4 text-muted-foreground" /> : <Skeleton className="h-4 w-4 rounded-full" />}
-        <span className="flex-1 truncate text-sm text-muted-foreground">{url}</span>
-        <span className="flex-shrink-0 text-xs text-muted-foreground">{isLoading ? 'Reading...' : 'Waiting'}</span>
-      </CardContent>
-    </Card>
+    <div className="flex items-center gap-3 rounded-control bg-surface px-4 py-3">
+      {isLoading ? <Spinner className="size-4 text-ink-muted" /> : <Skeleton className="size-4 rounded-pill" />}
+      <span className="flex-1 truncate text-[13px] text-ink-muted">{url}</span>
+      <StatusBadge>{isLoading ? 'Reading' : 'Waiting'}</StatusBadge>
+    </div>
   );
 }
 
@@ -28,13 +24,5 @@ export interface ErrorCardProps {
 }
 
 export function ErrorCard({ url, message }: ErrorCardProps) {
-  return (
-    <Alert variant="destructive" className="mb-3">
-      <AlertTriangle className="h-4 w-4" />
-      <AlertDescription>
-        <p className="mb-0.5 truncate text-xs font-medium">{url}</p>
-        <p className="text-xs">{message}</p>
-      </AlertDescription>
-    </Alert>
-  );
+  return <ErrorState title={url} message={message} className="rounded-control [&_p:first-child]:truncate" />;
 }

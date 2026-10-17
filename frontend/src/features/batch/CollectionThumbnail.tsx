@@ -1,4 +1,4 @@
-import { Check, Play } from 'lucide-react';
+import { Check, Film } from 'lucide-react';
 import { useState } from 'react';
 
 import { formatDuration } from '@/lib/format';
@@ -22,22 +22,22 @@ export default function CollectionThumbnail({ entry, imageSrc, isSelected, onTog
     <button
       type="button"
       aria-pressed={isSelected}
-      aria-label={entry.title}
+      aria-label={entry.isDownloadable ? entry.title : `${entry.title}, not downloadable yet`}
+      title={entry.title}
+      disabled={!entry.isDownloadable}
       onClick={onToggle}
-      className={cn('relative aspect-square overflow-hidden rounded-xl transition-all duration-100', isSelected ? 'ring-2 ring-purple-400 ring-offset-1' : 'hover:opacity-80')}
+      className={cn('relative aspect-square overflow-hidden rounded-row bg-surface-selected transition-quiet disabled:cursor-not-allowed disabled:opacity-40', isSelected ? 'ring-2 ring-spin ring-offset-2 ring-offset-surface' : 'hover:opacity-85')}
     >
       {imageSrc && !hasImageError ? (
-        <img src={imageSrc} alt="" loading="lazy" onError={() => setHasImageError(true)} className="h-full w-full object-cover" />
+        <img src={imageSrc} alt="" loading="lazy" onError={() => setHasImageError(true)} className="size-full object-cover" />
       ) : (
-        <span className="flex h-full w-full items-center justify-center bg-muted"><Play size={14} className="text-muted-foreground/30" /></span>
+        <span className="flex size-full items-center justify-center text-ink-faint"><Film size={14} /></span>
       )}
       {isSelected && (
-        <span className="absolute inset-0 flex items-end justify-end bg-purple-500/20 p-1">
-          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br from-purple-500 to-pink-500 text-white shadow"><Check size={10} /></span>
-        </span>
+        <span className="absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-pill bg-spin text-on-spin"><Check size={12} strokeWidth={3} /></span>
       )}
       {duration && !isSelected && (
-        <span className="absolute bottom-0.5 right-0.5 rounded bg-black/60 px-1 font-mono text-[9px] font-semibold text-white">{duration}</span>
+        <span className="absolute right-1 bottom-1 rounded-[4px] bg-black/75 px-1 text-[10px] font-semibold text-white tabular-nums">{duration}</span>
       )}
     </button>
   );

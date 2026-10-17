@@ -1,34 +1,45 @@
+import { ArrowLeft } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 
-import AppHeader from '@/components/AppHeader';
-import AppSidebar from '@/components/AppSidebar';
+import CommandPalette from '@/components/shell/CommandPalette';
+import AppSidebar from '@/components/shell/AppSidebar';
+import TopBar from '@/components/shell/TopBar';
 import UpdateDialog from '@/components/UpdateDialog';
+import { Button } from '@/components/ui/button';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import BatchPage from '@/features/batch/BatchPage';
 import { useBatch } from '@/features/batch/useBatch';
 import DownloadDialog from '@/features/downloads/DownloadDialog';
 import { useDownloadSession } from '@/features/downloads/useDownloadSession';
 import InstagramLoginModal from '@/features/instagram/InstagramLoginModal';
 import SettingsPage from '@/features/settings/SettingsPage';
 import TranscribePage from '@/features/transcribe/TranscribePage';
+import { useAppCommands } from '@/hooks/useAppCommands';
 import { useInstagramAccounts } from '@/hooks/useInstagramAccounts';
 import { useMediaLookup } from '@/hooks/useMediaLookup';
 import { useUpdateNotice } from '@/hooks/useUpdateNotice';
-import { isDownloadPage } from '@/lib/pages';
+import { mediaContext } from '@/lib/mediaContext';
+import { isDownloadPage, PAGE_LABELS } from '@/lib/pages';
 import { loadSettings, toDownloadSettings } from '@/lib/settings';
+import { isInstagramLink } from '@/lib/urlCleaners';
 import DownloadPage from '@/pages/DownloadPage';
 
 import type { useToolStatus } from '@/hooks/useToolStatus';
-import type { Page } from '@/lib/pages';
+import type { DownloadPlatformPage, Page } from '@/lib/pages';
 import type { AppSettings, DownloadSettings } from '@/lib/settings';
 
 export interface AppShellProps {
   tools: ReturnType<typeof useToolStatus>;
 }
 
+function platformOf(url: string): DownloadPlatformPage {
+  return isInstagramLink(url) ? 'instagram' : 'youtube';
+}
+
 export default function AppShell({ tools }: AppShellProps) {
   const [page, setPage] = useState<Page>('youtube');
   const [url, setUrl] = useState('');
-  const [isBatchMode, setIsBatchMode] = useState(false);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [settings, setSettings] = useState<DownloadSettings>(() => toDownloadSettings(loadSettings().downloads));
   const instagram = useInstagramAccounts();
@@ -41,9 +52,21 @@ export default function AppShell({ tools }: AppShellProps) {
     setPage(nextPage);
     setUrl('');
     lookup.clear();
-    if (!isDownloadPage(nextPage)) setIsBatchMode(false);
-    if (nextPage === 'instagram') instagram.refresh();
+    if (nextPage === 'instagram' || nextPage === 'batch') instagram.refresh();
   }, [lookup, instagram]);
+
+  // a channel tab, a playlist or a pasted link opens on the right page without clearing what it asks for
+  const openLink = useCallback(async (link: string) => {
+    const platform = platformOf(link);
+    // the last result stays up while a channel tab loads, but never on the other platform's page
+    if (platform !== page) lookup.clear();
+    setPage(platform);
+    setUrl(link);
+    const found = await lookup.lookUp(platform, link, instagram.activeAccount);
+    if (found) setUrl(found.media.url);
+  }, [page, lookup, instagram.activeAccount]);
+
+  const commands = useAppCommands({ changePage, openLink: (link) => void openLink(link) });
 
   // saved defaults replace this session's overrides, keeping the numbering start the person typed
   const applySavedSettings = useCallback((saved: AppSettings) => {
@@ -65,31 +88,35 @@ export default function AppShell({ tools }: AppShellProps) {
     lookup.clear();
   }
 
-  function toggleBatch() {
-    if (isBatchMode) batch.reset();
-    setIsBatchMode(!isBatchMode);
-  }
+
+  const context = isDownloadPage(page) && lookup.found ? mediaContext(lookup.found) : null;
 
   return (
-    <SidebarProvider>
+    <SidebarProvider className="h-svh overflow-hidden">
       <AppSidebar
         page={page}
         onPageChange={changePage}
         instagram={{ accounts: instagram.accounts, activeAccount: instagram.activeAccount, onSelect: instagram.setActiveAccount, onRemove: (username) => void instagram.remove(username), onAdd: () => setIsLoginOpen(true) }}
       />
-      <SidebarInset>
-        <AppHeader page={page} hasResult={Boolean(lookup.found)} isBatchMode={isBatchMode} canUseBatch={isDownloadPage(page)} onNewSearch={clearSearch} onToggleBatch={toggleBatch} />
-        <div className="flex flex-1 flex-col overflow-auto">
-          <div className="flex w-full flex-col items-center px-4 pb-12 pt-2">
+      <SidebarInset className="min-w-0 overflow-hidden">
+        <TopBar
+          title={PAGE_LABELS[page]}
+          context={context}
+          onOpenCommands={commands.open}
+          actions={lookup.found && isDownloadPage(page) && (
+            <Button type="button" variant="ghost" size="sm" onClick={clearSearch}><ArrowLeft /> New search</Button>
+          )}
+        />
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-[var(--content-max)] px-5 pt-8 pb-20 md:px-10">
             {page === 'transcribe' && <TranscribePage />}
             {page === 'settings' && <SettingsPage onSave={applySavedSettings} />}
+            {page === 'batch' && <BatchPage batch={batch} defaultQuality={settings.defaultQuality} onBulkDownload={session.downloadMany} />}
             {isDownloadPage(page) && (
               <DownloadPage
                 platform={page}
                 url={url}
                 lookup={lookup}
-                batch={batch}
-                isBatchMode={isBatchMode}
                 settings={settings}
                 ytdlp={tools.ytdlp}
                 isFfmpegInstalled={tools.isFfmpegInstalled}
@@ -99,10 +126,11 @@ export default function AppShell({ tools }: AppShellProps) {
                 onSubmit={() => void handleSubmit()}
                 onClear={clearSearch}
                 onSettingsChange={setSettings}
-                onSwitchToInstagram={() => changePage('instagram')}
-                onOpenSettings={() => changePage('settings')}
+                onOpenLink={(link) => void openLink(link)}
+                onPageChange={changePage}
+                onPasteLink={() => void commands.pasteAndFetch()}
                 onResume={session.resume}
-                onDismissResume={(download) => session.resumable.dismiss(download.id)}
+                onDismissResume={session.resumable.dismiss}
                 onDownload={session.download}
                 onBulkDownload={session.downloadMany}
               />
@@ -112,10 +140,15 @@ export default function AppShell({ tools }: AppShellProps) {
       </SidebarInset>
 
       <DownloadDialog session={session} />
+      {commands.isOpen && <CommandPalette onRun={commands.run} onClose={commands.close} />}
       {isLoginOpen && (
         <InstagramLoginModal
           onClose={() => setIsLoginOpen(false)}
-          onLoggedIn={(username) => { setIsLoginOpen(false); instagram.addLoggedIn(username); }}
+          onLoggedIn={(username) => {
+            setIsLoginOpen(false);
+            instagram.addLoggedIn(username);
+            toast.success(`Logged in as @${username}`, { description: 'Profiles now load with this account.' });
+          }}
         />
       )}
       {update.availableVersion && <UpdateDialog version={update.availableVersion} onDismiss={update.dismiss} />}

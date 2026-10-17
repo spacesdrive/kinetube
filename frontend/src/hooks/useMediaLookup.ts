@@ -35,14 +35,13 @@ export function useMediaLookup() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [progress, setProgress] = useState<ProfileProgress | null>(null);
-  // a newer lookup wins; the answer to an older one is dropped
+  // a newer lookup wins; the answer to an older one is dropped. The last result stays on screen while the next loads
   const generationRef = useRef(0);
 
   const lookUp = useCallback(async (platform: DownloadPlatformPage, url: string, account: string | null): Promise<FoundMedia | null> => {
     const generation = ++generationRef.current;
     setIsLoading(true);
     setError('');
-    setFound(null);
     setProgress(null);
     try {
       const result: FoundMedia = platform === 'instagram'

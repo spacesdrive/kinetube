@@ -27,10 +27,10 @@ export default function TwoFactorForm({ isSending, error, onSubmit, onBack }: Tw
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
-      <p className="text-center text-sm text-muted-foreground">Enter the code Instagram sent to your phone or email.</p>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <p className="text-sm text-ink-muted">Enter the code Instagram sent to your phone or email.</p>
       <div className="space-y-1.5">
-        <Label htmlFor="ig-2fa" className="text-xs">Verification code</Label>
+        <Label htmlFor="ig-2fa" className="text-[13px] text-ink-muted">Verification code</Label>
         <Input
           id="ig-2fa"
           value={code}
@@ -38,14 +38,14 @@ export default function TwoFactorForm({ isSending, error, onSubmit, onBack }: Tw
           placeholder="123456"
           inputMode="numeric"
           autoFocus
-          className="text-center font-mono text-xl tracking-widest"
+          className="h-11 text-center font-mono text-xl tracking-widest"
         />
       </div>
       <FormError message={error} />
-      <Button type="submit" disabled={isSending || code.length < MIN_CODE_LENGTH} className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
+      <Button type="submit" disabled={isSending || code.length < MIN_CODE_LENGTH} className="w-full">
         {isSending ? 'Checking the code...' : 'Verify'}
       </Button>
-      <Button type="button" variant="ghost" className="w-full text-sm" onClick={onBack}>Back to login</Button>
+      <Button type="button" variant="ghost" className="w-full" onClick={onBack}>Back to login</Button>
     </form>
   );
 }

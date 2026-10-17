@@ -13,12 +13,22 @@ export function formatUploadDate(uploadDate: string | null | undefined): string 
   return `${uploadDate.slice(0, 4)}-${uploadDate.slice(4, 6)}-${uploadDate.slice(6, 8)}`;
 }
 
-// 125 -> "2:05"
+const pad = (value: number): string => String(value).padStart(2, '0');
+
+// 19 -> "0:19", 125 -> "2:05", 3725 -> "1:02:05"
 export function formatDuration(seconds: number | null | undefined): string | null {
-  if (!seconds) return null;
-  const minutes = Math.floor(seconds / 60);
-  const remainder = Math.floor(seconds % 60);
-  return `${minutes}:${String(remainder).padStart(2, '0')}`;
+  if (!seconds || seconds < 0) return null;
+  const whole = Math.floor(seconds);
+  const hours = Math.floor(whole / 3600);
+  const minutes = Math.floor((whole % 3600) / 60);
+  const remainder = whole % 60;
+  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(remainder)}` : `${minutes}:${pad(remainder)}`;
+}
+
+// "444.7M views"; null when the count is missing
+export function formatViews(count: number | null | undefined): string | null {
+  const shortCount = formatCount(count);
+  return shortCount ? `${shortCount} views` : null;
 }
 
 const MEGABYTE = 1024 * 1024;

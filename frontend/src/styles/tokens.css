@@ -1,0 +1,140 @@
+/* every value traces to docs/design-reference.md: colours from the kinetube brand kit, structure from the measured reference */
+
+:root {
+  /* grounds */
+  --app: #ffffff;
+  --sidebar-ground: #faf8f7;
+  --surface: #f6f3f1;
+  --surface-elevated: #ffffff;
+  --surface-hover: rgb(45 41 45 / 0.05);
+  --surface-selected: rgb(45 41 45 / 0.08);
+  --overlay: rgb(22 20 22 / 0.4);
+
+  /* lines */
+  --line: rgb(45 41 45 / 0.1);
+  --line-strong: rgb(45 41 45 / 0.18);
+  --divider: rgb(45 41 45 / 0.07);
+
+  /* text */
+  --ink: #2d292d;
+  --ink-muted: #6b6469;
+  --ink-faint: #716b74;
+  --ink-inverse: #ffffff;
+  --inverse: #2d292d;
+
+  /* the accent: fills only, with on-spin text on top */
+  --spin: #e4572e;
+  --spin-hover: #d64c24;
+  --spin-soft: #fbe3d9;
+  --spin-text: #b5401a;
+  --on-spin: #1a1719;
+
+  /* states */
+  --success: #16683e;
+  --success-soft: #e8f0ec;
+  --warning: #7a4f00;
+  --warning-soft: #f2ede6;
+  --error: #ad2a23;
+  --error-soft: #f7eae9;
+  --info: #2457b0;
+  --info-soft: #e9eef7;
+
+  --focus: var(--spin-text);
+
+  /* elevation: flat surfaces first, a shadow only for things that float */
+  --elevation-popover: 0 8px 24px rgb(22 20 22 / 0.12), 0 0 0 1px var(--line);
+  --elevation-dialog: 0 24px 64px rgb(22 20 22 / 0.18), 0 0 0 1px var(--line);
+  --elevation-bar: 0 -1px 0 var(--line), 0 12px 32px rgb(22 20 22 / 0.1);
+
+  /* shape */
+  --shape-row: 8px;
+  --shape-control: 10px;
+  --shape-card: 16px;
+  --shape-choice: 20px;
+  --shape-dialog: 20px;
+  --shape-pill: 9999px;
+
+  /* layout */
+  --sidebar-width: 256px;
+  --topbar-height: 52px;
+  --content-max: 1152px;
+  --content-narrow: 760px;
+  --panel-width: 360px;
+
+  /* motion */
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 480ms;
+}
+
+.dark {
+  --app: #161416;
+  --sidebar-ground: #1c191c;
+  --surface: #211e21;
+  --surface-elevated: #282428;
+  --surface-hover: rgb(242 238 234 / 0.05);
+  --surface-selected: rgb(242 238 234 / 0.08);
+  --overlay: rgb(10 9 10 / 0.6);
+
+  --line: rgb(242 238 234 / 0.08);
+  --line-strong: rgb(242 238 234 / 0.15);
+  --divider: rgb(242 238 234 / 0.06);
+
+  --ink: #f2eeea;
+  --ink-muted: #a8a1a6;
+  --ink-faint: #8f888d;
+  --ink-inverse: #2d292d;
+  --inverse: #f2eeea;
+
+  --spin: #f07045;
+  --spin-hover: #f5855f;
+  --spin-soft: #3a2219;
+  --spin-text: #ff8a62;
+  --on-spin: #1a1719;
+
+  --success: #5cc98f;
+  --success-soft: #293630;
+  --warning: #f0b95a;
+  --warning-soft: #3e3429;
+  --error: #ff7a70;
+  --error-soft: #402b2c;
+  --info: #7fb2ff;
+  --info-soft: #2e3340;
+
+  --elevation-popover: 0 8px 24px rgb(0 0 0 / 0.4), 0 0 0 1px var(--line);
+  --elevation-dialog: 0 24px 64px rgb(0 0 0 / 0.5), 0 0 0 1px var(--line);
+  --elevation-bar: 0 -1px 0 var(--line), 0 12px 32px rgb(0 0 0 / 0.35);
+}
+
+/* the shadcn variable names, pointed at the tokens above so every primitive follows the brand */
+:root,
+.dark {
+  --background: var(--app);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-elevated);
+  --popover-foreground: var(--ink);
+  --primary: var(--spin);
+  --primary-foreground: var(--on-spin);
+  --secondary: var(--surface);
+  --secondary-foreground: var(--ink);
+  --muted: var(--surface);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--surface-hover);
+  --accent-foreground: var(--ink);
+  --destructive: var(--error);
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--focus);
+  --radius: var(--shape-control);
+  --sidebar: var(--sidebar-ground);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--spin);
+  --sidebar-primary-foreground: var(--on-spin);
+  --sidebar-accent: var(--surface-selected);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--focus);
+}

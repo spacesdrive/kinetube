@@ -1,9 +1,12 @@
-import { CheckCircle, RotateCcw, Save } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { RotateCcw, Save } from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
+import PageHeader from '@/components/patterns/PageHeader';
 import { Button } from '@/components/ui/button';
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from '@/lib/settings';
 import AboutCard from './AboutCard';
+import AppearanceSection from './AppearanceSection';
 import DownloadDefaultsCard from './DownloadDefaultsCard';
 import TranscriptionSettingsCard from './TranscriptionSettingsCard';
 
@@ -13,50 +16,38 @@ export interface SettingsPageProps {
   onSave(settings: AppSettings): void;
 }
 
-// the "Saved" confirmation stays long enough to read, then the button goes back to "Save"
-const SAVED_NOTICE_MS = 2_500;
-
 export default function SettingsPage({ onSave }: SettingsPageProps) {
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
-  const [isSaved, setIsSaved] = useState(false);
-
-  useEffect(() => {
-    if (!isSaved) return;
-    const timer = setTimeout(() => setIsSaved(false), SAVED_NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [isSaved]);
+  const [isDirty, setIsDirty] = useState(false);
 
   function change(next: AppSettings) {
     setSettings(next);
-    setIsSaved(false);
+    setIsDirty(true);
   }
 
   function handleSave() {
     saveSettings(settings);
-    setIsSaved(true);
+    setIsDirty(false);
     onSave(settings);
+    toast.success('Settings saved', { description: 'New downloads and transcriptions use them.' });
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-8">
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Settings</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">Saved on this computer only</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={() => change(DEFAULT_SETTINGS)} className="gap-1.5"><RotateCcw size={13} /> Reset</Button>
-          <Button type="button" size="sm" onClick={handleSave} className="gap-1.5">
-            {isSaved ? <CheckCircle size={14} /> : <Save size={14} />}
-            {isSaved ? 'Saved' : 'Save'}
-          </Button>
-        </div>
-      </div>
-      <div className="space-y-5">
-        <TranscriptionSettingsCard preferences={settings.transcription} onChange={(transcription) => change({ ...settings, transcription })} />
-        <DownloadDefaultsCard preferences={settings.downloads} onChange={(downloads) => change({ ...settings, downloads })} />
-        <AboutCard />
-      </div>
+    <div className="mx-auto max-w-[var(--content-narrow)] space-y-8">
+      <PageHeader
+        title="Settings"
+        description="Saved on this computer only."
+        actions={(
+          <>
+            <Button type="button" variant="ghost" onClick={() => change(DEFAULT_SETTINGS)}><RotateCcw /> Reset</Button>
+            <Button type="button" variant={isDirty ? 'default' : 'secondary'} disabled={!isDirty} onClick={handleSave}><Save /> {isDirty ? 'Save' : 'Saved'}</Button>
+          </>
+        )}
+      />
+      <AppearanceSection />
+      <TranscriptionSettingsCard preferences={settings.transcription} onChange={(transcription) => change({ ...settings, transcription })} />
+      <DownloadDefaultsCard preferences={settings.downloads} onChange={(downloads) => change({ ...settings, downloads })} />
+      <AboutCard />
     </div>
   );
 }

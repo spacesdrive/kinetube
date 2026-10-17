@@ -1,9 +1,8 @@
-import { ChevronDown, ChevronUp, Settings } from 'lucide-react';
-import { useState } from 'react';
+import { FolderOpen, SlidersHorizontal } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { cn } from '@/lib/utils';
+import StatusBadge from '@/components/patterns/StatusBadge';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetClose, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import FileNameFields from './FileNameFields';
 import { hasCustomNaming } from './fileNamePreview';
 import OutputFolderField from './OutputFolderField';
@@ -15,31 +14,36 @@ export interface DownloadSettingsPanelProps {
   onChange(settings: DownloadSettings): void;
 }
 
-// per-session overrides of the defaults saved in Settings, folded away under the link field
+// this session's overrides of the defaults saved in Settings, in a side panel so the link field stays first
 export default function DownloadSettingsPanel({ settings, onChange }: DownloadSettingsPanelProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const isCustom = hasCustomNaming(settings);
+  const isCustom = hasCustomNaming({ ...settings, outputDir: '' });
+  const folderLabel = settings.outputDir.trim() || 'the default downloads folder';
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen} className="mx-auto w-full max-w-3xl">
-      <CollapsibleTrigger
-        className={cn(
-          'flex cursor-pointer items-center gap-1.5 rounded-lg px-1.5 py-1 text-sm transition-colors hover:bg-muted',
-          isCustom ? 'font-medium text-blue-600' : 'text-muted-foreground hover:text-foreground',
-        )}
-      >
-        <Settings size={14} />
-        <span>Download settings</span>
-        {isCustom && <Badge variant="secondary" className="bg-blue-100 px-1.5 py-0 text-[10px] text-blue-700">Custom</Badge>}
-        {isOpen ? <ChevronUp size={13} className="ml-0.5" /> : <ChevronDown size={13} className="ml-0.5" />}
-      </CollapsibleTrigger>
-
-      <CollapsibleContent>
-        <div className="mt-2 space-y-5 rounded-2xl border bg-card p-5 shadow-sm">
-          <OutputFolderField value={settings.outputDir} onChange={(outputDir) => onChange({ ...settings, outputDir })} />
-          <FileNameFields settings={settings} onChange={onChange} />
-        </div>
-      </CollapsibleContent>
-    </Collapsible>
+    <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-[13px] text-ink-muted">
+      <span className="flex min-w-0 items-center gap-1.5">
+        <FolderOpen size={14} aria-hidden="true" className="flex-shrink-0 text-ink-faint" />
+        <span className="truncate">Saving to <span className="font-medium text-ink">{folderLabel}</span></span>
+      </span>
+      {isCustom && <StatusBadge tone="accent">Custom file names</StatusBadge>}
+      <Sheet>
+        <SheetTrigger render={<Button type="button" variant="outline" size="sm" />}>
+          <SlidersHorizontal /> Download options
+        </SheetTrigger>
+        <SheetContent className="w-full">
+          <SheetHeader>
+            <SheetTitle>Download options</SheetTitle>
+            <SheetDescription>These apply until you close kinetube. Change the saved defaults in Settings.</SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 space-y-6 overflow-y-auto px-6 py-2">
+            <OutputFolderField value={settings.outputDir} onChange={(outputDir) => onChange({ ...settings, outputDir })} />
+            <FileNameFields settings={settings} onChange={onChange} />
+          </div>
+          <SheetFooter>
+            <SheetClose render={<Button type="button" variant="inverse" className="w-full" />}>Done</SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }

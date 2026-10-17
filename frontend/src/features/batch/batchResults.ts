@@ -16,6 +16,8 @@ export interface CollectionEntry {
   url: string;
   thumbnailUrl: string | null;
   duration: number | null;
+  // an upcoming stream or a private video is listed but can't be picked
+  isDownloadable: boolean;
 }
 
 // one link per line or separated by commas; repeats are dropped and the first order kept
@@ -27,14 +29,19 @@ export function parseBatchUrls(text: string): string[] {
   return [...new Set(urls)];
 }
 
-// a channel or a profile holds many items the person picks from; anything else is one item
+// a channel, a playlist or a profile holds many items the person picks from; anything else is one item
 export function isCollection(found: FoundMedia): boolean {
-  return found.media.kind === 'channel' || found.media.kind === 'profile';
+  const { kind } = found.media;
+  return kind === 'channel' || kind === 'playlist' || kind === 'profile';
 }
 
 export function collectionEntries({ media }: FoundMedia): CollectionEntry[] {
-  if (media.kind === 'channel') return media.entries.map(({ id, title, url, thumbnailUrl, duration }) => ({ id, title, url, thumbnailUrl, duration }));
-  if (media.kind === 'profile') return media.entries.map(({ id, title, url, thumbnailUrl, duration }) => ({ id, title, url, thumbnailUrl, duration }));
+  if (media.kind === 'channel' || media.kind === 'playlist') {
+    return media.entries.map(({ id, title, url, thumbnailUrl, duration, status }) => ({ id, title, url, thumbnailUrl, duration, isDownloadable: status === 'available' }));
+  }
+  if (media.kind === 'profile') {
+    return media.entries.map(({ id, title, url, thumbnailUrl, duration }) => ({ id, title, url, thumbnailUrl, duration, isDownloadable: true }));
+  }
   return [];
 }
 
@@ -61,7 +68,7 @@ export function buildBatchItems(results: BatchResult[], shouldTranscribe: boolea
       continue;
     }
     for (const entry of collectionEntries(result.found)) {
-      if (result.selectedIds.has(entry.id)) items.push({ key: entry.url, url: entry.url, title: entry.title, platform, shouldTranscribe });
+      if (entry.isDownloadable && result.selectedIds.has(entry.id)) items.push({ key: entry.url, url: entry.url, title: entry.title, platform, shouldTranscribe });
     }
   }
   return items;

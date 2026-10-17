@@ -17,7 +17,7 @@ export class ApiError extends Error {
   }
 }
 
-const UNREACHABLE_MESSAGE = "Couldn't reach the KineTube backend. Restart the app if this keeps happening.";
+const UNREACHABLE_MESSAGE = "Couldn't reach the kinetube backend. Restart the app if this keeps happening.";
 
 function isErrorResponse(value: unknown): value is ErrorResponse {
   return typeof value === 'object' && value !== null && 'code' in value && 'message' in value;

@@ -1,9 +1,10 @@
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 import FormError from './FormError';
 
 import type { FormEvent } from 'react';
@@ -26,13 +27,13 @@ export default function LoginForm({ username, isSending, error, onUsernameChange
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-1.5">
-        <Label htmlFor="ig-username" className="text-xs">Username</Label>
+        <Label htmlFor="ig-username" className="text-[13px] text-ink-muted">Username</Label>
         <Input id="ig-username" value={username} onChange={(event) => onUsernameChange(event.target.value)} placeholder="your_username" autoComplete="username" />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="ig-password" className="text-xs">Password</Label>
+        <Label htmlFor="ig-password" className="text-[13px] text-ink-muted">Password</Label>
         <div className="relative">
           <Input
             id="ig-password"
@@ -46,15 +47,15 @@ export default function LoginForm({ username, isSending, error, onUsernameChange
             type="button"
             aria-label={isPasswordShown ? 'Hide password' : 'Show password'}
             onClick={() => setIsPasswordShown((isShown) => !isShown)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            className="absolute top-1/2 right-2 flex size-7 -translate-y-1/2 items-center justify-center rounded-pill text-ink-faint transition-quiet hover:bg-surface-hover hover:text-ink"
           >
             {isPasswordShown ? <EyeOff size={15} /> : <Eye size={15} />}
           </button>
         </div>
       </div>
       <FormError message={error} />
-      <Button type="submit" disabled={isSending} className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600">
-        {isSending ? <><Loader2 size={14} className="mr-2 animate-spin" /> Logging in...</> : 'Log in'}
+      <Button type="submit" disabled={isSending} className="w-full">
+        {isSending ? <><Spinner className="size-4" /> Logging in...</> : 'Log in'}
       </Button>
     </form>
   );

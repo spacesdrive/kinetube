@@ -12,12 +12,13 @@ export const APP_UPDATE_HINTS: Record<AppUpdateCheckState, string | undefined> =
 
 // the app's own updater, run by Electron; a found update opens the update dialog instead of showing here
 export function useAppUpdateCheck() {
-  const [appVersion, setAppVersion] = useState<string | null>(null);
+  // Electron reports the installed version; a plain browser falls back to the version this build came from
+  const [appVersion, setAppVersion] = useState<string>(__APP_VERSION__);
   const [state, setState] = useState<AppUpdateCheckState>('idle');
   const electronApi = window.electronAPI;
 
   useEffect(() => {
-    electronApi?.getAppVersion().then(setAppVersion).catch(() => setAppVersion(null));
+    electronApi?.getAppVersion().then(setAppVersion).catch(() => setAppVersion(__APP_VERSION__));
   }, [electronApi]);
 
   useEffect(() => {
@@ -41,5 +42,5 @@ export function useAppUpdateCheck() {
     }
   }, [electronApi]);
 
-  return { appVersion, state, check };
+  return { appVersion, state, check, canCheck: Boolean(electronApi) };
 }

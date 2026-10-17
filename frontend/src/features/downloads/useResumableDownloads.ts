@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import { api } from '@/services/api';
 
@@ -27,13 +28,32 @@ export function useResumableDownloads() {
     setDownloads((previous) => previous.filter((download) => download.id !== downloadId));
   }, []);
 
-  // dismissing keeps the partial file on disk and only forgets the record
-  const dismiss = useCallback((downloadId: string) => {
-    forget(downloadId);
+  // an undo puts a dismissed download back where it was in the list
+  const restore = useCallback((download: Download) => {
+    setDownloads((previous) => (previous.some((existing) => existing.id === download.id) ? previous : [...previous, download]));
+  }, []);
+
+  // discarding keeps the partial file on disk and only deletes the backend's record
+  const discard = useCallback((downloadId: string) => {
     api.removeDownload(downloadId).catch(() => {
-      // already gone on the backend, which is the outcome dismiss wanted
+      // already gone on the backend, which is the outcome discard wanted
     });
-  }, [forget]);
+  }, []);
+
+  // the record is deleted only once the undo in the toast has had its chance
+  const dismiss = useCallback((download: Download) => {
+    forget(download.id);
+    let isUndone = false;
+    const discardUnlessUndone = (): void => {
+      if (!isUndone) discard(download.id);
+    };
+    toast('Removed from unfinished downloads', {
+      description: 'The partial file stays in its folder.',
+      action: { label: 'Undo', onClick: () => { isUndone = true; restore(download); } },
+      onAutoClose: discardUnlessUndone,
+      onDismiss: discardUnlessUndone,
+    });
+  }, [forget, discard, restore]);
 
   return { downloads, forget, dismiss };
 }

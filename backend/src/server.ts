@@ -33,7 +33,7 @@ function start(): void {
   });
   server.on('error', (error: NodeJS.ErrnoException) => {
     const message = error.code === 'EADDRINUSE'
-      ? `Port ${config.port} is already in use. Close the other kinetube window and try again.`
+      ? `Port ${config.port} is already in use by another program, such as a development server or an older kinetube. Close it and start kinetube again.`
       : 'The backend could not start';
     logger.error(message, { error });
     process.exit(1);

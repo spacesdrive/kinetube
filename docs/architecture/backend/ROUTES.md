@@ -70,7 +70,7 @@ A paused download ends with `paused` (`{ download }`) instead of `done`. That is
 
 | Method | Path | Purpose | Success | Errors | Streams |
 |---|---|---|---|---|---|
-| GET | `/health` | Lets Electron and `npm run dev` know the server is up. Answered before the JSON parser and before any tool check. | 200 `{ ok: true }` | 403 | no |
+| GET | `/health` | Lets Electron and `npm run dev` know the server is up. Answered before the JSON parser and before any tool check. | 200 `{ ok: true, servesApp: boolean }`; `servesApp` is true only when the backend serves the built page, as in the packaged app | 403 | no |
 
 ## Tools (`src/routes/toolRoutes.ts`)
 

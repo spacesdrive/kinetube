@@ -75,9 +75,9 @@ describe('/api/v1', () => {
     });
   });
 
-  test('GET /health answers ok', async () => {
+  test('GET /health answers ok and says this backend does not serve the page', async () => {
     const res = await api.get('/health');
-    assert.deepEqual(res.body, { ok: true });
+    assert.deepEqual(res.body, { ok: true, servesApp: false });
   });
 
   describe('tools', () => {

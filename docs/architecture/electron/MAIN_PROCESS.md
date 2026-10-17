@@ -60,9 +60,9 @@ In a packaged build, `startBackend` calls `utilityProcess.fork` on `resources/ba
 | `ELECTRON_USER_DATA` | `app.getPath('userData')` | The writable data folder. |
 | `ELECTRON_FRONTEND_DIST` | `resources/frontend/dist` | The built frontend that the backend serves. |
 
-`waitForBackend` sends `GET http://127.0.0.1:3001/health` up to 40 times, 500 ms apart (about 20 seconds). The request names `127.0.0.1` because the backend listens there only. It sets `Host: localhost:3001`, which the origin guard accepts. Any status below 500 counts as healthy.
+`waitForBackend` sends `GET http://127.0.0.1:3001/health` up to 40 times, 500 ms apart (about 20 seconds). The request names `127.0.0.1` because the backend listens there only. It sets `Host: localhost:3001`, which the origin guard accepts. Only a 200 answer with `servesApp: true` counts. A development backend, or an older kinetube still running, also answers `/health` on that port but has no page, and the window would show Express's "Cannot GET /" (issue #10). The wait also stops as soon as the app's own backend exits, which it does with `EADDRINUSE` when another program holds port 3001.
 
-If `/health` never answers, `main.ts` writes a line to the log and loads `backendFailurePage`. That page shows the path of `backend.log` and its contents, so the person can report the problem.
+If the backend exits or `/health` never answers, `main.ts` writes a line to the log and loads `backendFailurePage`. That page shows the path of `backend.log` and its contents, so the person can report the problem.
 
 ## backend.log
 

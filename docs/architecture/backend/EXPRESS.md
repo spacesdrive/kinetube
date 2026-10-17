@@ -33,7 +33,7 @@ How the backend is launched:
 |---|---|---|
 | 1. Request id and access log | `requestContext(logger)` (`src/middleware/requestContext.ts`) | Every later step and every error can use `res.locals.requestId`. |
 | 2. Origin guard | `originGuard(config.port)` (`src/middleware/originGuard.ts`) | Refuses other web pages and other host names before any work is done. |
-| 3. `GET /health` | inline in `app.ts` | Answers `{ ok: true }` before the JSON parser and before any tool is checked. |
+| 3. `GET /health` | inline in `app.ts` | Answers `{ ok: true, servesApp }` before the JSON parser and before any tool is checked. |
 | 4. JSON body parser | `express.json({ limit: '1mb' })` | Every API route except the multipart upload reads JSON. |
 | 5. API router | `app.use('/api/v1', createApiRouter(services, logger))` | All resources. See `ROUTES.md`. |
 | 6. API 404 | `app.use('/api', apiNotFound)` | Any other `/api` path gets a JSON 404, never the frontend's `index.html`. |

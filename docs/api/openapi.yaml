@@ -51,10 +51,13 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [ok]
+                required: [ok, servesApp]
                 properties:
                   ok:
                     const: true
+                  servesApp:
+                    type: boolean
+                    description: True only when this backend also serves the built page, as in the packaged app. Electron loads the window only from such a backend.
         '403':
           $ref: '#/components/responses/Forbidden'
 

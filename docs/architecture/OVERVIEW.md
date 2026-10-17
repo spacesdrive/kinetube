@@ -50,7 +50,7 @@ A request passes through these layers in order. Each one only calls the layer be
 
 1. `requestContext` gives the request an id and writes one access log line when it finishes.
 2. `originGuard` answers 403 unless the Host is `localhost:<port>` or `127.0.0.1:<port>`, and unless any Origin header is the app itself or the Vite dev server (ADR-026).
-3. `GET /health` answers `{ ok: true }`.
+3. `GET /health` answers `{ ok: true, servesApp: true }`.
 4. `express.json` reads JSON bodies up to 1 MB.
 5. The `/api/v1` router handles the API. Any other `/api` path gets a 404 JSON error.
 6. In a packaged build, `express.static` serves `frontend/dist`, with `index.html` for every other path.

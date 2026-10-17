@@ -14,19 +14,19 @@ let mainWindow: BrowserWindow | null = null;
 let backend: UtilityProcess | null = null;
 const getWindow = (): BrowserWindow | null => mainWindow;
 
-function ensureBackend(): void {
-  if (backend) return;
+function ensureBackend(): UtilityProcess {
+  if (backend) return backend;
   const started = startBackend();
   started.once('exit', () => {
     if (backend === started) backend = null;
   });
   backend = started;
+  return started;
 }
 
 async function loadPackagedApp(window: BrowserWindow): Promise<void> {
-  ensureBackend();
-  if (!(await waitForBackend())) {
-    writeLog('[main] the backend did not answer /health in time\n');
+  if (!(await waitForBackend(ensureBackend()))) {
+    writeLog('[main] the backend exited or did not answer /health in time\n');
     await window.loadURL(backendFailurePage(backendLogPath(), readBackendLog()));
     return;
   }

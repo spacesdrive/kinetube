@@ -6,6 +6,7 @@ import { BACKEND_PORT, backendEntryPath, frontendDistPath } from './appPaths';
 import { openBackendLog, writeLog } from './backendLog';
 
 import type { UtilityProcess } from 'electron';
+import type { HealthResponse } from '../../shared/types/api';
 
 // 40 tries half a second apart: a cold start on a slow disk takes several seconds
 const HEALTH_CHECK_ATTEMPTS = 40;
@@ -33,21 +34,37 @@ export function startBackend(): UtilityProcess {
   return backend;
 }
 
+function isAppBackend(body: string): boolean {
+  try {
+    const health = JSON.parse(body) as Partial<HealthResponse>;
+    return health.ok === true && health.servesApp === true;
+  } catch {
+    return false;
+  }
+}
+
+// a dev backend or an old kinetube on the same port also answers /health, but it has no page to load
 function checkHealth(): Promise<boolean> {
   return new Promise((resolve) => {
     // the backend listens on 127.0.0.1 only, so the check names it rather than "localhost"
     http
       .get(`http://127.0.0.1:${BACKEND_PORT}/health`, { headers: { Host: `localhost:${BACKEND_PORT}` } }, (response) => {
-        response.resume();
-        resolve((response.statusCode ?? 500) < 500);
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk: string) => { body += chunk; });
+        response.on('end', () => resolve(response.statusCode === 200 && isAppBackend(body)));
       })
       .on('error', () => resolve(false));
   });
 }
 
-// resolves once /health answers; the backend answers it before checking any tool
-export async function waitForBackend(): Promise<boolean> {
-  for (let attempt = 0; attempt < HEALTH_CHECK_ATTEMPTS; attempt++) {
+// resolves once /health answers; the backend answers it before checking any tool.
+// stops early when the backend exits, which it does when another program holds the port
+export async function waitForBackend(backend: UtilityProcess): Promise<boolean> {
+  let hasExited = false;
+  backend.once('exit', () => { hasExited = true; });
+
+  for (let attempt = 0; attempt < HEALTH_CHECK_ATTEMPTS && !hasExited; attempt++) {
     if (await checkHealth()) return true;
     await new Promise((resolve) => setTimeout(resolve, HEALTH_CHECK_INTERVAL_MS));
   }

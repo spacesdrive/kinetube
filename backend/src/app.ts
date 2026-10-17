@@ -8,6 +8,7 @@ import { requestContext } from './middleware/requestContext.ts';
 import { createApiRouter } from './routes/apiRouter.ts';
 
 import type { Express } from 'express';
+import type { HealthResponse } from '@shared/api.ts';
 import type { AppConfig } from './config.ts';
 import type { Services } from './container.ts';
 import type { Logger } from './lib/logger.ts';
@@ -30,7 +31,8 @@ export function createApp({ config, services, logger }: AppDeps): Express {
 
   // 3. Electron waits for this before it opens the window, so it answers before any tool is checked
   app.get('/health', (_req, res) => {
-    res.json({ ok: true });
+    const health: HealthResponse = { ok: true, servesApp: config.frontendDist !== null };
+    res.json(health);
   });
 
   // 4. the API; multipart uploads are read by their own route, everything else is JSON

@@ -51,6 +51,7 @@ Every package is now version 2.0.0 (ADR-037). This section becomes the 2.0.0 ent
 
 ### Fixed
 - **UI bugs** (issue #3): the thumbnail on a video's card showed as an empty box; durations under a minute read "19" instead of "0:19"; every quality up to 4K was offered on low resolution videos; light colours appeared in the dark theme; the whole page scrolled, header included; the Instagram page promised 4K and a login it no longer uses; channel rows showed a bare number for views; the language selector covered its own field and opened without animation.
+- **The desktop app opened on "Cannot GET /" when port 3001 was taken** (issue #10). Its own backend could not start, but a development backend or an older kinetube on the same port answered `/health`, and the window loaded a backend with no page. `/health` now says whether it serves the page, Electron loads only from one that does, and it shows the backend log as soon as its own backend exits.
 - **A paused download showed as failed.** The stream reader treated the paused event as a cut connection.
 - **The installer kept the 1.0.0 name and the packages disagreed on the version** (issue #7). Every package is 2.0.0 and the build is `KineTube-Setup-2.0.0.exe`.
 - **Any web page could control the app.** The backend listened on every network interface and, in the installed app, accepted requests from any origin. It now listens on 127.0.0.1 only and refuses requests with a foreign Host or Origin. See ADR-026.

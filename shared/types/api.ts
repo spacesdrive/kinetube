@@ -12,6 +12,12 @@ export type ErrorCode =
   | 'CANCELLED'
   | 'INTERNAL';
 
+// what /health answers; Electron opens the window only from a backend that serves the page
+export interface HealthResponse {
+  ok: true;
+  servesApp: boolean;
+}
+
 export interface DataResponse<T> {
   data: T;
 }

@@ -28,6 +28,11 @@ Every package is now version 2.0.0 (ADR-037). This section becomes the 2.0.0 ent
 **Folder picker on macOS and Linux** (issue #5)
 - The browser fallback opens a native dialog with osascript on macOS and zenity or kdialog on Linux.
 
+**A new README** (issue #11)
+- The README is shorter and shows six animated GIFs of the real app, filmed with Flute, in place of the screenshots. The brand lockup at the top follows GitHub's light or dark theme, and two Mermaid diagrams show how the app is put together. See ADR-038.
+- `CONTRIBUTING.md` covers setup, checks, builds and the project layout. `docs/USER_GUIDE.md` holds the settings, Instagram setup, keyboard shortcuts and known limitations that used to fill the README.
+- `npm run demos` films the scenes in `frontend/src/flute/scenes/` again and rebuilds the GIFs in `docs/media/` (`docs/workflows/DEMOS.md`).
+
 ### Changed
 - yt-dlp now checks TLS certificates on every lookup and download; `--no-check-certificates` is gone (issue #4).
 - The app uses Unbounded and DM Sans, bundled with the app (ADR-033). Geist is removed.

@@ -38,8 +38,10 @@ For MCP usage, read `docs/mcp/OVERVIEW.md` before using Context7, Parallel Searc
 ```
 docs/
   WRITING_STANDARDS.md        Typography, icons, writing style, UI copy, commit messages
+  USER_GUIDE.md               Settings, Instagram setup, keyboard shortcuts, privacy, known limitations
   design-reference.md         Measured reference layout, brand kit findings, tokens, contrast, page mapping
   screenshots/                Before and after screenshots of every screen, light and dark
+  media/                      The README lockups and GIFs (made by npm run demos)
   api/
     openapi.yaml               OpenAPI 3.1 description of /api/v1
   architecture/
@@ -62,6 +64,7 @@ docs/
     TESTING.md                 Test runners, what is covered, manual verification checklist
     GIT.md                     Commit format, branch rules, changelog policy
     RELEASE.md                 Build steps, electron-builder targets, GitHub Actions release flow
+    DEMOS.md                   The Flute scenes behind the README GIFs and how to make them again
   features/
     NEW_API_ROUTE.md           Add a route to the Express backend
     NEW_TOOL_MANAGER.md        Add or extend a managed external binary (yt-dlp-style)
@@ -69,6 +72,7 @@ docs/
     ARCHITECTURE.md            Architectural principles and constraints
     CROSS_PLATFORM.md          Per-platform tool support and what is still unverified
 
+CONTRIBUTING.md    Setup, checks, builds, project layout, how a change gets in
 DECISIONS.md       Architectural decision log
 CHANGELOG.md       Version history and feature changes
 ROADMAP.md         Planned features and priorities
@@ -268,4 +272,5 @@ When anything changes, update every relevant docs file from the table below.
 | Engineering standard changed | `docs/philosophy/ARCHITECTURE.md`, this file (Engineering Standards section) |
 | Testing approach changed | `docs/workflows/TESTING.md` |
 | Feature guide added or changed | `docs/features/` (relevant file) |
-| README setup or feature list changes | `README.md` |
+| README setup or feature list changes | `README.md`, `CONTRIBUTING.md` for setup and builds, `docs/USER_GUIDE.md` for settings and limitations |
+| A page shown in a README GIF changed | Run `npm run demos` with `npm run dev` running and check the GIFs (`docs/workflows/DEMOS.md`) |

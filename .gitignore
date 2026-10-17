@@ -16,6 +16,15 @@ release/
 # ── Auto-downloaded binaries (re-downloaded on first run) ─────────────────────
 backend/downloads/*.exe
 backend/downloads/*.zip
+backend/downloads/yt-dlp
+backend/downloads/ffmpeg
+backend/downloads/whisper-cli
+backend/downloads/main
+backend/downloads/*.so
+backend/downloads/*.so.*
+backend/downloads/*.dylib
+backend/downloads/*.tar.xz
+backend/downloads/*.download
 
 # ── Downloaded media files ────────────────────────────────────────────────────
 backend/downloads/*.mp4

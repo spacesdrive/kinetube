@@ -14,8 +14,17 @@ let mainWindow: BrowserWindow | null = null;
 let backend: UtilityProcess | null = null;
 const getWindow = (): BrowserWindow | null => mainWindow;
 
-async function openPackagedApp(window: BrowserWindow): Promise<void> {
-  backend = startBackend();
+function ensureBackend(): void {
+  if (backend) return;
+  const started = startBackend();
+  started.once('exit', () => {
+    if (backend === started) backend = null;
+  });
+  backend = started;
+}
+
+async function loadPackagedApp(window: BrowserWindow): Promise<void> {
+  ensureBackend();
   if (!(await waitForBackend())) {
     writeLog('[main] the backend did not answer /health in time\n');
     await window.loadURL(backendFailurePage(backendLogPath(), readBackendLog()));
@@ -27,6 +36,19 @@ async function openPackagedApp(window: BrowserWindow): Promise<void> {
     void window.loadURL(loadFailurePage(errorCode, description));
   });
   await window.loadURL(APP_URL);
+}
+
+// on macOS a window can be closed and reopened from the dock while the app keeps running
+function openWindow(): void {
+  const window = createMainWindow();
+  mainWindow = window;
+  window.on('closed', () => {
+    if (mainWindow === window) mainWindow = null;
+  });
+
+  // in development the npm dev script runs the backend; packaged, Electron starts it
+  if (isDev) return;
+  loadPackagedApp(window).catch((error: unknown) => writeLog(`[main] could not open the app: ${String(error)}\n`));
 }
 
 // the app has its own sidebar, so the native File / Edit / View menu is removed
@@ -44,23 +66,17 @@ if (!app.requestSingleInstanceLock()) {
   });
 }
 
-void app.whenReady().then(async () => {
-  mainWindow = createMainWindow();
-  mainWindow.on('closed', () => {
-    mainWindow = null;
-  });
+void app.whenReady().then(() => {
+  openWindow();
   setUpAutoUpdater(getWindow);
 
-  // in development the npm dev script runs the backend; packaged, Electron starts it
-  if (!isDev) await openPackagedApp(mainWindow);
-
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createMainWindow();
+    if (BrowserWindow.getAllWindows().length === 0) openWindow();
   });
 });
 
+// the backend lives as long as the app, so a window reopened on macOS finds it still running
 app.on('before-quit', () => backend?.kill());
 app.on('window-all-closed', () => {
-  backend?.kill();
   if (process.platform !== 'darwin') app.quit();
 });

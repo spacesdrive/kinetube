@@ -7,6 +7,18 @@ import { createSingleDownload } from '@/features/downloads/singleDownloadState';
 
 import type { ProgressModalProps } from '@/features/downloads/ProgressModal';
 import type { SingleDownloadState } from '@/features/downloads/singleDownloadState';
+import type { TranscriptFiles } from '@shared/transcriptions.ts';
+
+// every format of a short transcript, as the backend sends them
+const TRANSCRIPTS: TranscriptFiles = {
+  txt: 'one two three\n',
+  srt: '1\n00:00:00,000 --> 00:00:01,000\none two three\n',
+  vtt: 'WEBVTT\n\n00:00:00.000 --> 00:00:01.000\none two three\n',
+  lrc: '[00:00.00]one two three\n',
+  csv: 'start,end,text\n0,1000,"one two three"\n',
+  tsv: 'start\tend\ttext\n0\t1000\tone two three\n',
+  json: '{}\n',
+};
 
 function single(changes: Partial<SingleDownloadState> = {}): SingleDownloadState {
   return { ...createSingleDownload('My Video', '1080p', false), ...changes };
@@ -54,12 +66,13 @@ describe('ProgressModal for one download', () => {
     expect(screen.getByText('The download failed. Private video')).toBeTruthy();
   });
 
-  it('shows the transcript and its word count once transcription finishes', () => {
+  it('shows the transcript, its word count and the files written beside the video', () => {
     renderModal({
       download: single({ status: 'done', isSuccess: true, message: 'Download complete', filePath: '/a.mp4' }),
-      transcript: { kind: 'text', text: 'one two three', outputPath: '/a.txt' },
+      transcript: { kind: 'text', text: 'one two three', transcripts: TRANSCRIPTS, outputPaths: ['/a.srt', '/a.txt'] },
     });
-    expect(screen.getByText(/3 words/)).toBeTruthy();
+    expect(screen.getByText('3 words, saved beside the video as TXT and SRT')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Save a copy/ })).toBeTruthy();
   });
 });
 

@@ -63,7 +63,7 @@ function DownloadPanel() {
       <div className="mt-3 flex items-start justify-between gap-3 border-t border-line pt-3">
         <span>
           <span className="block text-xs font-semibold text-ink">Transcribe after download</span>
-          <span className="block text-[10px] text-ink-muted">Writes a text transcript with Whisper, on this computer</span>
+          <span className="block text-[10px] text-ink-muted">Saves a transcript beside the file, in the formats chosen in Settings</span>
         </span>
         <span className="mt-0.5 flex h-4 w-7 shrink-0 items-center rounded-full bg-line-strong p-0.5"><span className="size-3 rounded-full bg-surface-elevated" /></span>
       </div>

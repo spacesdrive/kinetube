@@ -49,7 +49,7 @@ export default function HomeBelow() {
         notes={[
           { title: 'Five models', text: 'From Tiny, about 75 MB, to Large, about 2.9 GB. Larger models are more accurate, but slower.' },
           { title: 'Twelve languages', text: 'Or let Whisper work out the language for you.' },
-          { title: 'Transcribe after download', text: 'Turn on one switch and every finished download gets a text file next to it.' },
+          { title: 'Text or subtitles', text: 'Save a transcript as plain text, SRT or VTT subtitles, LRC, CSV, TSV or JSON. Every finished download can get one next to it.' },
         ]}
       >
         <TranscribeCard />

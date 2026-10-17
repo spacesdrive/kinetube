@@ -53,11 +53,11 @@ frontend/
     components/
       shell/              sidebar, top bar, brand mark and lockup, theme switcher, command palette, Instagram accounts
       patterns/           page patterns built on the tokens (see "Patterns")
-      UpdateDialog.tsx, YtdlpAlert.tsx, QualitySelect.tsx, ...   pieces used by more than one feature
+      UpdateDialog.tsx, YtdlpAlert.tsx, QualitySelect.tsx, SaveTranscriptMenu.tsx, ...   pieces used by more than one feature
       icons/              YouTube and Instagram brand icons
       ui/                 shadcn primitives (kebab-case file names), restyled to the tokens
     hooks/                hooks used by more than one feature
-    lib/                  pure helpers: settings, format, URL cleaners, qualities, pages, commands, media context, folder picker, cn
+    lib/                  pure helpers: settings, format, URL cleaners, qualities, transcript formats, pages, commands, media context, folder picker, cn
     flute/                development only: the Flute scenes that film the README animations (see "README demos")
   tests/                  Vitest tests, same folders as src/
 ```
@@ -217,6 +217,7 @@ When you add a font size, radius or shadow token, add its name here in the same 
 | `DetailPanel` | The settings column beside a working surface, sticky under the top bar on wide windows |
 | `SearchField` | A labelled search input |
 | `FilterChips` | Pill chips with counts, as one radio group |
+| `ToggleChips` | The same pills, each switched on and off by itself (`aria-pressed`). `isOneRequired` keeps the last one on. Settings uses it for Transcript files. |
 | `ChoiceCard` | A large option tile that starts a flow |
 | `StatusBadge` | A small pill in a tone |
 | `Notice` | An inline callout tinted by its tone |
@@ -302,6 +303,8 @@ Each stream has a pure reducer in a `*State.ts` file. A reducer takes the curren
 | `features/setup/toolSetupState.ts` | `applyToolEvent` | `useToolSetup` |
 | `features/transcribe/transcribeQueueState.ts` | `applyTranscriptionEvent` | `useTranscribeQueue` |
 
+A finished transcription carries every format (`transcripts`) and the files written beside a typed path (`outputPaths`). `SaveTranscriptMenu` in `components/` is the Save button on a queue item, Save all on the queue and Save a copy after a download: it lists every format from `lib/transcriptFormats.ts` and saves the chosen one with `saveTextFile`, named after the media file. The Transcribe page and the after-download transcript send the formats picked under Transcript files in Settings (`transcription.fileFormats`, plain text by default; `loadSettings` drops unknown formats and never leaves the list empty).
+
 A hook opens the stream and passes each event to the reducer inside a state updater:
 
 ```ts
@@ -348,7 +351,7 @@ The files in `components/ui/` are generated, then restyled to the tokens. They k
 
 Tests live in `frontend/tests/`, in the same folders as the code they test (`tests/features/downloads/` for `src/features/downloads/`). Vitest runs every `tests/**/*.test.{ts,tsx}` file in jsdom. `tests/setup.ts` runs Testing Library's `cleanup` after each test, because Vitest globals are off. It also gives jsdom a `matchMedia` that answers "light", because next-themes asks for the system theme.
 
-- Reducers, helpers and the stream reader have unit tests: `downloadState.test.ts`, `toolSetupState.test.ts`, `transcribeQueueState.test.ts`, `batchResults.test.ts`, `collectionFilters.test.ts`, `commands.test.ts`, `qualities.test.ts`, `urlCleaners.test.ts`, `format.test.ts`, `settings.test.ts`, `fileNamePreview.test.ts`, `eventStream.test.ts` and `request.test.ts`.
+- Reducers, helpers and the stream reader have unit tests: `downloadState.test.ts`, `toolSetupState.test.ts`, `transcribeQueueState.test.ts`, `batchResults.test.ts`, `collectionFilters.test.ts`, `commands.test.ts`, `qualities.test.ts`, `urlCleaners.test.ts`, `format.test.ts`, `settings.test.ts`, `fileNamePreview.test.ts`, `transcriptFormats.test.ts`, `eventStream.test.ts` and `request.test.ts`. `VideoEntryRow.test.tsx` opens a menu with a label, because Base UI throws when a `DropdownMenuLabel` sits outside a `DropdownMenuGroup` or `DropdownMenuRadioGroup` (issue #23).
 - `ProgressModal`, `ResumeDownloadsBanner`, `HoldToConfirmButton`, `CommandPalette` and `AppearanceSection` have component tests with Testing Library.
 
 Run them with `npm test` in `frontend/`, or `npm test` at the root for the backend and frontend together. `docs/workflows/TESTING.md` lists what each file covers.

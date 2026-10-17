@@ -1,3 +1,5 @@
+import type { TranscriptFormat } from '@shared/transcriptions.ts';
+
 // hands the text to the browser as a file download, which Electron shows as a save dialog
 export function saveTextFile(text: string, fileName: string): void {
   const link = document.createElement('a');
@@ -9,7 +11,7 @@ export function saveTextFile(text: string, fileName: string): void {
   URL.revokeObjectURL(link.href);
 }
 
-// "clip.mp4" -> "clip.txt"
-export function transcriptFileName(mediaName: string): string {
-  return `${mediaName.replace(/\.[^.]+$/, '')}.txt`;
+// "clip.mp4" -> "clip.txt", or "clip.srt" for subtitles
+export function transcriptFileName(mediaName: string, format: TranscriptFormat): string {
+  return `${mediaName.replace(/\.[^.]+$/, '')}.${format}`;
 }

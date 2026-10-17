@@ -12,7 +12,7 @@ export default function TranscribeToggle({ id, isOn, onChange }: TranscribeToggl
     <div className="flex items-center justify-between gap-4 border-t border-divider pt-4">
       <div className="min-w-0">
         <Label htmlFor={id} className="text-sm font-medium text-ink">Transcribe after download</Label>
-        <p className="mt-0.5 text-xs text-ink-muted">Writes a text transcript with Whisper, on this computer</p>
+        <p className="mt-0.5 text-xs text-ink-muted">Saves a transcript beside the file, in the formats chosen in Settings</p>
       </div>
       <Switch id={id} checked={isOn} onCheckedChange={onChange} />
     </div>

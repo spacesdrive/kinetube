@@ -204,7 +204,7 @@ Defined in `frontend/src/styles/tokens.css`, mapped into Tailwind in `frontend/s
 |---|---|
 | App shell, sidebar, top bar, brand mark and lockup, theme switcher, command palette | `frontend/src/components/shell/` |
 | Page header, section header, surface box, metric box, list row, detail panel | `frontend/src/components/patterns/` |
-| Search field, filter chips, choice card, status badge, notice, media thumbnail, keyboard hint | `frontend/src/components/patterns/` |
+| Search field, filter chips, toggle chips, choice card, status badge, notice, media thumbnail, keyboard hint | `frontend/src/components/patterns/` |
 | Confirm dialog, hold-to-confirm button | `frontend/src/components/patterns/` |
 | Empty, loading and error states | `frontend/src/components/patterns/` |
 | Underline tabs, select, dropdown menu, dialog, sheet, tooltip, switch, checkbox, progress, toasts | `frontend/src/components/ui/`, restyled to the tokens |

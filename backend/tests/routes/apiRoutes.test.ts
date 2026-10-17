@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, describe, test } from 'node:test';
 
@@ -213,6 +214,31 @@ describe('/api/v1', () => {
       assert.equal((await api.post('/api/v1/transcriptions').send({ filePath: 'clip.mp4' })).status, 400);
       const res = await api.post('/api/v1/transcriptions').send({ filePath: path.join(root, 'missing.mp4') });
       assert.equal(res.status, 404);
+    });
+
+    test('an unknown or empty list of formats is refused', async () => {
+      const filePath = path.join(root, 'talk.mp4');
+      fs.writeFileSync(filePath, '');
+      assert.equal((await api.post('/api/v1/transcriptions').send({ filePath, formats: ['docx'] })).status, 400);
+      assert.equal((await api.post('/api/v1/transcriptions').send({ filePath, formats: [] })).status, 400);
+    });
+
+    test('the chosen formats reach whisper once each, and done carries every format', async () => {
+      const filePath = path.join(root, 'talk.mp4');
+      fs.writeFileSync(filePath, '');
+      const res = await api.post('/api/v1/transcriptions').send({ filePath, formats: ['srt', 'txt', 'srt'] });
+      const data = parseSseBody(res.text).find((event) => event.event === 'done')?.data as { success: boolean; transcripts: object; outputPaths: string[] };
+      assert.equal(data.success, true);
+      assert.deepEqual(Object.keys(data.transcripts).sort(), ['csv', 'json', 'lrc', 'srt', 'tsv', 'txt', 'vtt']);
+      assert.deepEqual(data.outputPaths, [path.join(root, 'talk.srt'), path.join(root, 'talk.txt')]);
+    });
+
+    test('plain text is the only file when no formats are named', async () => {
+      const filePath = path.join(root, 'talk.mp4');
+      fs.writeFileSync(filePath, '');
+      const res = await api.post('/api/v1/transcriptions').send({ filePath });
+      const data = parseSseBody(res.text).find((event) => event.event === 'done')?.data as { outputPaths: string[] };
+      assert.deepEqual(data.outputPaths, [path.join(root, 'talk.txt')]);
     });
   });
 

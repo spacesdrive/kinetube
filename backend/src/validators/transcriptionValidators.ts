@@ -1,11 +1,12 @@
 import path from 'node:path';
 
 import { NotFoundError, ValidationError } from '../lib/errors.ts';
+import { TRANSCRIPT_FORMATS } from '../managers/whisper/whisperFormats.ts';
 import { WHISPER_MODEL_IDS } from '../managers/whisper/whisperModels.ts';
-import { optionalOneOf, optionalString, readObject, requiredString } from './fields.ts';
+import { oneOf, optionalOneOf, optionalString, readObject, requiredString } from './fields.ts';
 import { exampleFilePath } from './pathExamples.ts';
 
-import type { WhisperModelId } from '@shared/transcriptions.ts';
+import type { TranscriptFormat, WhisperModelId } from '@shared/transcriptions.ts';
 import type { TranscriptionInput } from '../services/transcriptionService.ts';
 
 // auto detection, or an ISO 639 language code such as en or yue
@@ -23,6 +24,13 @@ function parseLanguage(value: unknown): string {
   return language;
 }
 
+// ["srt", "txt", "srt"] -> ["srt", "txt"]; left out means plain text only
+export function parseFormats(value: unknown): TranscriptFormat[] {
+  if (value === undefined || value === null) return ['txt'];
+  if (!Array.isArray(value) || value.length === 0) throw new ValidationError(`"formats" must be a list with at least one of: ${TRANSCRIPT_FORMATS.join(', ')}.`);
+  return [...new Set(value.map((format) => oneOf(format, 'formats', TRANSCRIPT_FORMATS)))];
+}
+
 export function parseCreateTranscription(body: unknown): TranscriptionInput {
   const fields = readObject(body);
   const filePath = requiredString(fields.filePath, 'filePath');
@@ -32,6 +40,7 @@ export function parseCreateTranscription(body: unknown): TranscriptionInput {
     filePath,
     modelId: optionalOneOf(fields.modelId, 'modelId', WHISPER_MODEL_IDS, 'base'),
     language: parseLanguage(fields.language),
+    formats: parseFormats(fields.formats),
     isUpload: false,
   };
 }
@@ -45,6 +54,7 @@ export function parseUploadedTranscription(body: unknown, uploadedPath: string |
     filePath: uploadedPath,
     modelId: optionalOneOf(fields.modelId, 'modelId', WHISPER_MODEL_IDS, 'base'),
     language: parseLanguage(fields.language),
+    formats: [],
     isUpload: true,
   };
 }

@@ -1,5 +1,7 @@
+import ToggleChips from '@/components/patterns/ToggleChips';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TRANSCRIPTION_LANGUAGES } from '@/lib/languages';
+import { TRANSCRIPT_FORMAT_LABELS, TRANSCRIPT_FORMATS } from '@/lib/transcriptFormats';
 import SettingRow from './SettingRow';
 import SettingsSection from './SettingsSection';
 
@@ -21,6 +23,8 @@ const MODEL_LABELS: Record<WhisperModelId, string> = {
 
 const MODEL_IDS = Object.keys(MODEL_LABELS) as WhisperModelId[];
 
+const FORMAT_CHIPS = TRANSCRIPT_FORMATS.map((format) => ({ value: format, label: format.toUpperCase(), title: TRANSCRIPT_FORMAT_LABELS[format] }));
+
 export default function TranscriptionSettingsCard({ preferences, onChange }: TranscriptionSettingsCardProps) {
   const languageLabel = TRANSCRIPTION_LANGUAGES.find((language) => language.value === preferences.defaultLanguage)?.label;
 
@@ -37,6 +41,9 @@ export default function TranscriptionSettingsCard({ preferences, onChange }: Tra
             <SelectTrigger aria-label="Default language" className="w-48"><SelectValue>{languageLabel}</SelectValue></SelectTrigger>
             <SelectContent>{TRANSCRIPTION_LANGUAGES.map((language) => <SelectItem key={language.value} value={language.value}>{language.label}</SelectItem>)}</SelectContent>
           </Select>
+        </SettingRow>
+        <SettingRow label="Transcript files" hint="Saved beside each file kinetube transcribes. Video players show SRT and VTT files as subtitles.">
+          <ToggleChips label="Transcript files" chips={FORMAT_CHIPS} value={preferences.fileFormats} isOneRequired onChange={(fileFormats) => onChange({ ...preferences, fileFormats })} />
         </SettingRow>
       </SettingsSection>
   );

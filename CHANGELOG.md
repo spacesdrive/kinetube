@@ -11,6 +11,7 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ### Added
 - A website at https://kinetube.ujjwal.fyi with a home page and the user docs, in `site/` (issues #14 to #18, ADR-040). It follows the layout and motion of activepieces.com in the kinetube brand: a scroll story, product pictures driven by a cursor, the real app clips, and docs with search. `.github/workflows/deploy-site.yml` checks every change to `site/` and deploys `main` to Cloudflare Pages (`docs/workflows/SITE.md`).
+- Transcripts in seven formats (issue #21, ADR-041): plain text, SRT and VTT subtitles, LRC lyrics, CSV, TSV and JSON, all with whisper.cpp's timestamps except plain text. Save on the Transcribe page, Save all on the queue and Save a copy after a download each ask which format to save. Settings has a Transcript files row that picks the files written beside a transcribed file; plain text stays the default. `POST /api/v1/transcriptions` takes `formats`, and its `done` event carries `transcripts` and `outputPaths` instead of `outputPath`.
 
 ### Changed
 - Both GitHub Actions workflows use `actions/checkout@v7`, `actions/setup-node@v7` and, for releases, `softprops/action-gh-release@v3`, which run on Node 24 instead of the deprecated Node 20 (issue #19).
@@ -19,6 +20,7 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ### Fixed
 - Opening the Theme menu in the sidebar, or the Download menu on a video in a playlist or channel, no longer leaves an empty window. Base UI throws when a menu label sits outside a menu group, and that error unmounted the whole app (issue #23).
+- Transcribing a dropped file no longer leaves a `.txt` file in the system temp folder beside the deleted upload (issue #21).
 
 ## [2.0.0] - 2026-10-17
 

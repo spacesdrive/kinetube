@@ -1,4 +1,4 @@
-import { AudioLines, Download, Square } from 'lucide-react';
+import { AudioLines, Square } from 'lucide-react';
 import { useState } from 'react';
 
 import DetailPanel from '@/components/patterns/DetailPanel';
@@ -6,6 +6,7 @@ import EmptyState from '@/components/patterns/EmptyState';
 import HoldToConfirmButton from '@/components/patterns/HoldToConfirmButton';
 import PageHeader from '@/components/patterns/PageHeader';
 import SectionHeader from '@/components/patterns/SectionHeader';
+import SaveTranscriptMenu from '@/components/SaveTranscriptMenu';
 import { Button } from '@/components/ui/button';
 import { pluralize } from '@/lib/format';
 import { loadSettings } from '@/lib/settings';
@@ -62,7 +63,7 @@ export default function TranscribePage() {
               description={queue.items.length > 0 ? `${pluralize(queue.items.length, 'file')}, ${doneCount} done` : undefined}
               actions={(
                 <>
-                  {doneCount > 1 && !queue.isRunning && <Button type="button" variant="outline" size="sm" onClick={queue.saveAll}><Download /> Save all</Button>}
+                  {doneCount > 1 && !queue.isRunning && <SaveTranscriptMenu label="Save all" variant="outline" size="sm" onSave={queue.saveAll} />}
                   {queue.items.length > 0 && !queue.isRunning && <HoldToConfirmButton label="Hold to clear" onConfirm={queue.clear} className="h-8 px-3 text-[13px]" />}
                 </>
               )}

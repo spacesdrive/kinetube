@@ -27,6 +27,14 @@ describe('loadSettings', () => {
     expect(loadSettings().downloads.defaultQuality).toBe('best');
   });
 
+  it('gives settings from before transcript formats plain text files, and drops formats that do not exist', () => {
+    localStorage.setItem('kinetube_settings', JSON.stringify({ transcription: { defaultModel: 'small' } }));
+    expect(loadSettings().transcription).toEqual({ defaultModel: 'small', defaultLanguage: 'auto', fileFormats: ['txt'] });
+
+    localStorage.setItem('kinetube_settings', JSON.stringify({ transcription: { fileFormats: ['srt', 'pdf'] } }));
+    expect(loadSettings().transcription.fileFormats).toEqual(['srt']);
+  });
+
   it('reads back what was saved', () => {
     const settings = { ...DEFAULT_SETTINGS, downloads: { ...DEFAULT_SETTINGS.downloads, suffix: '_HD' } };
     saveSettings(settings);

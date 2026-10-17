@@ -741,3 +741,14 @@ Flute's automatic Vite setup refused this project's `vite.config.ts` (it has `de
 New packages, all in `site/` only: `motion` (the scroll story and product pictures, loaded after the hero), `react-router` 7 (routing; version 8 needs Node 22.22, above the repository's 22.18), `@mdx-js/rollup`, `@mdx-js/react`, `remark-gfm`, `shiki` and `@shikijs/rehype` (the docs pages and code highlighting), `minisearch` (docs search) and `wrangler` (deploys). The site's icons are Lucide, as the brand kit and the app use, instead of the prompt's default Solar set.
 
 **Reasoning:** the owner asked for a landing page at kinetube.ujjwal.fyi with a CI/CD workflow. A separate project keeps the site's packages out of the app, the installers and the release workflow, which runs on three operating systems. The site reuses the app's colour tokens and fonts so the two look like one product, and its pictures use the app's real labels and the same NASA sample data as the README recordings. Pages was created as a classic Pages project (`wrangler pages project create --force`), matching the owner's other sites, because wrangler 4.151 otherwise moves new Pages projects to Workers.
+
+---
+
+## ADR-041: Transcript formats rendered by the backend
+
+**Date:** 2026-10-18
+**Status:** Accepted
+
+**Decision:** whisper.cpp runs with its timestamps on (no more `--no-timestamps`). The backend parses each `[start --> end] text` line into a segment and renders every format from those segments in `managers/whisper/whisperFormats.ts`: TXT, SRT, VTT, LRC, CSV, TSV and JSON. `POST /api/v1/transcriptions` takes `formats`, the files to write beside the input (plain text when left out). Its `done` event carries the full text of every format (`transcripts`) and the paths written (`outputPaths`), which replaces `outputPath`. An upload writes no files. The frontend only names and saves the formats; it has no formatting code.
+
+**Reasoning:** the owner asked for transcripts in every common format, not only one paragraph. The formats are rendered in one place because both sides need them: the backend writes files beside a downloaded video, and the app saves any format from the queue, including dropped files that have no folder to write to. Sending every format in `done` costs a few hundred kilobytes for an hour of speech over a local connection, and saves a second run or a second endpoint. Our own renderer was chosen over whisper.cpp's `-osrt`, `-ovtt` and similar flags because those write files only, and the app also needs the text of each format. The JSON keeps OpenAI Whisper's seconds and the CSV and TSV keep milliseconds, so files work with tools that read either. `outputPath` was dropped rather than kept beside `outputPaths`: the API listens on 127.0.0.1 behind the origin guard, so the bundled frontend is its only client.

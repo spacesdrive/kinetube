@@ -17,7 +17,7 @@ Whisper models are downloaded from Hugging Face when you pick one, from Tiny (ab
 
 ## Where files go
 
-- **Downloads and transcripts** go to your download folder. When none is set, kinetube uses a `downloads` folder inside its own data folder. A transcript is saved as a `.txt` file next to the file it came from.
+- **Downloads and transcripts** go to your download folder. When none is set, kinetube uses a `downloads` folder inside its own data folder. A transcript is saved next to the file it came from, as a `.txt` file unless Settings picks other formats.
 - **Tools, models, Instagram sessions and unfinished downloads** live in the app's data folder (Electron's `userData`), so an update never touches them.
 - **Settings** are saved in the app itself and survive restarts and updates.
 
@@ -33,6 +33,7 @@ Whisper models are downloaded from Hugging Face when you pick one, from Tiny (ab
 | Custom file name | A yt-dlp template, such as `%(title)s`, `%(uploader)s`, `%(upload_date)s` or `%(id)s` |
 | Default Whisper model | Tiny, Base, Small, Medium or Large |
 | Transcription language | Detect automatically, or one of 12 languages |
+| Transcript files | The files saved beside a transcribed file: TXT (one paragraph), SRT and VTT subtitles, LRC lyrics, CSV and TSV tables, and JSON. At least one stays on. SRT and VTT open as subtitles in most video players. |
 
 The YouTube and Instagram pages also have a Download options panel. It changes the folder and the file names for this session only and leaves the saved defaults alone.
 

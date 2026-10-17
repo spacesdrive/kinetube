@@ -61,7 +61,7 @@ Events per stream:
 | Download and resume | `start`, then `warning`, `title`, `phase`, `progress`, `log` (repeated), then `paused` or `done` | `title`, `filePath` |
 | Download batch | `start`, then per item `itemStart`, `itemProgress`, `itemDone`, with `warning` as needed, then `done` | `succeededCount`, `failedCount` |
 | Whisper model download | `phase`, `progress`, then `done` | `model` (a `WhisperModel`) |
-| Transcription | `phase` (`extracting`, then `transcribing`), `progress`, `chunk`, then `done` | `text`, `outputPath` |
+| Transcription | `phase` (`extracting`, then `transcribing`), `progress`, `chunk`, then `done` | `text`, `transcripts`, `outputPaths` |
 | Instagram media | `profile`, `progress` (one per post), then `done` | `media` (an `InstagramMedia`) |
 
 A paused download ends with `paused` (`{ download }`) instead of `done`. That is the one exception to "the last event is `done`".
@@ -149,10 +149,10 @@ Batch items have no pending record and cannot be paused. Instagram items are pac
 
 The route takes two body types:
 
-- JSON `CreateTranscriptionRequest`: `{ filePath, modelId, language }`. `filePath` must be an absolute path to a file on disk.
+- JSON `CreateTranscriptionRequest`: `{ filePath, modelId, language, formats }`. `filePath` must be an absolute path to a file on disk.
 - `multipart/form-data` with the file in a field named `file`, plus optional `modelId` and `language` text fields. The upload is saved to the system temp folder and deleted when the transcription ends.
 
-`modelId` defaults to `base`. `language` defaults to `auto`, or takes a two or three letter code such as `en`. A file that is not `.wav` is first converted by FFmpeg, so FFmpeg must be installed for it; that failure arrives in `done`. The transcript is written as a `.txt` beside the input file, and `outputPath` names it. whisper.cpp is stopped after 30 minutes.
+`modelId` defaults to `base`. `language` defaults to `auto`, or takes a two or three letter code such as `en`. A file that is not `.wav` is first converted by FFmpeg, so FFmpeg must be installed for it; that failure arrives in `done`. `formats` lists the files to write beside the input file, named after it: any of `txt`, `srt`, `vtt`, `lrc`, `csv`, `tsv` and `json`. It defaults to `["txt"]`; an empty list or an unknown format is 400, and a repeated one is written once. An upload writes no files, because its folder is a temporary one. `done` carries `text` (one paragraph), `transcripts` (the full text of every format, so the caller can save any of them) and `outputPaths` (the files written, in the order asked for). whisper.cpp is stopped after 30 minutes.
 
 ## Instagram accounts (`src/routes/instagramAccountRoutes.ts`)
 

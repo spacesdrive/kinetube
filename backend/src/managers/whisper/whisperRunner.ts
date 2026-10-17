@@ -1,6 +1,8 @@
 import os from 'node:os';
 
+import { createLineSplitter } from '../../lib/lineSplitter.ts';
 import { runProcess } from '../../lib/runProcess.ts';
+import { parseSegment } from './whisperTranscript.ts';
 
 export interface WhisperRunInput {
   binaryPath: string;
@@ -24,7 +26,8 @@ function threadCount(): number {
 }
 
 function buildArgs({ modelPath, wavPath, language }: WhisperRunInput): string[] {
-  const args = ['-m', modelPath, '-f', wavPath, '-t', String(threadCount()), '--no-timestamps', '--print-progress'];
+  // the timestamps on each line become the subtitle and data formats
+  const args = ['-m', modelPath, '-f', wavPath, '-t', String(threadCount()), '--print-progress'];
   if (language !== 'auto') args.push('-l', language);
   return args;
 }
@@ -36,9 +39,10 @@ export async function runWhisper(input: WhisperRunInput): Promise<string> {
   const result = await runProcess(binaryPath, buildArgs(input), {
     timeoutMs: TRANSCRIPTION_TIMEOUT_MS,
     signal,
-    onStdout: (chunk) => {
-      if (chunk.trim()) onText(chunk.trim());
-    },
+    onStdout: createLineSplitter((line) => {
+      const segment = parseSegment(line);
+      if (segment) onText(segment.text);
+    }),
     onStderr: (chunk) => {
       const percentMatch = chunk.match(PROGRESS_PATTERN);
       if (percentMatch?.[1]) onPercent(Number(percentMatch[1]));

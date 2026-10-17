@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 import { ConflictError, errorMessage, NotFoundError, ToolNotInstalledError } from '../lib/errors.ts';
 
-import type { TranscriptionEvents, WhisperModelId } from '@shared/transcriptions.ts';
+import type { TranscriptFormat, TranscriptionEvents, WhisperModelId } from '@shared/transcriptions.ts';
 import type { WhisperManager } from '../managers/whisper/whisperManager.ts';
 import type { StreamJob } from './streamJob.ts';
 
@@ -10,6 +10,8 @@ export interface TranscriptionInput {
   filePath: string;
   modelId: WhisperModelId;
   language: string;
+  // written beside filePath; an upload gets none, since its folder is a temporary one
+  formats: TranscriptFormat[];
   // an uploaded file is a temporary copy, deleted once the transcription ends
   isUpload: boolean;
 }
@@ -29,7 +31,7 @@ function checkReady(whisper: WhisperManager, { filePath, modelId }: Transcriptio
 export function createTranscriptionService(whisper: WhisperManager): TranscriptionService {
   return {
     create(input) {
-      const { filePath, modelId, language, isUpload } = input;
+      const { filePath, modelId, language, formats, isUpload } = input;
       try {
         checkReady(whisper, input);
       } catch (error) {
@@ -39,8 +41,8 @@ export function createTranscriptionService(whisper: WhisperManager): Transcripti
 
       return async (send, signal) => {
         try {
-          const { text, outputPath } = await whisper.transcribe({ inputPath: filePath, modelId, language, send, signal });
-          send('done', { success: true, message: 'Transcription complete', text, outputPath });
+          const result = await whisper.transcribe({ inputPath: filePath, modelId, language, formats, send, signal });
+          send('done', { success: true, message: 'Transcription complete', ...result });
         } catch (error) {
           send('done', { success: false, code: 'UPSTREAM_FAILED', message: `Couldn't transcribe the file. ${errorMessage(error)}` });
         } finally {

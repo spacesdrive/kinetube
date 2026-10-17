@@ -73,7 +73,7 @@ The real work is done by open-source tools you may already trust. [yt-dlp](https
 |---|---|
 | **YouTube** | Videos and Shorts up to 4K, only in the qualities each video really has. Any video can also be saved as an MP3. |
 | **Instagram** | Posts, reels and stories. Open a profile, load up to 500 posts and download the ones you pick. Log in with two-factor authentication and keep several accounts. |
-| **Transcription** | Five Whisper models, from Tiny (about 75 MB) to Large (about 2.9 GB), and 12 languages. Turn on one switch and every finished download is transcribed too. |
+| **Transcription** | Five Whisper models, from Tiny (about 75 MB) to Large (about 2.9 GB), and 12 languages. Save the transcript as plain text, SRT or VTT subtitles, LRC, CSV, TSV or JSON. Turn on one switch and every finished download is transcribed too. |
 | **Pause and resume** | Pause a download and continue it later. If the app closes in the middle of one, the next start offers to resume it. |
 | **File names** | Add a prefix, a suffix or a number, or write your own yt-dlp template such as `%(title)s`. |
 | **Command palette** | Press <kbd>Ctrl</kbd> <kbd>K</kbd> (<kbd>Cmd</kbd> <kbd>K</kbd> on macOS) to jump to a page, switch the theme or paste a link. |

@@ -1,7 +1,8 @@
 import { isVideoQuality } from './qualities';
+import { cleanFormats } from './transcriptFormats';
 
 import type { FileNameOptions, VideoQuality } from '@shared/downloads.ts';
-import type { WhisperModelId } from '@shared/transcriptions.ts';
+import type { TranscriptFormat, WhisperModelId } from '@shared/transcriptions.ts';
 
 export interface DownloadPreferences {
   outputDir: string;
@@ -16,6 +17,8 @@ export interface DownloadPreferences {
 export interface TranscriptionPreferences {
   defaultModel: WhisperModelId;
   defaultLanguage: string;
+  // written beside a file kinetube transcribes from the disk
+  fileFormats: TranscriptFormat[];
 }
 
 export interface AppSettings {
@@ -24,7 +27,7 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  transcription: { defaultModel: 'base', defaultLanguage: 'auto' },
+  transcription: { defaultModel: 'base', defaultLanguage: 'auto', fileFormats: ['txt'] },
   downloads: {
     outputDir: '',
     defaultQuality: 'best',
@@ -54,8 +57,11 @@ export function loadSettings(): AppSettings {
   const downloads = { ...DEFAULT_SETTINGS.downloads, ...stored.downloads };
   if (!isVideoQuality(downloads.defaultQuality)) downloads.defaultQuality = 'best';
 
+  const transcription = { ...DEFAULT_SETTINGS.transcription, ...stored.transcription };
+  transcription.fileFormats = cleanFormats(transcription.fileFormats);
+
   return {
-    transcription: { ...DEFAULT_SETTINGS.transcription, ...stored.transcription },
+    transcription,
     downloads,
   };
 }

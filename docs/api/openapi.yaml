@@ -513,8 +513,11 @@ paths:
         field. Streams TranscriptionEvents:
         - `phase` (TranscriptionPhaseEvent): `extracting` (FFmpeg converts to WAV), then `transcribing`.
         - `progress` (TranscriptionProgressEvent).
-        - `chunk` (TranscriptionChunkEvent): text as whisper.cpp prints it.
-        - `done` (TranscriptionDone): last, with the cleaned text and the path of the `.txt` file written beside the input.
+        - `chunk` (TranscriptionChunkEvent): the text of each line as whisper.cpp prints it, without its timestamps.
+        - `done` (TranscriptionDone): last, with the text as one paragraph, the full text of every format, and the files written beside the input.
+
+        A JSON request writes one file per entry in `formats` beside `filePath`, named after it (`clip.mp4` gives `clip.srt`).
+        An upload writes none, because its copy lives in a temporary folder and is deleted at the end.
 
         Closing the stream stops FFmpeg and whisper.cpp.
       requestBody:
@@ -1770,6 +1773,31 @@ components:
           default: base
         language:
           $ref: '#/components/schemas/TranscriptionLanguage'
+        formats:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/TranscriptFormat'
+          default: [txt]
+          description: The files written beside filePath. A repeated format is written once.
+    TranscriptFormat:
+      type: string
+      enum: [txt, srt, vtt, lrc, csv, tsv, json]
+      description: |
+        txt is the transcript as one paragraph. srt and vtt are subtitles, lrc is timed lyrics, csv and tsv have
+        start and end in milliseconds and the text, and json has the paragraph and each segment with start and end in seconds.
+    TranscriptFiles:
+      type: object
+      description: Every format of one transcript, each as the full text of its file.
+      required: [txt, srt, vtt, lrc, csv, tsv, json]
+      properties:
+        txt: { type: string }
+        srt: { type: string }
+        vtt: { type: string }
+        lrc: { type: string }
+        csv: { type: string }
+        tsv: { type: string }
+        json: { type: string }
     TranscriptionPhaseEvent:
       type: object
       required: [phase, message]
@@ -1794,7 +1822,7 @@ components:
     TranscriptionDone:
       oneOf:
         - type: object
-          required: [success, message, text, outputPath]
+          required: [success, message, text, transcripts, outputPaths]
           properties:
             success:
               const: true
@@ -1802,8 +1830,13 @@ components:
               type: string
             text:
               type: string
-            outputPath:
-              type: string
+            transcripts:
+              $ref: '#/components/schemas/TranscriptFiles'
+            outputPaths:
+              type: array
+              items:
+                type: string
+              description: The files written beside the input, in the order of formats. Empty for an upload.
         - $ref: '#/components/schemas/StreamDoneFailure'
 
     # shared/types/folders.ts

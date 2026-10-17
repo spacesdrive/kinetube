@@ -1,10 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { saveTextFile, transcriptFileName } from '@/lib/saveTextFile';
+import { loadSettings } from '@/lib/settings';
 import { api } from '@/services/api';
 import { applyTranscriptionEvent, isWaiting, itemFromFile, itemFromPath } from './transcribeQueueState';
 
-import type { TranscriptionEvents, WhisperModelId } from '@shared/transcriptions.ts';
+import type { TranscriptFormat, TranscriptionEvents, WhisperModelId } from '@shared/transcriptions.ts';
 import type { StreamHandler } from '@/services/eventStream';
 import type { QueueItem } from './transcribeQueueState';
 
@@ -21,13 +22,13 @@ export function useTranscribeQueue() {
   }, []);
 
   const transcribeOne = useCallback((item: QueueItem, modelId: WhisperModelId, language: string) => {
-    updateItem(item.id, (current) => ({ ...current, status: 'transcribing', percent: 0, phase: item.file ? 'Uploading...' : 'Starting...', text: '', error: '' }));
+    updateItem(item.id, (current) => ({ ...current, status: 'transcribing', percent: 0, phase: item.file ? 'Uploading...' : 'Starting...', text: '', transcripts: null, outputPaths: [], error: '' }));
     const handler: StreamHandler<TranscriptionEvents> = (...event) => {
       updateItem(item.id, (current) => applyTranscriptionEvent(current, ...event));
     };
     const stream = item.file
       ? api.transcribeUpload(item.file, modelId, language, handler)
-      : api.transcribeFile({ filePath: item.localPath, modelId, language }, handler);
+      : api.transcribeFile({ filePath: item.localPath, modelId, language, formats: loadSettings().transcription.fileFormats }, handler);
     return stream.finished;
   }, [updateItem]);
 
@@ -53,10 +54,10 @@ export function useTranscribeQueue() {
   const remove = useCallback((id: string) => setItems((previous) => previous.filter((item) => item.id !== id)), []);
   const clear = useCallback(() => setItems([]), []);
 
-  const saveAll = useCallback(() => {
+  const saveAll = useCallback((format: TranscriptFormat) => {
     items
-      .filter((item) => item.status === 'done')
-      .forEach((item, index) => setTimeout(() => saveTextFile(item.text, transcriptFileName(item.name)), index * SAVE_SPACING_MS));
+      .flatMap((item) => (item.transcripts ? [{ name: item.name, content: item.transcripts[format] }] : []))
+      .forEach(({ name, content }, index) => setTimeout(() => saveTextFile(content, transcriptFileName(name, format)), index * SAVE_SPACING_MS));
   }, [items]);
 
   return { items, isRunning, start, stopAfterCurrent, addFiles, addPath, remove, clear, saveAll };

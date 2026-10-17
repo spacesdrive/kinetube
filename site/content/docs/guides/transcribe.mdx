@@ -27,7 +27,23 @@ Leave the language on **Detect automatically**, or pick one of 12 languages: Eng
 
 ## Transcribe files
 
-Drop files on the Transcribe page, or select them to browse. You can also paste the full path of a file on this computer. Each file joins the queue and is transcribed in turn. A finished transcript is saved as a `.txt` file next to the file it came from.
+Drop files on the Transcribe page, or select them to browse. You can also paste the full path of a file on this computer. Each file joins the queue and is transcribed in turn. A finished transcript is saved next to the file it came from, in the formats picked under **Transcript files** in [Settings](/docs/guides/settings). Plain text is the default.
+
+## Save a transcript
+
+Press **Save** on a finished file and pick a format. **Save all** does the same for the whole queue.
+
+| Format | What it is for |
+|---|---|
+| Text (`.txt`) | The words as one paragraph |
+| Subtitles (`.srt`) | Subtitles with timestamps. Most video players load them when they sit next to the video with the same name. |
+| Web subtitles (`.vtt`) | Subtitles for web video players |
+| Lyrics (`.lrc`) | One timed line per sentence, for music players |
+| Spreadsheet (`.csv`) | Start and end in milliseconds, and the text |
+| Tab separated (`.tsv`) | The same columns, separated by tabs |
+| JSON (`.json`) | The text, and each segment with its start and end in seconds |
+
+A file you dropped on the page is a temporary copy, so nothing is saved next to it. Use **Save** instead.
 
 ## Transcribe every download
 

@@ -1,4 +1,4 @@
-import type { TranscriptionEvents } from '@shared/transcriptions.ts';
+import type { TranscriptFiles, TranscriptionEvents } from '@shared/transcriptions.ts';
 import type { StreamEvent } from '@/services/eventStream';
 
 export type QueueItemStatus = 'pending' | 'transcribing' | 'done' | 'error';
@@ -13,6 +13,10 @@ export interface QueueItem {
   percent: number;
   phase: string;
   text: string;
+  // every format, ready to save, once the item is done
+  transcripts: TranscriptFiles | null;
+  // the files written beside a typed path; an uploaded file gets none
+  outputPaths: string[];
   error: string;
 }
 
@@ -21,13 +25,13 @@ function newId(): string {
 }
 
 export function itemFromFile(file: File): QueueItem {
-  return { id: newId(), name: file.name, file, localPath: '', status: 'pending', percent: 0, phase: '', text: '', error: '' };
+  return { id: newId(), name: file.name, file, localPath: '', status: 'pending', percent: 0, phase: '', text: '', transcripts: null, outputPaths: [], error: '' };
 }
 
 // "C:\Videos\clip.mp4" -> an item named "clip.mp4"
 export function itemFromPath(localPath: string): QueueItem {
   const name = localPath.split(/[\\/]/).pop() || localPath;
-  return { id: newId(), name, file: null, localPath, status: 'pending', percent: 0, phase: '', text: '', error: '' };
+  return { id: newId(), name, file: null, localPath, status: 'pending', percent: 0, phase: '', text: '', transcripts: null, outputPaths: [], error: '' };
 }
 
 export function isWaiting(item: QueueItem): boolean {
@@ -41,5 +45,5 @@ export function applyTranscriptionEvent(item: QueueItem, ...[event, data]: Strea
   if (event === 'chunk') return { ...item, text: item.text ? `${item.text} ${data.text}` : data.text };
   if (event !== 'done') return item;
   if (!data.success) return { ...item, status: 'error', error: data.message };
-  return { ...item, status: 'done', text: data.text, percent: 100 };
+  return { ...item, status: 'done', text: data.text, transcripts: data.transcripts, outputPaths: data.outputPaths, percent: 100 };
 }

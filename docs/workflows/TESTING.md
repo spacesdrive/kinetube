@@ -81,6 +81,7 @@ Counted on 2026-10-17 from `cd backend && npm test` and `cd frontend && npx vite
 | `lib/versions.test.ts` | `isNewerVersion` part-by-part version comparison |
 | `managers/ffmpeg/ffmpegBinary.test.ts` | FFmpeg binary name and download source per platform |
 | `managers/whisper/whisperManager.test.ts` | Transcript cleanup, the model list, the whisper.cpp binary name |
+| `managers/whisper/whisperFormats.test.ts` | Parsing whisper's timestamped lines, and each transcript format: SRT and VTT times, LRC minutes past an hour, CSV quoting, TSV tabs, JSON seconds, a recording with no speech |
 | `managers/ytdlp/ytdlpArgs.test.ts` | yt-dlp arguments for downloads and metadata, and format selection |
 | `managers/ytdlp/ytdlpBinary.test.ts` | yt-dlp asset, binary name and download URL per platform |
 | `managers/ytdlp/ytdlpFileNames.test.ts` | Output file name templates (prefix, suffix, numbering, custom template) |
@@ -90,7 +91,7 @@ Counted on 2026-10-17 from `cd backend && npm test` and `cd frontend && npx vite
 | `platforms/youtube/youtubeEntries.test.ts` | Entry status (upcoming, live, unavailable from `availability` or a `[Private video]` title), clean watch and Shorts links for entries, playlist entries of a channel playlists tab |
 | `platforms/youtube/youtubeMetadata.test.ts` | Video and audio format lists, channel avatar choice, mapping yt-dlp JSON to videos (with `playlistUrl`), channel tabs (streams and playlists) and playlists |
 | `platforms/youtube/youtubeUrl.test.ts` | Every supported YouTube link shape and rejected input: playlists, watch and youtu.be links with a list, each channel tab, malformed list ids, other channel pages |
-| `routes/apiRoutes.test.ts` | The origin guard (foreign Origin, foreign Host, Vite origin), the error shape, invalid JSON, `/health`, tools, YouTube media (videos, playlists, a channel playlists tab), downloads (a playlist link refused) and batches, Instagram accounts, Whisper models and transcriptions, folders and images |
+| `routes/apiRoutes.test.ts` | The origin guard (foreign Origin, foreign Host, Vite origin), the error shape, invalid JSON, `/health`, tools, YouTube media (videos, playlists, a channel playlists tab), downloads (a playlist link refused) and batches, Instagram accounts, Whisper models and transcriptions (the formats asked for reach whisper once each), folders and images |
 | `services/downloadService.test.ts` | Finished, duplicate, paused, resumed, interrupted, cancelled and failed downloads, and yt-dlp missing |
 | `services/folderService.test.ts` | The folder picker on each platform with a fake process runner: a chosen folder, a closed dialog, a timeout, a missing tool (PowerShell, zenity and kdialog), a failing tool, an unsupported platform |
 | `services/downloads/downloadTracker.test.ts` | Tracking which downloads are running |
@@ -115,7 +116,9 @@ Counted on 2026-10-17 from `cd backend && npm test` and `cd frontend && npx vite
 | `features/downloads/fileNamePreview.test.ts` | The file name preview and custom naming detection |
 | `features/settings/AppearanceSection.test.tsx` | Choosing a theme applies it at once, with no Save |
 | `features/setup/toolSetupState.test.ts` | Applying tool install events to the setup screen state |
-| `features/transcribe/transcribeQueueState.test.ts` | Transcription queue items |
+| `features/transcribe/transcribeQueueState.test.ts` | Transcription queue items, with their formats and written files |
+| `features/youtube/VideoEntryRow.test.tsx` | The row's Download menu opens with its label and downloads the quality picked |
+| `lib/transcriptFormats.test.ts` | Transcript file names, formats read back from written files, the format list in a sentence, cleaning a stored list |
 | `features/youtube/collectionFilters.test.ts` | Only available entries can be downloaded, search then filter chips, the download targets with and without ticked entries |
 | `lib/commands.test.ts` | `filterCommands`: every command for an empty query, every word matched in any order, no match, a pasted link turned into one fetch command |
 | `lib/format.test.ts` | Formatting helpers (counts, dates, durations under a minute and over an hour, sizes, speeds, word counts) |
@@ -196,7 +199,10 @@ Run this before you ship any change the automated tests do not fully cover. Use 
 
 - [ ] On the Transcribe page, install whisper.cpp if asked, then download a model: it shows as ready in the model picker
 - [ ] Transcribe a local file: the text appears while it runs, and a `.txt` file with no timestamps is saved next to the source
-- [ ] Turn on "Transcribe after download", then download a video: the transcript appears when the download finishes and is saved next to the video
+- [ ] In Settings, pick SRT and VTT under Transcript files and press Save, then transcribe a local file: `.srt` and `.vtt` files are saved next to it, the item says "saved beside the file as SRT and VTT", and a video player shows the `.srt` as subtitles
+- [ ] Open Save on a finished item and on the after-download transcript: every format is listed, and each saves a file named after the media file
+- [ ] Turn off every chip but one under Transcript files: the last one stays on
+- [ ] Turn on "Transcribe after download", then download a video: the transcript appears when the download finishes and is saved next to the video in the formats chosen in Settings
 - [ ] Copy a transcript: a "Transcript copied" toast appears
 - [ ] Open the language selector: the list opens below or above the field, not on top of it, and fades in. The quality select and the selects in Settings do the same
 - [ ] With a finished queue, "Hold to clear" empties it only after a full hold. A click does nothing

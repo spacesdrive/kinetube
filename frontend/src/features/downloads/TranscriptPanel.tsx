@@ -1,12 +1,15 @@
-import { Copy, Save } from 'lucide-react';
+import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
 
 import Notice from '@/components/patterns/Notice';
+import SaveTranscriptMenu from '@/components/SaveTranscriptMenu';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { countWords } from '@/lib/format';
-import { saveTextFile } from '@/lib/saveTextFile';
+import { saveTextFile, transcriptFileName } from '@/lib/saveTextFile';
+import { formatList, formatsOfFiles } from '@/lib/transcriptFormats';
 
+import type { TranscriptFiles } from '@shared/transcriptions.ts';
 import type { TranscriptOutcome } from './usePostDownloadTranscription';
 
 export interface TranscriptPanelProps {
@@ -16,8 +19,15 @@ export interface TranscriptPanelProps {
   onTranscribe(filePath: string): void;
 }
 
-function TranscriptText({ text, outputPath }: { text: string; outputPath: string }) {
-  const fileName = outputPath.split(/[\\/]/).pop() || 'transcript.txt';
+interface TranscriptTextProps {
+  filePath: string;
+  text: string;
+  transcripts: TranscriptFiles;
+  outputPaths: string[];
+}
+
+function TranscriptText({ filePath, text, transcripts, outputPaths }: TranscriptTextProps) {
+  const mediaName = filePath.split(/[\\/]/).pop() || 'transcript';
 
   async function copy() {
     try {
@@ -32,10 +42,10 @@ function TranscriptText({ text, outputPath }: { text: string; outputPath: string
     <div className="space-y-2">
       <textarea readOnly aria-label="Transcript" value={text} rows={6} className="w-full resize-none rounded-control bg-app p-3 font-mono text-xs leading-relaxed text-ink-muted outline-none" />
       <div className="flex items-center justify-between gap-2 text-xs text-ink-muted">
-        <span>{countWords(text)} words, saved beside the video</span>
+        <span>{countWords(text)} words, saved beside the video as {formatList(formatsOfFiles(outputPaths))}</span>
         <span className="flex gap-1">
           <Button type="button" variant="ghost" size="xs" onClick={() => void copy()}><Copy /> Copy</Button>
-          <Button type="button" variant="ghost" size="xs" onClick={() => saveTextFile(text, fileName)}><Save /> Save a copy</Button>
+          <SaveTranscriptMenu label="Save a copy" variant="ghost" onSave={(format) => saveTextFile(transcripts[format], transcriptFileName(mediaName, format))} />
         </span>
       </div>
     </div>
@@ -51,7 +61,7 @@ export default function TranscriptPanel({ filePath, isTranscribing, outcome, onT
         <Button type="button" variant="secondary" className="w-full" onClick={() => onTranscribe(filePath)}>Transcribe this file</Button>
       )}
       {outcome?.kind === 'error' && <Notice tone="error">{outcome.message}</Notice>}
-      {outcome?.kind === 'text' && <TranscriptText text={outcome.text} outputPath={outcome.outputPath} />}
+      {outcome?.kind === 'text' && <TranscriptText filePath={filePath} text={outcome.text} transcripts={outcome.transcripts} outputPaths={outcome.outputPaths} />}
     </div>
   );
 }

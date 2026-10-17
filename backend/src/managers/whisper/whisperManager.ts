@@ -7,16 +7,17 @@ import { downloadWhisperModel } from './whisperModelDownload.ts';
 import { modelPath, WHISPER_MODEL_IDS, WHISPER_MODELS } from './whisperModels.ts';
 import { transcribeFile } from './whisperTranscribe.ts';
 
-import type { WhisperModel, WhisperModelId } from '@shared/transcriptions.ts';
+import type { TranscriptFormat, WhisperModel, WhisperModelId } from '@shared/transcriptions.ts';
 import type { FfmpegManager } from '../ffmpeg/ffmpegManager.ts';
 import type { ToolEventSink } from '../toolEvents.ts';
 import type { ModelEventSink } from './whisperModelDownload.ts';
-import type { TranscriptionEventSink } from './whisperTranscribe.ts';
+import type { TranscriptionEventSink, TranscriptResult } from './whisperTranscribe.ts';
 
 export interface TranscribeInput {
   inputPath: string;
   modelId: WhisperModelId;
   language: string;
+  formats: readonly TranscriptFormat[];
   send: TranscriptionEventSink;
   signal?: AbortSignal;
 }
@@ -27,7 +28,7 @@ export interface WhisperManager {
   listModels(): WhisperModel[];
   isModelDownloaded(modelId: WhisperModelId): boolean;
   downloadModel(modelId: WhisperModelId, send: ModelEventSink): Promise<void>;
-  transcribe(input: TranscribeInput): Promise<{ text: string; outputPath: string }>;
+  transcribe(input: TranscribeInput): Promise<TranscriptResult>;
 }
 
 export interface WhisperDeps {
@@ -65,10 +66,10 @@ export function createWhisperManager({ downloadsDir, modelsDir, ffmpeg, platform
 
     downloadModel: (modelId, send) => downloadWhisperModel(modelsDir, modelId, send),
 
-    async transcribe({ inputPath, modelId, language, send, signal }) {
+    async transcribe({ inputPath, modelId, language, formats, send, signal }) {
       const binaryPath = findBinary();
       if (!binaryPath) throw new Error('whisper.cpp is not installed. Open the Transcribe page to install it.');
-      return transcribeFile({ binaryPath, modelPath: modelPath(modelsDir, modelId), inputPath, language, ffmpeg, send, signal });
+      return transcribeFile({ binaryPath, modelPath: modelPath(modelsDir, modelId), inputPath, language, formats, ffmpeg, send, signal });
     },
   };
 }

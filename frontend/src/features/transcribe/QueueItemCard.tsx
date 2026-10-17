@@ -1,13 +1,15 @@
-import { AlertTriangle, CheckCircle2, ChevronDown, Copy, Save, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, Copy, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import SaveTranscriptMenu from '@/components/SaveTranscriptMenu';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { countWords } from '@/lib/format';
 import { saveTextFile, transcriptFileName } from '@/lib/saveTextFile';
+import { formatList, formatsOfFiles } from '@/lib/transcriptFormats';
 import { cn } from '@/lib/utils';
 
 import type { QueueItem } from './transcribeQueueState';
@@ -25,9 +27,14 @@ function StatusIcon({ item }: { item: QueueItem }) {
   return <span className="size-2.5 rounded-pill bg-line-strong" />;
 }
 
+// only a typed path gets files written beside it; an uploaded copy is deleted
+function savedBeside(item: QueueItem): string {
+  return item.outputPaths.length > 0 ? `, saved beside the file as ${formatList(formatsOfFiles(item.outputPaths))}` : '';
+}
+
 function StatusText({ item }: { item: QueueItem }) {
   if (item.status === 'transcribing') return <p className="truncate text-xs text-ink-muted">{item.phase}</p>;
-  if (item.status === 'done') return <p className="text-xs text-ink-muted">{countWords(item.text)} words</p>;
+  if (item.status === 'done') return <p className="truncate text-xs text-ink-muted">{countWords(item.text)} words{savedBeside(item)}</p>;
   if (item.status === 'error') return <p className="truncate text-xs text-error">{item.error}</p>;
   return <p className="text-xs text-ink-faint">Waiting</p>;
 }
@@ -54,10 +61,10 @@ export default function QueueItemCard({ item, canRemove, onRemove }: QueueItemCa
           <StatusText item={item} />
         </div>
         <div className="flex flex-shrink-0 items-center gap-1">
-          {item.status === 'done' && (
+          {item.status === 'done' && item.transcripts && (
             <>
               <Button type="button" variant="ghost" size="xs" onClick={() => void copy(item.text)}><Copy /> Copy</Button>
-              <Button type="button" variant="secondary" size="xs" onClick={() => saveTextFile(item.text, transcriptFileName(item.name))}><Save /> Save</Button>
+              <SaveTranscriptMenu label="Save" onSave={(format) => { if (item.transcripts) saveTextFile(item.transcripts[format], transcriptFileName(item.name, format)); }} />
               <Button type="button" variant="ghost" size="icon-xs" aria-expanded={isTextShown} aria-label={isTextShown ? 'Hide the transcript' : 'Show the transcript'} onClick={() => setIsTextShown((isShown) => !isShown)}>
                 <ChevronDown className={cn('transition-transform duration-200', isTextShown && 'rotate-180')} />
               </Button>

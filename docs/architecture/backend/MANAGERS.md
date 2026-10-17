@@ -83,9 +83,10 @@ Any other platform throws `NotSupportedError`. The archive is saved as `download
 | `whisperBuild.ts` | `buildWhisperFromSource()` for macOS and Linux |
 | `whisperModels.ts` | the five models, their file names and the Hugging Face URL |
 | `whisperModelDownload.ts` | `downloadWhisperModel()` |
-| `whisperTranscribe.ts` | `transcribeFile()`: WAV conversion, the run, the `.txt` output |
+| `whisperTranscribe.ts` | `transcribeFile()`: WAV conversion, the run, the files written beside the input |
 | `whisperRunner.ts` | `runWhisper()`: arguments, progress parsing, the 30 minute timeout |
-| `whisperTranscript.ts` | `cleanTranscription()`: strips timestamps and joins lines into one text |
+| `whisperTranscript.ts` | `parseSegments()`: whisper's timestamped lines as segments in milliseconds. `cleanTranscription()`: strips timestamps and joins lines into one text |
+| `whisperFormats.ts` | `TRANSCRIPT_FORMATS` and `renderTranscripts()`: the segments as TXT, SRT, VTT, LRC, CSV, TSV and JSON |
 
 The `WhisperManager` interface:
 
@@ -96,7 +97,7 @@ The `WhisperManager` interface:
 | `listModels()` | the five `WhisperModel` entries with `isDownloaded` |
 | `isModelDownloaded(modelId)` | the model file exists in `modelsDir` |
 | `downloadModel(modelId, send)` | downloads one model (see below) |
-| `transcribe({ inputPath, modelId, language, send, signal })` | converts to WAV if needed, runs whisper.cpp, writes `<input name>.txt` beside the input, returns `{ text, outputPath }` |
+| `transcribe({ inputPath, modelId, language, formats, send, signal })` | converts to WAV if needed, runs whisper.cpp, renders every format, writes `<input name>.<format>` beside the input for each of `formats`, returns `{ text, transcripts, outputPaths }` |
 
 Install on Windows: downloads `whisper-blas-bin-x64.zip` from the `v1.8.4` release to `downloads/whisper-setup.zip`, extracts every `.exe` and `.dll` into `downloadsDir` (the CLI needs the DLLs beside it), then deletes the zip.
 
@@ -113,7 +114,7 @@ The check does not look for a C or C++ compiler. A missing compiler shows up as 
 
 Models (`whisperModels.ts`): `tiny` (75 MB), `base` (142 MB), `small` (466 MB), `medium` (1.5 GB) and `large` (`ggml-large-v3.bin`, 2.9 GB), downloaded from `https://huggingface.co/ggerganov/whisper.cpp/resolve/main`. The same files work on every platform. `whisperModelService` locks each model while it downloads, so a second request gets 409, and closing the stream does not stop it.
 
-Transcription: `runWhisper()` passes `-m`, `-f`, `-t` (half the CPU cores, at least 1), `--no-timestamps` and `--print-progress`, plus `-l <language>` unless the language is `auto`. Progress comes from `progress = N%` on stderr; stdout text arrives as `chunk` events. The run is stopped after 30 minutes, or when the abort signal fires. The temporary WAV file is deleted afterwards.
+Transcription: `runWhisper()` passes `-m`, `-f`, `-t` (half the CPU cores, at least 1) and `--print-progress`, plus `-l <language>` unless the language is `auto`. Progress comes from `progress = N%` on stderr. Each stdout line is a segment such as `[00:00:00.000 --> 00:00:02.500]  Hello there.`; its text arrives as a `chunk` event, and at the end the timestamps become the subtitle and data formats (ADR-041). SRT and VTT use `hh:mm:ss,mmm` and `hh:mm:ss.mmm`, LRC counts minutes past 59, CSV and TSV keep milliseconds as whisper.cpp's CSV and OpenAI Whisper's TSV do, and JSON uses seconds as OpenAI Whisper's JSON does. The run is stopped after 30 minutes, or when the abort signal fires. The temporary WAV file is deleted afterwards.
 
 ## InstaloaderManager and PythonDetector (`src/managers/instaloader/`)
 

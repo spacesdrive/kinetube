@@ -1,3 +1,4 @@
+import { renderTranscripts } from '../../src/managers/whisper/whisperFormats.ts';
 import { parseYtdlpLine } from '../../src/managers/ytdlp/ytdlpOutput.ts';
 
 import type { ProcessResult } from '../../src/lib/runProcess.ts';
@@ -87,7 +88,12 @@ export function createFakeWhisper(): WhisperManager {
     listModels: () => [{ id: 'base', label: 'Base (~142 MB)', sizeMb: 142, isDownloaded: true }],
     isModelDownloaded: (modelId) => modelId === 'base',
     downloadModel: async () => {},
-    transcribe: async () => ({ text: 'hello there', outputPath: '/fake/clip.txt' }),
+    // names the files it would write, so a test can see which formats reached the manager
+    transcribe: async ({ inputPath, formats }) => ({
+      text: 'hello there',
+      transcripts: renderTranscripts([{ startMs: 0, endMs: 1500, text: 'hello there' }], 'hello there'),
+      outputPaths: formats.map((format) => inputPath.replace(/\.[^.]+$/, `.${format}`)),
+    }),
   };
 }
 

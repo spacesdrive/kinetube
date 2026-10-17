@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { chipClassName } from './chipStyles';
 
 export interface FilterChip<Value extends string> {
   value: Value;
@@ -26,10 +27,7 @@ export default function FilterChips<Value extends string>({ label, chips, value,
             role="radio"
             aria-checked={isActive}
             onClick={() => onChange(chip.value)}
-            className={cn(
-              'inline-flex h-8 items-center gap-1.5 rounded-pill border px-3 text-[13px] font-medium transition-quiet',
-              isActive ? 'border-transparent bg-inverse text-ink-inverse' : 'border-line-strong text-ink-muted hover:bg-surface-hover hover:text-ink',
-            )}
+            className={chipClassName(isActive)}
           >
             {chip.label}
             {chip.count !== undefined && <span className={cn('tabular-nums', isActive ? 'opacity-70' : 'text-ink-faint')}>{chip.count}</span>}

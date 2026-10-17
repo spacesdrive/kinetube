@@ -58,8 +58,7 @@ function checkHealth(): Promise<boolean> {
   });
 }
 
-// resolves once /health answers; the backend answers it before checking any tool.
-// stops early when the backend exits, which it does when another program holds the port
+// resolves once /health answers, or gives up when the backend exits because another program holds the port
 export async function waitForBackend(backend: UtilityProcess): Promise<boolean> {
   let hasExited = false;
   backend.once('exit', () => { hasExited = true; });

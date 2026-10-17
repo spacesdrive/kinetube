@@ -32,6 +32,11 @@ describe('buildDownloadArgs', () => {
     assert.deepEqual(args.slice(args.indexOf('-x'), args.indexOf('-x') + 5), ['-x', '--audio-format', 'mp3', '--audio-quality', '0']);
   });
 
+  test('TLS certificates are always checked', () => {
+    assert.ok(!buildDownloadArgs(BASE_INPUT).includes('--no-check-certificates'));
+    assert.ok(!buildDownloadArgs({ ...BASE_INPUT, isAudioOnly: true, cookiesPath: '/s/c' }).includes('--no-check-certificates'));
+  });
+
   test('cookies, FFmpeg and request pacing are passed only when given', () => {
     const bare = buildDownloadArgs(BASE_INPUT);
     assert.ok(!bare.includes('--cookies') && !bare.includes('--ffmpeg-location') && !bare.includes('--sleep-requests'));
@@ -48,6 +53,14 @@ describe('buildMetadataArgs', () => {
     const channel = buildMetadataArgs({ url: 'u', isPlaylist: true, ffmpegDir: null, cookiesPath: null });
     assert.ok(channel.includes('--flat-playlist') && channel.includes('--dump-single-json'));
     assert.ok(buildMetadataArgs({ url: 'u', isPlaylist: false, ffmpegDir: null, cookiesPath: null }).includes('-J'));
+  });
+
+  test('a metadata lookup checks TLS certificates and ends with the link', () => {
+    for (const isPlaylist of [true, false]) {
+      const args = buildMetadataArgs({ url: 'https://www.youtube.com/playlist?list=PLx', isPlaylist, ffmpegDir: null, cookiesPath: null });
+      assert.ok(!args.includes('--no-check-certificates'));
+      assert.deepEqual(args.slice(-2), ['--', 'https://www.youtube.com/playlist?list=PLx']);
+    }
   });
 });
 

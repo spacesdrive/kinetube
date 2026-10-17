@@ -27,7 +27,7 @@ function appendTarget(args: string[], url: string): string[] {
 
 export function buildDownloadArgs(input: DownloadArgsInput): string[] {
   const { url, outputTemplate, quality, isAudioOnly, ffmpegDir, cookiesPath, sleepSeconds } = input;
-  const args = ['--newline', '--progress', '--no-warnings', '--no-check-certificates', '--restrict-filenames'];
+  const args = ['--newline', '--progress', '--no-warnings', '--restrict-filenames'];
 
   args.push('-f', formatSelector(quality, isAudioOnly), '-o', outputTemplate);
   if (sleepSeconds) args.push('--sleep-requests', String(sleepSeconds));
@@ -44,9 +44,9 @@ export function buildDownloadArgs(input: DownloadArgsInput): string[] {
 
 export function buildMetadataArgs(input: MetadataArgsInput): string[] {
   const { url, isPlaylist, ffmpegDir, cookiesPath } = input;
-  const args = ['--no-warnings', '--no-check-certificates'];
+  const args = ['--no-warnings'];
 
-  // a flat playlist lists a channel's videos without opening each one
+  // a flat playlist lists a channel tab or a playlist without opening each video
   if (isPlaylist) args.push('--flat-playlist', '--dump-single-json');
   else args.push('-J');
 

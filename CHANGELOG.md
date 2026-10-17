@@ -9,6 +9,10 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-10-18
+
+The website, transcripts in seven formats and direct installer downloads. The macOS and Linux installers are still untested on real hardware.
+
 ### Added
 - A website at https://kinetube.ujjwal.fyi with a home page and the user docs, in `site/` (issues #14 to #18, ADR-040). It follows the layout and motion of activepieces.com in the kinetube brand: a scroll story, product pictures driven by a cursor, the real app clips, and docs with search. `.github/workflows/deploy-site.yml` checks every change to `site/` and deploys `main` to Cloudflare Pages (`docs/workflows/SITE.md`).
 - Transcripts in seven formats (issue #21, ADR-041): plain text, SRT and VTT subtitles, LRC lyrics, CSV, TSV and JSON, all with whisper.cpp's timestamps except plain text. Save on the Transcribe page, Save all on the queue and Save a copy after a download each ask which format to save. Settings has a Transcript files row that picks the files written beside a transcribed file; plain text stays the default. `POST /api/v1/transcriptions` takes `formats`, and its `done` event carries `transcripts` and `outputPaths` instead of `outputPath`.

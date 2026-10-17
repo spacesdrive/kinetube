@@ -8,7 +8,7 @@ KineTube is a privacy-first desktop application for downloading YouTube and Inst
 - Primary value: One-click download and transcription backed by yt-dlp, FFmpeg, whisper.cpp, and instaloader, auto-installed on first run
 - Current platforms: YouTube (videos, Shorts, playlists, the Videos, Shorts, Live and Playlists channel tabs, MP3 extraction), Instagram (posts/Reels/stories/profile bulk-download), local Whisper transcription
 - GitHub repository: https://github.com/spacesdrive/kinetube
-- Version: 2.0.0 in every `package.json`; the root one names the installer and is the version the app shows
+- Version: 2.1.0 in every `package.json` (root, `backend/`, `frontend/`, `site/`); the root one is the version the app and the website show
 
 The codebase is strict TypeScript in four projects: `backend/` (Express 5 API), `frontend/` (React 19 and Vite), `electron/` (main process and preload) and `shared/types/` (the API contract all three import). The website at https://kinetube.ujjwal.fyi is a fifth, separate project in `site/` (`docs/workflows/SITE.md`).
 

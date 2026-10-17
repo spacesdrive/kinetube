@@ -134,7 +134,7 @@ A second workflow builds and deploys the website in `site/`. It runs when `site/
 
 ## Versioning and tagging
 
-The version in the root `package.json` is the app version and the tag name. The current version is 2.0.0, tagged `v2.0.0` on 2026-10-17. Its release notes label the macOS and Linux installers untested, as every release should until `docs/philosophy/CROSS_PLATFORM.md` records them as verified.
+The version in the root `package.json` is the app version and the tag name. The current version is 2.1.0, tagged `v2.1.0` on 2026-10-18. Its release notes label the macOS and Linux installers untested, as every release should until `docs/philosophy/CROSS_PLATFORM.md` records them as verified.
 
 The root version reaches the person in three places:
 
@@ -142,7 +142,7 @@ The root version reaches the person in three places:
 - `app.getVersion()` in Electron, which the About section in Settings shows
 - `__APP_VERSION__`, which `frontend/vite.config.ts` reads from the root `package.json` at build time. About shows it when the frontend runs without Electron.
 
-`backend/package.json` and `frontend/package.json` carry the same version, so every package matches the release. Change all three together.
+`backend/package.json`, `frontend/package.json` and `site/package.json` carry the same version, so every package matches the release. Change all four together. The website shows the root version beside its Download button.
 
 Follow semantic versioning:
 

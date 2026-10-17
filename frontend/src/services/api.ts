@@ -29,6 +29,8 @@ import type {
 import type { YouTubeMedia } from '@shared/youtube.ts';
 import type { StreamHandler, StreamHandle } from './eventStream';
 
+const DOWNLOAD_END_EVENTS: readonly (keyof DownloadEvents)[] = ['done', 'paused'];
+
 function query(params: Record<string, string | null | undefined>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -56,9 +58,9 @@ export const api = {
 
   listDownloads: (status?: DownloadStatus) => request<ListResponse<Download>>(`/downloads${query({ status })}`),
   createDownload: (body: CreateDownloadRequest, onEvent: StreamHandler<DownloadEvents>): StreamHandle =>
-    openStream('/downloads', jsonInit(body), onEvent),
+    openStream('/downloads', jsonInit(body), onEvent, DOWNLOAD_END_EVENTS),
   resumeDownload: (downloadId: string, onEvent: StreamHandler<DownloadEvents>): StreamHandle =>
-    openStream(`/downloads/${downloadId}/resume`, { method: 'POST' }, onEvent),
+    openStream(`/downloads/${downloadId}/resume`, { method: 'POST' }, onEvent, DOWNLOAD_END_EVENTS),
   pauseDownload: (downloadId: string) => request<DataResponse<Download>>(`/downloads/${downloadId}/pause`, { method: 'POST' }),
   removeDownload: (downloadId: string) => requestNoContent(`/downloads/${downloadId}`, { method: 'DELETE' }),
   createDownloadBatch: (body: CreateDownloadBatchRequest, onEvent: StreamHandler<DownloadBatchEvents>): StreamHandle =>

@@ -60,6 +60,14 @@ describe('openStream', () => {
     expect(events.at(-1)?.[1]).toMatchObject({ success: false });
   });
 
+  it('treats a listed end event as the end, so a paused download is not reported as failed', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => streamResponse(['event: paused\ndata: {"download":{}}\n\n'])));
+    const events: unknown[][] = [];
+    const onEvent = (...event: unknown[]): number => events.push(event);
+    await openStream<TestEvents & { paused: object }>('/work', { method: 'POST' }, onEvent, ['done', 'paused']).finished;
+    expect(events).toEqual([['paused', { download: {} }]]);
+  });
+
   it('sends Accept: text/event-stream so the backend picks the stream representation', async () => {
     const fetchMock = vi.fn(async () => streamResponse(['event: done\ndata: {"success":true,"message":"ok","filePath":""}\n\n']));
     vi.stubGlobal('fetch', fetchMock);

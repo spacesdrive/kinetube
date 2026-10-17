@@ -51,12 +51,15 @@ async function readBlocks(body: ReadableStream<Uint8Array>, onBlock: (block: str
 }
 
 // fetch-based server-sent events: unlike EventSource it can POST a body and never reconnects on its own
+// endEvents names every event a stream may finish on; a paused download ends on "paused", not "done"
 export function openStream<Events extends { done: StreamDone<object> }>(
   path: string,
   init: RequestInit,
   onEvent: StreamHandler<Events>,
+  endEvents: readonly (keyof Events & string)[] = ['done'],
 ): StreamHandle {
   const abort = new AbortController();
+  const endNames: readonly string[] = endEvents;
   let hasEnded = false;
 
   // every StreamDone<T> has this failure branch, so it fits the done event of any stream
@@ -76,7 +79,7 @@ export function openStream<Events extends { done: StreamDone<object> }>(
     await readBlocks(response.body, (block) => {
       const parsed = parseEventBlock(block);
       if (!parsed) return;
-      if (parsed[0] === 'done') hasEnded = true;
+      if (endNames.includes(parsed[0])) hasEnded = true;
       emit(parsed[0], parsed[1]);
     });
     if (!hasEnded) fail({ success: false, code: 'INTERNAL', message: CUT_OFF_MESSAGE });

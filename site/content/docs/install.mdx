@@ -1,0 +1,30 @@
+export const meta = {
+  title: 'Install',
+  description: 'Download the installer for Windows, macOS or Linux from the latest release.',
+};
+
+Download the installer for your system from the [latest release](https://github.com/spacesdrive/kinetube/releases/latest) on GitHub.
+
+| System | File |
+|---|---|
+| Windows (x64) | `KineTube-Setup-<version>.exe` |
+| macOS (Intel and Apple Silicon) | `.dmg` |
+| Linux (x64) | `.AppImage` |
+
+<Callout type="note">
+Windows is the tested platform. The macOS and Linux builds come from the same release workflow, but they have not been run end to end on real hardware yet. [Cross-platform status](/docs/reference/platforms) lists what is known.
+</Callout>
+
+## Before the first start
+
+The first start needs an internet connection, because kinetube installs yt-dlp and FFmpeg then. Whisper and instaloader are installed the first time you use them. Instagram profiles also need Python 3 on your computer.
+
+[First start](/docs/first-start) explains each step.
+
+## Updates
+
+Once kinetube is installed, it checks for a newer release by itself. When one is out, the app tells you and installs it when you choose. Your tools, models, logins and settings stay as they are.
+
+## Run it from source
+
+If you would rather build kinetube yourself, [Run from source](/docs/contribute/run-from-source) has the commands.

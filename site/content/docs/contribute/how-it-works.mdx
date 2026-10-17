@@ -1,0 +1,37 @@
+export const meta = {
+  title: 'How it works',
+  description: 'How the kinetube window, its local server and the tools fit together.',
+};
+
+kinetube is an [Electron](https://www.electronjs.org) app. The window is a [React](https://react.dev) interface, and a small local server runs the tools.
+
+| Part | What it does |
+|---|---|
+| The kinetube window | The interface you click, built with React. It talks to the local server through `/api/v1`. |
+| The local server | An Express server that listens on `127.0.0.1` only. It runs the tools and reports progress back. |
+| The tools | yt-dlp, FFmpeg, whisper.cpp and instaloader. Only the server starts them. |
+| Your download folder | Where every finished file and transcript is saved. |
+
+The tools talk to YouTube and Instagram. Nothing else in kinetube goes over the internet, apart from installing tools, models and updates.
+
+## Downloading part of a playlist
+
+<Steps>
+  <Step title="You paste a playlist link">
+    The window asks the local server to look the link up.
+  </Step>
+  <Step title="The server reads the playlist">
+    yt-dlp reads it and returns the titles, lengths and thumbnails. The window shows the list of videos.
+  </Step>
+  <Step title="You tick videos and press Download">
+    The window asks the server to download those videos.
+  </Step>
+  <Step title="Each video downloads">
+    For each video, yt-dlp downloads it and FFmpeg merges the video and the audio. Progress, speed and time left stream back to the window.
+  </Step>
+  <Step title="The files land in your folder">
+    The finished files are saved in your download folder.
+  </Step>
+</Steps>
+
+Progress arrives as a live stream from the server, so the window always shows the current step. The [architecture overview](https://github.com/spacesdrive/kinetube/blob/main/docs/architecture/OVERVIEW.md) on GitHub explains the rest.

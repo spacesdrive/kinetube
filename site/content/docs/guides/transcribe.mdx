@@ -1,0 +1,34 @@
+export const meta = {
+  title: 'Transcribe',
+  description: 'Turn audio and video into text with whisper.cpp, on your own computer.',
+};
+
+whisper.cpp turns audio and video into text. It runs on your computer, so your files never go to a server.
+
+## Install whisper.cpp
+
+whisper.cpp is installed the first time you open Transcribe and choose to install it. On macOS and Linux it is built from source, which needs `git`, `cmake` and a C/C++ compiler.
+
+## Pick a model
+
+Whisper models are downloaded from Hugging Face when you pick one. Larger models are more accurate, but slower.
+
+| Model | Size |
+|---|---|
+| Tiny | about 75 MB |
+| Base | about 142 MB |
+| Small | about 466 MB |
+| Medium | about 1.5 GB |
+| Large | about 2.9 GB |
+
+## Pick a language
+
+Leave the language on **Detect automatically**, or pick one of 12 languages: English, Spanish, French, German, Italian, Portuguese, Chinese, Japanese, Korean, Arabic, Hindi and Russian. Naming the language helps with short or noisy clips.
+
+## Transcribe files
+
+Drop files on the Transcribe page, or select them to browse. You can also paste the full path of a file on this computer. Each file joins the queue and is transcribed in turn. A finished transcript is saved as a `.txt` file next to the file it came from.
+
+## Transcribe every download
+
+Turn on **Transcribe after download** on the YouTube or Instagram page, and every finished download is transcribed too. The default model and language are in [Settings](/docs/guides/settings).

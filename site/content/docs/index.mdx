@@ -1,0 +1,33 @@
+export const meta = {
+  title: 'Introduction',
+  description: 'kinetube saves YouTube and Instagram media and turns it into text, all on your own computer.',
+};
+
+kinetube is a free, open-source desktop app. It downloads videos, Shorts, playlists, channels, posts and reels, and transcribes them with Whisper. There is no account, no subscription and no telemetry.
+
+Many downloaders are websites full of ads, or apps that want an account and a monthly fee. Transcription services want your files on their servers first. kinetube does both jobs on your machine. Paste a link, pick what you want, and the file lands in your download folder. Turn on transcription and a text file lands next to it.
+
+<Cards>
+  <Card href="/docs/install" title="Install">Pick the installer for your system.</Card>
+  <Card href="/docs/first-start" title="First start" art={1}>What kinetube sets up the first time it opens.</Card>
+  <Card href="/docs/guides/youtube" title="Download from YouTube" art={2}>Videos, Shorts, playlists and channels.</Card>
+</Cards>
+
+## The tools inside
+
+The real work is done by open-source tools you may already trust. kinetube installs them for you and puts them behind one window.
+
+| Tool | What it does |
+|---|---|
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Reads and downloads the media |
+| [FFmpeg](https://ffmpeg.org) | Merges video and audio, and converts to MP3 |
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | Turns speech into text |
+| [instaloader](https://github.com/instaloader/instaloader) | Reads Instagram profiles |
+
+## What you can do
+
+- **YouTube.** Videos and Shorts up to 4K, only in the qualities each video really has. Any video can also be saved as an MP3.
+- **Instagram.** Posts, reels and stories. Open a profile, load up to 500 posts and download the ones you pick.
+- **Transcription.** Five Whisper models, from Tiny (about 75 MB) to Large (about 2.9 GB), and 12 languages.
+- **Pause and resume.** Pause a download and continue it later. If the app closes in the middle of one, the next start offers to resume it.
+- **Updates.** The app tells you when a new version of kinetube or yt-dlp is out and installs it when you choose.

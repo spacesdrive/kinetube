@@ -1,0 +1,35 @@
+export const meta = {
+  title: 'Cross-platform status',
+  description: 'What works on Windows, macOS and Linux, and what has not been checked on real hardware yet.',
+};
+
+The release builds installers for three platforms:
+
+| Platform | Installer | Architectures |
+|---|---|---|
+| Windows | NSIS installer | x64 |
+| macOS | dmg | x64 and arm64 |
+| Linux | AppImage | x64 |
+
+Each tool picks its download for your platform. What is still open is mostly verification: the macOS and Linux paths have unit tests, but they have not been run end to end on real Mac or Linux hardware. The release workflow runs the type check and the tests on Windows, macOS and Ubuntu before it packages anything.
+
+## Each tool on each platform
+
+| Tool | Windows | macOS | Linux |
+|---|---|---|---|
+| yt-dlp | Verified | Not yet run on real hardware | Not yet run on real hardware (x86_64) |
+| FFmpeg | Verified | x64 build under Rosetta 2 on Apple Silicon; not yet run on real hardware | Static amd64 build; not yet run on real hardware |
+| whisper.cpp | Prebuilt download; verified | Built from source with `git` and `cmake`; not yet run on real hardware | Built from source with `git` and `cmake`; not yet run on real hardware |
+| instaloader | `pip install` into Python | `pip install` into Python 3 | `pip install` into Python 3 |
+
+## Open gaps
+
+- **No end-to-end run on real hardware** on macOS and Linux.
+- **The whisper.cpp source build needs a C/C++ compiler** on macOS and Linux. A missing compiler shows up as a failed `cmake` step.
+- **FFmpeg extraction on Linux needs the system `tar` with xz support.** Without it the install asks you to install tar and xz-utils.
+- **pip may refuse to install into the system Python.** Some systems mark their Python as externally managed, for example recent Debian and Ubuntu releases and Homebrew Python. Setup then fails with "pip couldn't install instaloader".
+- **No arm64 builds of yt-dlp and FFmpeg on Linux**, which matches the x64-only AppImage.
+
+<Callout type="tip">
+If you run kinetube on a Mac or a Linux machine, please report what works and what breaks in an [issue](https://github.com/spacesdrive/kinetube/issues). It is the most useful help the project can get right now.
+</Callout>

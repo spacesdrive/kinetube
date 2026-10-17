@@ -1,0 +1,45 @@
+export const meta = {
+  title: 'Contributing',
+  description: 'How to report a problem, suggest an idea, and get a change into kinetube.',
+};
+
+Bug reports, ideas and pull requests are welcome. Help with testing on macOS and Linux is especially useful.
+
+## Before you start
+
+Every change starts with a [GitHub issue](https://github.com/spacesdrive/kinetube/issues), labelled `bug`, `enhancement` or `documentation`. Search first, then open one that says what is wrong or wanted and what "done" looks like. Agreeing on the approach there saves a rewrite later.
+
+## Make the change
+
+<Steps>
+  <Step title="Branch from main">
+    Fork the repository and create a branch from `main`, named `type/short-topic` (for example `fix/playlist-count`).
+  </Step>
+  <Step title="Start from the contract">
+    A changed endpoint starts in `shared/types/` and `docs/api/openapi.yaml`, then the backend and the frontend.
+  </Step>
+  <Step title="Write clear commits">
+    Use the Conventional Commits format and name the issue in the body: `Refs #12` while you work, `Closes #12` in the last commit.
+  </Step>
+  <Step title="Update the docs">
+    Update the docs your change affects, and add a line to the `[Unreleased]` section of `CHANGELOG.md`.
+  </Step>
+  <Step title="Open a pull request">
+    Run the checks in [Run from source](/docs/contribute/run-from-source), then open a pull request that says what changed, why, and how you tested it.
+  </Step>
+</Steps>
+
+## Project layout
+
+```text
+kinetube/
+  shared/types/      API request, response and stream-event types, shared by every part
+  backend/src/       Express 5 API: routes, validators, controllers, services, stores, managers
+  frontend/src/      React 19 interface: features, shell, patterns, shadcn ui, design tokens
+  electron/src/      main process, backend process, updater, IPC, preload
+  site/              this website and its docs
+  scripts/           build and demo helpers
+  docs/              architecture, guidelines, workflows, design reference, media
+```
+
+The full guide, with the code style and writing rules, is [CONTRIBUTING.md](https://github.com/spacesdrive/kinetube/blob/main/CONTRIBUTING.md) on GitHub.

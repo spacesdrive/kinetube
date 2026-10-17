@@ -1,0 +1,17 @@
+export const meta = {
+  title: 'Privacy',
+  description: 'kinetube has no server, no account and no analytics. Here is everything it connects to.',
+};
+
+- kinetube has no server of its own, no account and no telemetry.
+- It contacts YouTube and Instagram (with their image servers for thumbnails), and the hosts it installs tools and models from: GitHub, the FFmpeg build hosts, Hugging Face, and PyPI through pip.
+- Downloads, transcripts, settings and Instagram logins stay on your computer.
+- The fonts ship inside the app, so no page loads anything from a font service.
+
+## The local server
+
+kinetube runs a small server on your computer that the window talks to. It listens on `127.0.0.1` only. It refuses requests from other web pages and other host names, so a website you visit can't use it, and other computers on your network can't reach it.
+
+## This website
+
+This site loads no analytics and sets no cookies. It remembers your theme choice in your browser, and nothing else.

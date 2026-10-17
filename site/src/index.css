@@ -1,0 +1,313 @@
+@import 'tailwindcss';
+
+/* the brand faces, self-hosted; both are SIL Open Font License 1.1 and variable, so every weight is real */
+@font-face {
+  font-family: 'Unbounded';
+  src: url('/fonts/unbounded-latin-wght-normal.woff2') format('woff2');
+  font-weight: 200 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'DM Sans';
+  src: url('/fonts/dm-sans-latin-wght-normal.woff2') format('woff2');
+  font-weight: 100 1000;
+  font-display: swap;
+}
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* the app's tokens (frontend/src/styles/tokens.css, docs/design-reference.md), contrast-checked in both themes */
+/* also on any element with data-theme, so a picture of the other theme can use the real tokens */
+:root,
+[data-theme='light'] {
+  --app: #ffffff;
+  --surface: #f6f3f1;
+  --surface-elevated: #ffffff;
+  --surface-hover: rgb(45 41 45 / 0.05);
+  --surface-selected: rgb(45 41 45 / 0.08);
+  --line: rgb(45 41 45 / 0.1);
+  --line-strong: rgb(45 41 45 / 0.18);
+  --ink: #2d292d;
+  --ink-muted: #6b6469;
+  --ink-inverse: #ffffff;
+  --spin: #e4572e;
+  --spin-hover: #d64c24;
+  --spin-soft: #fbe3d9;
+  --spin-text: #b5401a;
+  --on-spin: #1a1719;
+  --success: #16683e;
+  --success-soft: #e8f0ec;
+  --warning: #7a4f00;
+  --warning-soft: #f2ede6;
+  --info: #2457b0;
+  --info-soft: #e9eef7;
+  --error: #ad2a23;
+  --error-soft: #f7eae9;
+  --focus: var(--spin-text);
+  /* the deep panel that holds a product picture: ink in the light theme, a step below the page in the dark one */
+  --panel-deep: #2d292d;
+  /* text on the deep panel, which stays dark in both themes */
+  --on-deep: #f2eeea;
+  --on-deep-muted: #c9c2c6;
+  --on-deep-accent: #ff8a62;
+  --elevation-popover: 0 8px 24px rgb(22 20 22 / 0.12), 0 0 0 1px var(--line);
+  --elevation-window: 0 1px 2px rgb(22 20 22 / 0.06), 0 30px 60px -30px rgb(22 20 22 / 0.35);
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --app: #161416;
+  --surface: #211e21;
+  --surface-elevated: #282428;
+  --surface-hover: rgb(242 238 234 / 0.05);
+  --surface-selected: rgb(242 238 234 / 0.08);
+  --line: rgb(242 238 234 / 0.08);
+  --line-strong: rgb(242 238 234 / 0.15);
+  --ink: #f2eeea;
+  --ink-muted: #a8a1a6;
+  --ink-inverse: #2d292d;
+  --spin: #f07045;
+  --spin-hover: #f5855f;
+  --spin-soft: #3a2219;
+  --spin-text: #ff8a62;
+  --on-spin: #1a1719;
+  --success: #5cc98f;
+  --success-soft: #293630;
+  --warning: #f0b95a;
+  --warning-soft: #3e3429;
+  --info: #7fb2ff;
+  --info-soft: #2e3340;
+  --error: #ff7a70;
+  --error-soft: #402b2c;
+  --panel-deep: #0e0c0e;
+  --elevation-popover: 0 8px 24px rgb(0 0 0 / 0.4), 0 0 0 1px var(--line);
+  --elevation-window: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 30px 60px -30px rgb(0 0 0 / 0.8);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-app: var(--app);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-selected: var(--surface-selected);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-inverse: var(--ink-inverse);
+  --color-spin: var(--spin);
+  --color-spin-hover: var(--spin-hover);
+  --color-spin-soft: var(--spin-soft);
+  --color-spin-text: var(--spin-text);
+  --color-on-spin: var(--on-spin);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-error: var(--error);
+  --color-error-soft: var(--error-soft);
+  --color-panel-deep: var(--panel-deep);
+  --color-on-deep: var(--on-deep);
+  --color-on-deep-muted: var(--on-deep-muted);
+  --color-on-deep-accent: var(--on-deep-accent);
+  --color-focus: var(--focus);
+  --shadow-popover: var(--elevation-popover);
+  --shadow-window: var(--elevation-window);
+}
+
+@theme {
+  /* the platforms' own colours, only for their marks */
+  --color-youtube: #ff0000;
+  --color-instagram: #e1306c;
+
+  --font-display: 'Unbounded', 'DM Sans', system-ui, sans-serif;
+  --font-sans: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+
+  --radius-row: 8px;
+  --radius-control: 10px;
+  --radius-card: 16px;
+  --radius-choice: 20px;
+  --radius-panel: 32px;
+
+  --ease-brand: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-panel: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    background-color: var(--app);
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    margin: 0;
+    background-color: var(--app);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  * {
+    border-color: var(--line);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--spin-soft);
+  }
+}
+
+/* headlines: Unbounded SemiBold in sentence case, kept short because the face is wide */
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+/* the brand's label style: one or two words, uppercase */
+@utility label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* the page column, 1216px of content like the Activepieces sections */
+@utility container-page {
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (width >= 48rem) {
+    padding-inline: 1.5rem;
+  }
+  @media (width >= 64rem) {
+    padding-inline: 2rem;
+  }
+}
+
+/* the hero's entrance, in CSS so the first screen needs no animation library */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise-in {
+  animation: rise-in 600ms var(--ease-brand) var(--delay, 0ms) both;
+}
+
+@keyframes nav-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.nav-panel-in {
+  animation: nav-panel-in 280ms var(--ease-panel) both;
+}
+
+/* the brand's signature move: one short clockwise turn that eases to a stop */
+@keyframes brand-turn {
+  from {
+    transform: rotate(-120deg);
+  }
+  to {
+    transform: none;
+  }
+}
+.brand-turn {
+  animation: brand-turn 900ms var(--ease-brand) var(--delay, 0ms) both;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+.caret {
+  animation: caret-blink 1s step-end infinite;
+}
+
+/* the hero's download: the bar fills, Complete appears, and the loop starts again */
+@keyframes hero-progress {
+  0%,
+  12% {
+    width: 0;
+  }
+  70%,
+  100% {
+    width: 100%;
+  }
+}
+@keyframes hero-done {
+  0%,
+  72% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  78%,
+  96% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.hero-progress {
+  animation: hero-progress 7s var(--ease-brand) infinite;
+}
+.hero-done {
+  animation: hero-done 7s var(--ease-brand) infinite;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in,
+  .brand-turn {
+    animation: fade-in 200ms linear both;
+  }
+  .nav-panel-in,
+  .caret,
+  .hero-progress,
+  .hero-done {
+    animation: none;
+  }
+  .hero-progress {
+    width: 100%;
+  }
+}
+
+/* shiki writes both themes as variables; the page theme picks one */
+.shiki,
+.shiki span {
+  color: var(--shiki-light);
+}
+[data-theme='dark'] .shiki,
+[data-theme='dark'] .shiki span {
+  color: var(--shiki-dark);
+}

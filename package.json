@@ -15,6 +15,8 @@
     "build": "npm run build:electron && npm run build:frontend && npm run build:backend",
     "postinstall": "node scripts/patch-7zip.mts",
     "demos": "node scripts/make-demos.mts",
+    "site:dev": "cd site && npm run dev",
+    "site:check": "cd site && npm run typecheck && npm run lint && npm test && npm run build",
     "dist": "npm run build && npx electron-builder --publish never",
     "dist:win": "npm run build && npx electron-builder --win --publish never",
     "dist:mac": "npm run build && npx electron-builder --mac --publish never",

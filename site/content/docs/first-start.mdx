@@ -1,0 +1,29 @@
+export const meta = {
+  title: 'First start',
+  description: 'What kinetube installs the first time it opens, and what it installs later.',
+};
+
+kinetube needs an internet connection the first time it starts. Keep the window open while setup runs.
+
+<Steps>
+  <Step title="yt-dlp installs">
+    yt-dlp reads and downloads the media. It comes from its official release host.
+  </Step>
+  <Step title="FFmpeg installs">
+    FFmpeg merges video and audio and converts to MP3. It also comes from its official release host.
+  </Step>
+  <Step title="The app opens">
+    Once both show Ready, the setup screen says All set and the app opens. This happens only once.
+  </Step>
+</Steps>
+
+## Installed when you need them
+
+Two more tools are installed the first time you need them:
+
+| Tool | Installed when | Needs |
+|---|---|---|
+| whisper.cpp | You open Transcribe and choose to install it | On macOS and Linux it is built from source, which needs `git`, `cmake` and a C/C++ compiler |
+| instaloader | You log in to Instagram or open a profile | Python 3 with pip on your `PATH` |
+
+Whisper models are downloaded from Hugging Face when you pick one, from Tiny (about 75 MB) to Large (about 2.9 GB).

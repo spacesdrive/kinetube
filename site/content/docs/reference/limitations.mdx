@@ -1,0 +1,28 @@
+export const meta = {
+  title: 'Known limitations',
+  description: 'What kinetube cannot do yet, and why.',
+};
+
+## Instagram downloads run logged out
+
+instaloader saves its session in a format yt-dlp can't read, so post lookups and downloads don't use your login. Content that Instagram only shows to logged-in visitors can't be downloaded yet. Profiles do use the saved session.
+
+## macOS and Linux aren't verified on real hardware
+
+The tool setup for both is implemented and unit tested, but hasn't been run end to end on a real Mac or Linux machine. See [Cross-platform status](/docs/reference/platforms).
+
+## FFmpeg on Apple Silicon runs under Rosetta 2
+
+The FFmpeg build kinetube downloads for macOS is x64 only.
+
+## Only x64 Linux is supported
+
+The Linux yt-dlp, FFmpeg and AppImage builds are x64.
+
+## Starting kinetube from a VS Code terminal can fail
+
+That terminal sets `ELECTRON_RUN_AS_NODE=1`, and the installed app then exits at once. Start it from the Start menu or the desktop instead.
+
+## Something else
+
+Something else wrong? Search the [issues](https://github.com/spacesdrive/kinetube/issues) or open a new one.

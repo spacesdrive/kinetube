@@ -1,0 +1,28 @@
+export const meta = {
+  title: 'Instagram',
+  description: 'Download posts, reels, stories and whole profiles, and keep several logins.',
+};
+
+Public posts and reels need no setup. Paste a link, pick a quality and press Download. Instagram serves one combined file per height.
+
+## Set up instaloader
+
+Logging in and opening profiles use instaloader, which needs Python 3 on your `PATH`. When kinetube finds Python, it offers to run `pip install instaloader` for you. You can also install it yourself:
+
+```bash
+pip install instaloader
+```
+
+## Log in
+
+Log in from the sidebar on the Instagram page. Two-factor authentication works: kinetube asks for the code Instagram sent to your phone or email.
+
+You can add several accounts and switch between them. Removing an account asks you to press and hold, so it can't happen by accident. A saved login helps profiles load. Posts and reels download without one.
+
+## Profiles
+
+Open a profile, load up to 500 posts and download the ones you pick. Search the posts, select everything shown, or pick them one by one.
+
+<Callout type="note">
+Instagram downloads run logged out. instaloader saves its session in a format yt-dlp can't read, so post lookups and downloads don't use your login. Content that Instagram only shows to logged-in visitors can't be downloaded yet. Profiles do use the saved session.
+</Callout>

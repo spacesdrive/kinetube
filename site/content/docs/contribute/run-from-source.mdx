@@ -1,0 +1,47 @@
+export const meta = {
+  title: 'Run from source',
+  description: 'Clone kinetube, install its packages and start it in development.',
+};
+
+## Requirements
+
+- [Node.js](https://nodejs.org) 22.18 or newer. In development, Node runs the backend and the scripts as TypeScript directly, without a build step.
+- On Windows, the .NET Framework 4. The root `npm install` uses its `csc.exe` to patch electron-builder's 7-Zip.
+
+## Start it
+
+```bash
+git clone https://github.com/spacesdrive/kinetube.git
+cd kinetube
+npm install
+cd frontend && npm install && cd ..
+cd backend && npm install && cd ..
+npm run dev
+```
+
+`npm run dev` does four things:
+
+1. Compiles the Electron code into `electron/dist/`.
+2. Starts the backend with `node --watch src/server.ts` on `127.0.0.1:3001`.
+3. Starts Vite on port 5173. Vite forwards `/api` to the backend.
+4. Waits until `/health` and Vite answer, then opens the Electron window.
+
+In development, tools, models, sessions and downloads are kept in `backend/`.
+
+## Check your change
+
+```bash
+npm run typecheck
+npm test
+cd frontend && npm run lint
+```
+
+## Build installers
+
+```bash
+npm run dist:win
+npm run dist:mac
+npm run dist:linux
+```
+
+Installers land in `dist/`. Run each one on its own platform: `dist:mac` needs macOS. The backend build removes the backend's dev dependencies, so run `cd backend && npm install` before you test or develop again.

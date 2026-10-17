@@ -1,116 +1,110 @@
 #!/usr/bin/env python3
-"""
-instaloader_login.py — KineTube login helper
+"""Log in to Instagram with instaloader and save the session file KineTube uses.
 
-Uses the instaloader Python library (pip install instaloader) to log in
-interactively and save the session file, which KineTube can then load for
-authenticated downloads.
+The backend talks to this script with one JSON object per line:
 
-Communication protocol with the Node.js host (stdin/stdout, JSON lines):
+  backend -> script: {"username": "...", "password": "...", "sessions_dir": "..."}
+  script -> backend: {"status": "success"}
+                   | {"status": "twofa_required"}
+                   | {"status": "error", "message": "..."}
 
-  Node → Python:  {"username": "...", "password": "...", "sessions_dir": "..."}
-  Python → Node:  {"status": "success"}
-                | {"status": "twofa_required"}
-                | {"status": "error", "message": "..."}
-
-  If twofa_required, Node sends:
-  Node → Python:  {"code": "123456"}
-  Python → Node:  {"status": "success"}
-                | {"status": "error", "message": "..."}
+After "twofa_required" the backend sends {"code": "123456"} and the script answers once more
+with "success" or "error".
 """
 
-import sys
 import io
 import json
 import os
+import sys
+from typing import Any
 
-# Force UTF-8 on stdout/stderr — Windows defaults to cp1252 which crashes on
-# non-Latin characters in usernames, captions, etc.
+# Windows defaults to cp1252, which crashes on non-Latin usernames
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
+SUSPICIOUS_LOGIN_MESSAGE = (
+    'Instagram blocked this login as suspicious. Open Instagram on your phone, '
+    'approve the login notification, then try again.'
+)
+VERIFICATION_MESSAGE = 'Instagram wants to verify the account. Finish the check in the Instagram app first.'
 
-def emit(data):
-    print(json.dumps(data, ensure_ascii=False), flush=True)
+
+def emit(message: dict[str, Any]) -> None:
+    print(json.dumps(message, ensure_ascii=False), flush=True)
 
 
-def main():
-    # Check that instaloader is importable
+def read_message() -> dict[str, Any]:
+    line = sys.stdin.readline()
+    if not line:
+        raise ValueError('the backend closed the connection before sending anything')
+    message = json.loads(line)
+    if not isinstance(message, dict):
+        raise ValueError('expected a JSON object')
+    return message
+
+
+def session_path(sessions_dir: str, username: str) -> str:
+    # the backend's account store looks for exactly this name
+    return os.path.join(sessions_dir, f'session-{username}')
+
+
+def connection_error_message(error: Exception) -> str:
+    text = str(error).lower()
+    if any(word in text for word in ('checkpoint', 'suspicious', 'unusual')):
+        return SUSPICIOUS_LOGIN_MESSAGE
+    if 'challenge' in text or 'verify' in text:
+        return VERIFICATION_MESSAGE
+    return f'Instagram could not be reached: {error}'
+
+
+def finish_two_factor(loader: Any, username: str, sessions_dir: str) -> None:
+    emit({'status': 'twofa_required'})
+    code = str(read_message().get('code', ''))
+    loader.two_factor_login(code)
+    loader.save_session_to_file(session_path(sessions_dir, username))
+    emit({'status': 'success'})
+
+
+def log_in(instaloader: Any, credentials: dict[str, Any]) -> None:
+    username = str(credentials['username'])
+    sessions_dir = str(credentials['sessions_dir'])
+    loader = instaloader.Instaloader()
+    exceptions = instaloader.exceptions
+
+    try:
+        loader.login(username, str(credentials['password']))
+        loader.save_session_to_file(session_path(sessions_dir, username))
+        emit({'status': 'success'})
+    except exceptions.TwoFactorAuthRequiredException:
+        try:
+            finish_two_factor(loader, username, sessions_dir)
+        except (exceptions.InstaloaderException, ValueError) as error:
+            emit({'status': 'error', 'message': f"Instagram didn't accept the code: {error}"})
+    except exceptions.BadCredentialsException:
+        emit({'status': 'error', 'message': 'The username or password is wrong.'})
+    except exceptions.ConnectionException as error:
+        emit({'status': 'error', 'message': connection_error_message(error)})
+    except exceptions.InstaloaderException as error:
+        emit({'status': 'error', 'message': str(error)})
+
+
+def main() -> None:
     try:
         import instaloader
     except ImportError:
-        emit({
-            'status': 'error',
-            'message': (
-                'instaloader Python library not found. '
-                'Run: pip install instaloader'
-            )
-        })
+        emit({'status': 'error', 'message': 'The instaloader library is not installed. Run: pip install instaloader'})
         return
 
-    # Read credentials from Node
     try:
-        raw = sys.stdin.readline()
-        if not raw:
-            emit({'status': 'error', 'message': 'No input from host'})
-            return
-        data = json.loads(raw.strip())
-        username     = data['username']
-        password     = data['password']
-        sessions_dir = data['sessions_dir']
-    except Exception as exc:
-        emit({'status': 'error', 'message': f'Bad input: {exc}'})
+        credentials = read_message()
+        missing = [key for key in ('username', 'password', 'sessions_dir') if key not in credentials]
+        if missing:
+            raise ValueError(f'missing {", ".join(missing)}')
+    except (ValueError, json.JSONDecodeError) as error:
+        emit({'status': 'error', 'message': f'The login request could not be read: {error}'})
         return
 
-    L = instaloader.Instaloader()
-
-    try:
-        L.login(username, password)
-        # Session saved — same naming convention as instaloaderManager.js
-        session_path = os.path.join(sessions_dir, f'session-{username}')
-        L.save_session_to_file(session_path)
-        emit({'status': 'success'})
-
-    except instaloader.exceptions.TwoFactorAuthRequiredException:
-        emit({'status': 'twofa_required'})
-
-        try:
-            code_raw  = sys.stdin.readline()
-            code_data = json.loads(code_raw.strip())
-            L.two_factor_login(code_data['code'])
-            session_path = os.path.join(sessions_dir, f'session-{username}')
-            L.save_session_to_file(session_path)
-            emit({'status': 'success'})
-        except Exception as exc:
-            emit({'status': 'error', 'message': str(exc)})
-
-    except instaloader.exceptions.BadCredentialsException:
-        emit({'status': 'error', 'message': 'Incorrect username or password.'})
-
-    except instaloader.exceptions.ConnectionException as exc:
-        msg = str(exc).lower()
-        if 'checkpoint' in msg or 'suspicious' in msg or 'unusual' in msg:
-            emit({
-                'status': 'error',
-                'message': (
-                    'Instagram blocked this login attempt as suspicious. '
-                    'Open Instagram on your phone, approve the login '
-                    'notification, then try again.'
-                )
-            })
-        elif 'challenge' in msg or 'verify' in msg:
-            emit({
-                'status': 'error',
-                'message': (
-                    'Instagram requires account verification. '
-                    'Complete the verification in the Instagram app first.'
-                )
-            })
-        else:
-            emit({'status': 'error', 'message': f'Connection error: {exc}'})
-
-    except Exception as exc:
-        emit({'status': 'error', 'message': str(exc)})
+    log_in(instaloader, credentials)
 
 
 if __name__ == '__main__':

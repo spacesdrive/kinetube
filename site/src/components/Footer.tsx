@@ -1,7 +1,7 @@
 import { Check } from 'lucide-react';
 import { Link } from 'react-router';
 
-import { CHANGELOG_URL, DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, ROADMAP_URL } from '@/lib/links';
+import { CHANGELOG_URL, DOWNLOAD_URL, GITHUB_URL, LICENSE_URL, opensInNewTab, ROADMAP_URL } from '@/lib/links';
 
 import { Logo, Panel } from './brand';
 import { Pill } from './Pill';
@@ -46,6 +46,7 @@ const TICKS = ['Free', 'No account', 'Open source'];
 function FooterAnchor({ link }: { link: FooterLink }) {
   const classes = 'text-[15px] text-ink-muted transition-colors hover:text-ink';
   if (link.href.startsWith('/')) return <Link to={link.href} className={classes}>{link.label}</Link>;
+  if (!opensInNewTab(link.href)) return <a href={link.href} className={classes}>{link.label}</a>;
   return <a href={link.href} target="_blank" rel="noopener noreferrer" className={classes}>{link.label}</a>;
 }
 

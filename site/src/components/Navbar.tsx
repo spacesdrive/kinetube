@@ -200,7 +200,7 @@ function PhoneMenu({ onDone }: { onDone: () => void }) {
       ))}
       <div className="flex flex-col gap-2 border-t border-line pt-5">
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Pill href={DOWNLOAD_URL} className="w-full sm:w-auto">Download kinetube</Pill>
+          <Pill href={DOWNLOAD_URL} className="w-full sm:w-auto">Download for Windows</Pill>
           <Pill href={GITHUB_URL} variant="soft" className="w-full sm:w-auto">View on GitHub</Pill>
         </div>
         <div className="flex items-center justify-between px-3 pt-2 text-sm text-ink-muted">

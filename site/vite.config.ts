@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import mdx from '@mdx-js/rollup';
@@ -9,7 +10,11 @@ import { defineConfig } from 'vitest/config';
 
 import { docsPlugin } from './build/docsPlugin.ts';
 
+// the app's version, which the root package.json carries for every release
+const appVersion = (JSON.parse(readFileSync(path.resolve(import.meta.dirname, '../package.json'), 'utf8')) as { version: string }).version;
+
 export default defineConfig({
+  define: { __APP_VERSION__: JSON.stringify(appVersion) },
   plugins: [
     // MDX compiles before the React plugin transforms the result
     {

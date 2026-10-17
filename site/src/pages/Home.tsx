@@ -5,11 +5,13 @@ import { Mark, Panel } from '@/components/brand';
 import { GitHubIcon, InstagramIcon, YouTubeIcon } from '@/components/marks';
 import { HeroWindow } from '@/components/mockups/HeroWindow';
 import { Pill } from '@/components/Pill';
-import { DOWNLOAD_URL, GITHUB_URL } from '@/lib/links';
+import { APP_VERSION, DOWNLOAD_URL, GITHUB_URL, LINUX_DOWNLOAD_URL, MAC_ARM_DOWNLOAD_URL, MAC_INTEL_DOWNLOAD_URL } from '@/lib/links';
 import { usePageMeta } from '@/lib/seo';
 
 // everything below the hero loads after it, so the first screen paints from the smallest bundle
 const HomeBelow = lazy(() => import('./HomeBelow'));
+
+const OTHER_LINK = 'font-medium text-ink underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-ink';
 
 const DESCRIPTION = 'kinetube is a free desktop app that downloads YouTube and Instagram media and turns it into text with Whisper. It all happens on your own computer.';
 
@@ -32,7 +34,12 @@ function Hero() {
             View on GitHub
           </Pill>
         </div>
-        <p className="rise-in mt-5 max-w-md text-sm text-ink-muted [--delay:300ms]">Free and open source, with no account to make. The macOS and Linux builds are not tested yet.</p>
+        <div className="rise-in mt-5 flex max-w-xl flex-col gap-1.5 text-sm text-ink-muted [--delay:300ms]">
+          <p>Version {APP_VERSION} for 64-bit Windows. Free and open source, with no account to make.</p>
+          <p>
+            Also for macOS (<a href={MAC_ARM_DOWNLOAD_URL} className={OTHER_LINK}>Apple Silicon</a> or <a href={MAC_INTEL_DOWNLOAD_URL} className={OTHER_LINK}>Intel</a>) and <a href={LINUX_DOWNLOAD_URL} className={OTHER_LINK}>Linux</a>, not tested yet.
+          </p>
+        </div>
         <div className="rise-in mt-9 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 [--delay:360ms]">
           <span className="label text-ink-muted">Works with</span>
           <span className="flex items-center gap-2 text-[15px] font-semibold text-ink"><YouTubeIcon className="size-5 text-youtube" />YouTube</span>

@@ -95,7 +95,7 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "KineTube",
-      "artifactName": "${productName}-Setup-${version}.${ext}"
+      "artifactName": "${productName}-Setup.${ext}"
     },
     "mac": {
       "target": [
@@ -110,6 +110,9 @@
       "icon": "build/icon.png",
       "category": "public.app-category.utilities"
     },
+    "dmg": {
+      "artifactName": "${productName}-${arch}.${ext}"
+    },
     "linux": {
       "target": [
         {
@@ -121,6 +124,9 @@
       ],
       "icon": "build/icon.png",
       "category": "Utility"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${arch}.${ext}"
     }
   },
   "devDependencies": {

@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 
 import { OrbitArt } from '@/components/brand';
 import { cn } from '@/lib/cn';
+import { opensInNewTab } from '@/lib/links';
 
 import { slugify } from './searchShared';
 
@@ -33,7 +34,7 @@ const LINK = 'font-medium text-spin-text underline decoration-spin-text/40 under
 
 export function DocLink({ href = '', children, ...props }: ComponentPropsWithoutRef<'a'>) {
   if (href.startsWith('/') && !href.startsWith('//')) return <Link to={href} className={LINK}>{children}</Link>;
-  if (href.startsWith('#')) return <a href={href} className={LINK} {...props}>{children}</a>;
+  if (href.startsWith('#') || !opensInNewTab(href)) return <a href={href} className={LINK} {...props}>{children}</a>;
   return <a href={href} target="_blank" rel="noopener noreferrer" className={LINK} {...props}>{children}</a>;
 }
 

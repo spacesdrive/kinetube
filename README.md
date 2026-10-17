@@ -81,13 +81,16 @@ The real work is done by open-source tools you may already trust. [yt-dlp](https
 
 ## Install
 
-Download the installer for your system from the **[latest release](https://github.com/spacesdrive/kinetube/releases/latest)**.
+Pick the installer for your system. Each link always downloads the newest version.
 
-| System | File |
+| System | Installer |
 |---|---|
-| Windows (x64) | `KineTube-Setup-<version>.exe` |
-| macOS (Intel and Apple Silicon) | `.dmg` |
-| Linux (x64) | `.AppImage` |
+| Windows, 64-bit | **[KineTube-Setup.exe](https://github.com/spacesdrive/kinetube/releases/latest/download/KineTube-Setup.exe)** |
+| macOS, Apple Silicon (M1 and later) | [KineTube-arm64.dmg](https://github.com/spacesdrive/kinetube/releases/latest/download/KineTube-arm64.dmg) |
+| macOS, Intel | [KineTube-x64.dmg](https://github.com/spacesdrive/kinetube/releases/latest/download/KineTube-x64.dmg) |
+| Linux, 64-bit | [KineTube-x86_64.AppImage](https://github.com/spacesdrive/kinetube/releases/latest/download/KineTube-x86_64.AppImage) |
+
+Older versions and release notes are on the [releases page](https://github.com/spacesdrive/kinetube/releases).
 
 The first start needs an internet connection, because kinetube installs yt-dlp and FFmpeg then. Whisper and instaloader are installed the first time you use them. Instagram profiles also need Python 3 on your computer.
 

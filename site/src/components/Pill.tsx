@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 
 import { cn } from '@/lib/cn';
+import { opensInNewTab } from '@/lib/links';
 
 // spin is the one primary action per view; text on it is always on-spin, never white
 export type PillVariant = 'spin' | 'soft' | 'ink';
@@ -28,7 +29,7 @@ export interface PillProps {
   onClick?: () => void;
 }
 
-// the brand's pill button; a path inside the site uses the router, anything else opens in a new tab
+// the brand's pill button; a path inside the site uses the router, an installer downloads in place, anything else opens in a new tab
 export function Pill({ href, variant = 'spin', size = 'md', className, children, onClick }: PillProps) {
   const classes = cn(
     'group inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-semibold whitespace-nowrap transition-colors duration-150',
@@ -39,5 +40,6 @@ export function Pill({ href, variant = 'spin', size = 'md', className, children,
   if (href.startsWith('/')) {
     return <Link to={href} className={classes} onClick={onClick}>{children}</Link>;
   }
+  if (!opensInNewTab(href)) return <a href={href} className={classes} onClick={onClick}>{children}</a>;
   return <a href={href} target="_blank" rel="noopener noreferrer" className={classes} onClick={onClick}>{children}</a>;
 }

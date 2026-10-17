@@ -12,13 +12,13 @@ electron-builder reads the `build` section of the root `package.json`.
 
 | Platform | Target | Arch | Output |
 |---|---|---|---|
-| Windows | `nsis` | x64 | `dist/KineTube-Setup-<version>.exe` |
-| macOS | `dmg` | x64, arm64 | `dist/*.dmg` |
-| Linux | `AppImage` | x64 | `dist/*.AppImage` |
+| Windows | `nsis` | x64 | `dist/KineTube-Setup.exe` |
+| macOS | `dmg` | x64, arm64 | `dist/KineTube-x64.dmg`, `dist/KineTube-arm64.dmg` |
+| Linux | `AppImage` | x64 | `dist/KineTube-x86_64.AppImage` |
 
 All three use `build/icon.png`. `asar` is `false`, so the app files are shipped as plain files.
 
-The installer name comes from the root `package.json`: `productName` (`KineTube`) and `version`. For version 2.0.0 the Windows build writes `dist/KineTube-Setup-2.0.0.exe`, and `latest.yml` names the same file.
+The installer names come from `artifactName` in `build.nsis`, `build.dmg` and `build.appImage`, and carry no version (ADR-042). Every release uploads files with the same names, so `https://github.com/spacesdrive/kinetube/releases/latest/download/KineTube-Setup.exe` (and the same for the other three) always serves the newest one. The website, the README and the install docs link to those addresses. `${arch}` gives `x64` and `arm64` for a DMG and `x86_64` for an AppImage. `latest.yml` and the other update files name the same files. Never put the version back into a name: the direct links would break at the next release.
 
 ## What goes into the package
 
@@ -120,15 +120,17 @@ Each job runs these steps:
 
 `fail-fast` is `false`, so a failure on one platform does not cancel the other two builds.
 
+A last job, `website`, runs after all three builds succeed. It starts `deploy-site.yml` on `main` with `gh workflow run`, so the website rebuilds and shows the new version from the root `package.json` once the installers are on the release. It needs the `actions: write` permission, and nothing else. If a build fails, the website keeps the previous version, which is still what its download links serve.
+
 ## The website workflow (`.github/workflows/deploy-site.yml`)
 
-A second workflow builds and deploys the website in `site/`. It runs only when `site/` or the workflow changes, checks every pull request, and deploys `main` to the Cloudflare Pages project `kinetube-site` at https://kinetube.ujjwal.fyi with the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets. It is separate from the release flow and never touches installers. See `docs/workflows/SITE.md`.
+A second workflow builds and deploys the website in `site/`. It runs when `site/` or the workflow changes and when the release workflow finishes, checks every pull request, and deploys `main` to the Cloudflare Pages project `kinetube-site` at https://kinetube.ujjwal.fyi with the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets. It is separate from the release flow and never touches installers. See `docs/workflows/SITE.md`.
 
 ## Auto-update
 
 `electron-updater` reads `latest.yml`, `latest-mac.yml` and `latest-linux.yml` from the GitHub Release to find out whether a newer version exists. The `publish` block in `package.json` (`provider: github`, `owner: spacesdrive`, `repo: kinetube`) tells it where to look. No other server is needed. See `docs/architecture/electron/MAIN_PROCESS.md` for the in-app flow: the app checks five seconds after start, and the person chooses when to download and install.
 
-**The NSIS file name must never contain a space.** The workflow builds with `--publish never` and uploads `dist/*.exe` itself. The file name written into `latest.yml` and the name of the uploaded asset must match exactly, or the updater gets a 404 when it downloads the update (ADR-014). By default, electron-builder puts spaces in the NSIS file name, and GitHub replaces spaces with dots on upload, so the two names never matched. To fix this, `build.nsis.artifactName` is set to `${productName}-Setup-${version}.${ext}`, so the built file, the GitHub asset and `latest.yml` all use the same name.
+**The NSIS file name must never contain a space.** The workflow builds with `--publish never` and uploads `dist/*.exe` itself. The file name written into `latest.yml` and the name of the uploaded asset must match exactly, or the updater gets a 404 when it downloads the update (ADR-014). By default, electron-builder puts spaces in the NSIS file name, and GitHub replaces spaces with dots on upload, so the two names never matched. To fix this, `build.nsis.artifactName` sets the name itself. It was `${productName}-Setup-${version}.${ext}` until 2.1.0 and is `${productName}-Setup.${ext}` since (ADR-042), so the built file, the GitHub asset and `latest.yml` all use `KineTube-Setup.exe`. electron-updater downloads from the release of the new version, so a file name that repeats across releases is fine.
 
 ## Versioning and tagging
 
@@ -153,7 +155,7 @@ Follow semantic versioning:
 ## Cutting a release
 
 1. Check that the `[Unreleased]` section of `CHANGELOG.md` lists everything since the last tag.
-2. Bump `version` in the root `package.json`, `backend/package.json` and `frontend/package.json`, then run `npm install` in each folder so the three lock files match.
+2. Bump `version` in the root `package.json`, `backend/package.json`, `frontend/package.json` and `site/package.json`, then run `npm install` in each folder so the lock files match.
 3. In `CHANGELOG.md`, move `[Unreleased]` under a new version heading with today's date.
 4. Commit, then tag and push:
 
@@ -165,7 +167,8 @@ Follow semantic versioning:
 
 5. Watch the workflow for all three platforms at https://github.com/spacesdrive/kinetube/actions.
 6. Check that the GitHub Release has all three installers and the `latest*.yml` files.
-7. Check that the `url` and `path` in each `latest*.yml` match the uploaded file names exactly. Compare `gh release view vX.Y.Z --json assets` with `gh release download vX.Y.Z --pattern "latest*.yml" --output -`. A mismatch means the in-app updater will fail even though the release page looks fine.
+7. Check that the direct links serve the new files: `curl -sIL https://github.com/spacesdrive/kinetube/releases/latest/download/KineTube-Setup.exe` ends on a `200` from the new tag, and the website shows the new version once the `website` job has run.
+8. Check that the `url` and `path` in each `latest*.yml` match the uploaded file names exactly. Compare `gh release view vX.Y.Z --json assets` with `gh release download vX.Y.Z --pattern "latest*.yml" --output -`. A mismatch means the in-app updater will fail even though the release page looks fine.
 
 ## Verifying a release
 

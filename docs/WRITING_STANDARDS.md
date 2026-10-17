@@ -98,7 +98,7 @@ Write from the person's point of view, not from the code's.
 
 The brand kit writes the name as `kinetube`, always lowercase, even at the start of a sentence: "kinetube couldn't read the clipboard.", "Keep kinetube open until the download finishes." Use that spelling in every label, message, title and toast the person sees, and in the README.
 
-`productName` in the root `package.json` stays `KineTube`. It names the installer (`KineTube-Setup-<version>.exe`) and the folder that holds each person's data, so changing it would move their tools, models and sessions. Code comments and log lines may keep `KineTube` too.
+`productName` in the root `package.json` stays `KineTube`. It names the installer (`KineTube-Setup.exe`) and the folder that holds each person's data, so changing it would move their tools, models and sessions. Code comments and log lines may keep `KineTube` too.
 
 Some backend messages still say `KineTube`, such as `UNEXPECTED_ERROR_MESSAGE` in `backend/src/lib/errors.ts` and the origin guard's messages. Change them to `kinetube` when you work on those files.
 

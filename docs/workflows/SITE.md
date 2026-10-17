@@ -44,6 +44,12 @@ The docs are ported from `docs/USER_GUIDE.md`, the README, `CONTRIBUTING.md` and
 
 So a commit to `main` that touches `site/` is live a minute or two later. A pull request only runs the checks. Run the workflow by hand from the Actions tab to deploy without a change.
 
+The release workflow also starts this one when every installer is uploaded, because the hero shows the app version. `vite.config.ts` reads it from the root `package.json` into `__APP_VERSION__` (`APP_VERSION` in `src/lib/links.ts`).
+
+## Download links
+
+The Download buttons fetch the Windows installer itself, not the release page: `DOWNLOAD_URL` in `src/lib/links.ts` is `releases/latest/download/KineTube-Setup.exe`, and the hero links the macOS and Linux installers the same way. GitHub answers those addresses with the newest release's file, so a release needs no site change (ADR-042). `opensInNewTab()` keeps these links in the same tab, since the browser saves the file without leaving the page; every other outside link opens a new tab. The install docs page lists the same four links.
+
 | Setting | Where |
 |---|---|
 | Cloudflare Pages project | `kinetube-site` (classic Pages, production branch `main`) |

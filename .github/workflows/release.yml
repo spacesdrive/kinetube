@@ -63,3 +63,16 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # the website shows the version from the root package.json, so it is rebuilt once every installer is up
+  website:
+    name: Redeploy the website
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Run the website workflow on main
+        run: gh workflow run deploy-site.yml --repo "${{ github.repository }}" --ref main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

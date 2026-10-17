@@ -12,14 +12,14 @@ Every expected failure is an `AppError` subclass from `backend/src/lib/errors.ts
 | `ForbiddenError` | `FORBIDDEN` | 403 | the origin guard refuses a request, or an image host is not allowed | "Images can only be loaded from Instagram and YouTube." |
 | `NotFoundError` | `NOT_FOUND` | 404 | the thing asked for does not exist | "That download doesn't exist. It may have finished or been dismissed." |
 | `ConflictError` | `CONFLICT` | 409 | the same work is already running, or a precondition is not met | "This download is already running." |
-| `NotSupportedError` | `NOT_SUPPORTED` | 501 | the feature does not work on this platform | "The folder picker only works on Windows here. Type the folder path instead." |
+| `NotSupportedError` | `NOT_SUPPORTED` | 501 | the feature does not work on this platform | "The folder picker needs zenity or kdialog. Install one of them, or type the folder path instead." |
 | `UpstreamError` | `UPSTREAM_FAILED` | 502 | YouTube, Instagram, GitHub or a tool answered with a failure | "Couldn't reach GitHub to check for a newer yt-dlp release. Check your connection and try again." |
 | `ToolNotInstalledError` | `TOOL_NOT_INSTALLED` | 503 | a tool the request needs is not installed | "yt-dlp is not installed yet. Finish setup first." |
 | `UpstreamTimeoutError` | `UPSTREAM_TIMEOUT` | 504 | YouTube or Instagram took too long | "YouTube took too long to answer. Try again in a moment." |
 
 Two codes have no class:
 
-- `INTERNAL` (500) is what any error that is not an `AppError` becomes. Its message is always `UNEXPECTED_ERROR_MESSAGE`: "KineTube hit an unexpected error. Try again, and restart the app if it keeps happening."
+- `INTERNAL` (500) is what any error that is not an `AppError` becomes. Its message is always `UNEXPECTED_ERROR_MESSAGE`: "kinetube hit an unexpected error. Try again, and restart the app if it keeps happening."
 - `CANCELLED` only appears in a stream's `done` event, when a download or batch was cancelled.
 
 Who throws what:
@@ -85,12 +85,22 @@ A problem that does not stop the work is a `warning` event, not a failure. Downl
 
 Every request goes through `frontend/src/services/request.ts` and `frontend/src/services/eventStream.ts`.
 
-- `ApiError` has `status`, `code` and `message`. `code` is an `ErrorCode`, or `NETWORK` when the backend could not be reached at all ("Couldn't reach the KineTube backend. Restart the app if this keeps happening.").
+- `ApiError` has `status`, `code` and `message`. `code` is an `ErrorCode`, or `NETWORK` when the backend could not be reached at all ("Couldn't reach the kinetube backend. Restart the app if this keeps happening.").
 - `request<T>()` and `requestNoContent()` throw an `ApiError` for any status outside 2xx, built from the backend's `ErrorResponse` by `toApiError()`. A body that is not an `ErrorResponse` becomes "The backend answered with status <status>. Try again." with code `INTERNAL`.
 - `openStream()` never throws. A JSON error before the stream opened, a broken connection, or a stream that ends without an end event (`done`, or `paused` for a download) all arrive as a failed `done` event, so a stream handler only has one place to look. A stream cut off early gets "The connection to the backend closed before the work finished. Try again."
 - An aborted request (the caller closed the stream) is not reported as an error.
 
 Components catch an `ApiError` and show its message in the component's own error state. They often put what the page was doing in front of it, for example `Couldn't load the models. ${message}`. `OutputFolderField.tsx` adds what happens next: `${error.message} Until then, downloads go to the default folder.` Never show a raw `alert()`, and never leave a rejected promise unhandled. A `.catch(() => {})` is fine only with a comment that says why the failure does not matter, as in `useResumableDownloads.ts`.
+
+### Toasts for transient errors
+
+A failure that has no place on the screen, and that the person can fix at once, is a Sonner error toast. The title says what failed and the description says what to do:
+
+```ts
+toast.error("kinetube couldn't read the clipboard.", { description: 'Paste the link into the link field instead.' });
+```
+
+Today these are the clipboard errors: no YouTube or Instagram link on the clipboard, or no permission to read it (`hooks/useAppCommands.ts`), and a transcript that can't be copied (`TranscriptPanel.tsx`, `QueueItemCard.tsx`). Errors from the backend stay inline in the component that asked, because they belong to that field, card or page.
 
 ## Writing error messages
 

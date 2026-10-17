@@ -23,7 +23,7 @@ flowchart TD
 | Process | Code | What it owns |
 |---|---|---|
 | Main | `electron/src/`, compiled to `electron/dist/` | The window, the updater, the native folder dialog and, in a packaged build, the backend process. See `docs/architecture/electron/MAIN_PROCESS.md`. |
-| Renderer | `frontend/src/` | The React app built by Vite. It reaches the backend only through `frontend/src/services/api.ts` and reaches Electron only through `window.electronAPI`. See `docs/architecture/frontend/REACT_ARCHITECTURE.md`. |
+| Renderer | `frontend/src/` | The React app built by Vite, with five pages: YouTube, Instagram, Batch download, Transcribe and Settings. It reaches the backend only through `frontend/src/services/api.ts` and reaches Electron only through `window.electronAPI`. See `docs/architecture/frontend/REACT_ARCHITECTURE.md`. |
 | Backend | `backend/src/` | An Express 5 app that listens on `127.0.0.1` only. It does all file, network and process work, and serves the built frontend in a packaged build. See `docs/architecture/backend/EXPRESS.md`. |
 
 `shared/types/` holds the request, response and stream-event types that all three use. Every project imports it with `import type`, so none of it exists at runtime (ADR-028).
@@ -60,7 +60,7 @@ A request passes through these layers in order. Each one only calls the layer be
 
 This is the path of a single YouTube or Instagram download.
 
-1. The person picks a quality in `VideoView` or `InstagramPostView` and clicks the download button. The view calls `onDownload`.
+1. The person picks a quality in the download panel of `VideoView` (`VideoDownloadPanel`) or in `InstagramPostView`, and clicks the download button. The view calls `onDownload`.
 2. `AppShell` wires `onDownload` to `useDownloadSession().download`. It adds the Instagram account chosen in the sidebar and calls `startSingle` in `useActiveDownload`.
 3. `startSingle` puts a fresh `SingleDownloadState` in the progress dialog. Then it calls `api.createDownload` with the link, quality, audio-only flag, account, download folder and file name options from the settings.
 4. `openStream` in `frontend/src/services/eventStream.ts` sends `POST /api/v1/downloads` with a JSON body and `Accept: text/event-stream`. In development, Vite proxies `/api` to `127.0.0.1:3001`.
@@ -75,6 +75,15 @@ This is the path of a single YouTube or Instagram download.
 13. If the person asked for a transcript, a successful `done` starts `usePostDownloadTranscription`, which streams `POST /api/v1/transcriptions`.
 
 Closing the dialog closes the stream. The backend sees the response close, aborts the job and kills the yt-dlp process tree.
+
+### Many videos at once
+
+Playlists, channel tabs, Instagram profiles and the Batch download page all end in one download batch.
+
+1. A playlist link or a channel tab link goes to `GET /api/v1/youtube/media`. The answer lists each entry with a `status`. A channel has four tabs (Videos, Shorts, Live and Playlists), and each tab is its own link and its own lookup.
+2. The list in `features/youtube/VideoCollection.tsx` lets the person tick entries. Upcoming streams, running streams and unavailable videos can't be ticked.
+3. The Batch download page (`features/batch/BatchPage.tsx`) looks up each pasted link the same way and starts single videos and posts selected.
+4. The selection bar calls `onBulkDownload`. `useDownloadSession().downloadMany` adds the chosen Instagram account and calls `startBulk`, which streams `POST /api/v1/download-batches`. The progress dialog shows each item as it runs.
 
 ### Other streams
 

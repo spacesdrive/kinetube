@@ -9,6 +9,25 @@
 
 Commits in this repository use the spacesdrive author identity. The local git config for this repository is already set to it. Do not override it per commit with a different author.
 
+## GitHub issues
+
+Work is tracked in GitHub issues at https://github.com/spacesdrive/kinetube/issues. Every piece of work starts with an issue and ends with that issue closed.
+
+1. Open an issue before you start. The title names the outcome in plain words ("Folder picker fallback on macOS and Linux"). The body says what is wrong or missing and what done looks like.
+2. Give it one label: `bug` for something broken, `enhancement` for a new feature or capability, `documentation` for docs only.
+3. Reference the issue in every commit for it, in the commit body:
+   - `Refs #<n>` while the work is in progress
+   - `Closes #<n>` in the commit that finishes it
+   - one commit can name several: `Closes #1, closes #3. Refs #2`
+4. Close the issue once the finishing commit lands on the working branch. Add a comment that names the commit and the branch, says what changed, and says what was not verified.
+
+GitHub closes an issue from `Closes #<n>` only when the commit reaches the default branch, `main`. Work on a branch such as `refactor/typescript-rest` needs the manual close in step 4.
+
+```bash
+gh issue create --title "Show toasts through Sonner" --label bug --body "..."
+gh issue close 5 --comment "Implemented in cebb2c9 on refactor/typescript-rest: ... Not yet run on real macOS or Linux hardware."
+```
+
 ## Commit cadence
 
 Commit after every meaningful, self-contained change. Do not collect unrelated changes into one large commit, and do not leave work uncommitted between sessions.
@@ -77,7 +96,16 @@ next commit.
 
 ### Body
 
-The body explains why the change was made and what a reader would not guess from the diff. Short bullet lists are fine for several related fixes. Name the ADR in `DECISIONS.md` when the change follows one.
+The body explains why the change was made and what a reader would not guess from the diff. Short bullet lists are fine for several related fixes. Name the ADR in `DECISIONS.md` when the change follows one. End the body with the issue reference (`Refs #2` or `Closes #5`), as described in "GitHub issues".
+
+```
+feat(backend): open the folder picker on macOS and Linux
+
+osascript on macOS, zenity then kdialog on Linux. A missing tool
+answers 501 with a message that says what to install.
+
+Closes #5
+```
 
 Do not add `Co-Authored-By` lines that name AI tools. None of the commits in this repository have one; commits show only the project author.
 
@@ -184,5 +212,6 @@ git branch -d feat/cross-platform-ytdlp
 6. `git diff --staged`: review the whole diff
 7. No session files, tool binaries, models or media are staged
 8. `CHANGELOG.md` is updated if the commit adds a feature or a fix
+9. The commit body names its issue with `Refs #<n>` or `Closes #<n>`
 
 Do not use `npm run build` or `npm run build:backend` as a pre-commit check. They prune the backend's dev dependencies, and you would need `cd backend && npm install` before the next test run.

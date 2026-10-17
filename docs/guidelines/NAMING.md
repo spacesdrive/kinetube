@@ -14,16 +14,22 @@
 | Electron | `camelCase.ts` | `main.ts`, `backendProcess.ts`, `mainWindow.ts` |
 | Scripts | `kebab-case.mts` | `patch-7zip.mts`, `run-electron.mts` |
 | React components | `PascalCase.tsx`, named after the default export | `VideoView.tsx`, `ProgressModal.tsx`, `SettingsPage.tsx` |
-| React hooks | `use<Name>.ts` | `useActiveDownload.ts`, `useToolStatus.ts` |
+| Page patterns | `components/patterns/<Name>.tsx`, named after what it is, never after a feature | `PageHeader.tsx`, `ListRow.tsx`, `StatusBadge.tsx`, `HoldToConfirmButton.tsx` |
+| App shell | `components/shell/<Name>.tsx` | `AppSidebar.tsx`, `TopBar.tsx`, `CommandPalette.tsx`, `BrandLockup.tsx` |
+| React hooks | `use<Thing>.ts`, one hook per file, named after what it owns | `useActiveDownload.ts`, `useToolStatus.ts`, `useAppCommands.ts`, `useHoldToConfirm.ts` |
 | Stream reducers | `<thing>State.ts` | `singleDownloadState.ts`, `toolSetupState.ts` |
-| Frontend helpers | `camelCase.ts` | `settings.ts`, `urlCleaners.ts`, `eventStream.ts` |
+| Frontend helpers | `camelCase.ts` | `settings.ts`, `urlCleaners.ts`, `commands.ts`, `collectionFilters.ts` |
 | shadcn primitives | `kebab-case.tsx` (generated, do not rename) | `button.tsx`, `dropdown-menu.tsx`, `use-mobile.ts` |
-| Tests | `<file under test>.test.ts` or `.test.tsx`, in the same folders as the source | `tests/managers/ytdlp/ytdlpArgs.test.ts`, `tests/features/downloads/ProgressModal.test.tsx` |
-| Documentation | `SCREAMING_SNAKE_CASE.md` | `OVERVIEW.md`, `TYPESCRIPT.md` |
+| Stylesheets | `kebab-case.css` | `index.css`, `styles/tokens.css` |
+| Brand images | `kinetube-<asset>-<size>.png` in `src/assets/brand/` | `kinetube-mark-ink-96.png`, `kinetube-mark-white-96.png` |
+| Tests | `<file under test>.test.ts` or `.test.tsx`, in the same folders as the source | `tests/managers/ytdlp/ytdlpArgs.test.ts`, `tests/components/patterns/HoldToConfirmButton.test.tsx` |
+| Documentation | `SCREAMING_SNAKE_CASE.md` | `OVERVIEW.md`, `TYPESCRIPT.md`. `docs/design-reference.md` is the one kebab-case exception. |
 
 Two test files cover a group rather than one file: `backend/tests/routes/apiRoutes.test.ts` tests every route through `createApp`, and `frontend/tests/features/downloads/downloadState.test.ts` tests both download reducers.
 
-React file names also say what kind of component they hold: `<Name>Page`, `<Name>View`, `<Name>Card`, `<Name>Panel`, and `<Name>Dialog` or `<Name>Modal` for a dialog.
+React file names also say what kind of component they hold: `<Name>Page`, `<Name>View`, `<Name>Card`, `<Name>Panel`, `<Name>Section` for a block of Settings, `<Name>Row` for one list row, `<Name>Bar` for a bar (`SelectionBar`, `DownloadProgressBar`), and `<Name>Dialog` or `<Name>Modal` for a dialog.
+
+`EmptyState.tsx`, `LoadingState.tsx` and `ErrorState.tsx` are components, not reducers. A reducer file is a `.ts` file named after the stream it follows (`singleDownloadState.ts`). A component file is `.tsx` and starts with a capital letter.
 
 ## Functions
 
@@ -49,7 +55,7 @@ Controller methods are named after the action: `list`, `get`, `create`, `pause`,
 | Hooks | `use<Name>` | `useMediaLookup`, `useDownloadSession`, `useIsMobile` |
 | Reducers | `apply<Thing>Event`, with `create<Thing>` for the first state | `applyDownloadEvent`, `createSingleDownload`, `applyToolEvent` |
 | API client methods | verb plus resource | `api.listTools`, `api.createDownload`, `api.pauseDownload`, `api.removeInstagramAccount` |
-| Event handlers in a component | `handle<Event>`, or what the handler does | `handleSave`, `handleSubmit`, `clearSearch`, `toggleBatch` |
+| Event handlers in a component | `handle<Event>`, or what the handler does | `handleSave`, `handleSubmit`, `clearSearch`, `downloadAll` |
 | Callback props | `on<Event>` | `onDismiss`, `onDownload`, `onPageChange` |
 
 ## Types

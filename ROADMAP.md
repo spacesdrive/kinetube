@@ -31,7 +31,7 @@ Update this file whenever a feature ships (move to `CHANGELOG.md`) or when prior
 
 ### React component tests
 
-**Shipped 2026-10-17.** Vitest and Testing Library cover the progress modal, the resume banner, the stream reader, the request client, the download and transcription reducers and the URL cleaners (`frontend/tests/`).
+**Shipped 2026-10-17.** Vitest and Testing Library cover the progress modal, the resume banner, the stream reader, the request client, the download and transcription reducers and the URL cleaners (`frontend/tests/`). The redesign added tests for the command palette, the hold-to-confirm button, theme switching, command filtering, collection filters and quality availability.
 
 **Remaining work:** cover `SettingsPage`, the Instagram login dialog and the media views as they change for other reasons.
 
@@ -76,7 +76,13 @@ The current `dmg` target is unsigned. Before wide distribution, macOS builds nee
 
 ### Playlist-aware batch download
 
-`frontend/src/features/batch/BatchResultsView.tsx` currently handles a manually pasted mixed queue of YouTube/Instagram URLs. A full playlist URL (`youtube.com/playlist?list=...`) is not yet a first-class input type distinct from a channel's `/videos` tab.
+**Shipped 2026-10-17** (issue #2, `DECISIONS.md` ADR-034). Playlist links list every video to pick from, on the YouTube page and in Batch download, and channels have Videos, Shorts, Live and Playlists tabs.
+
+**Remaining work:** lists render every row at once. A channel Live tab with 597 streams stays smooth, but a channel with several thousand videos may want a virtualised list.
+
+### Keep the brand kit out of the build
+
+`frontend/public/kinetube-brand-kit/` is copied into `frontend/dist` and the installer, about 400 KB the app never loads. Moving the kit to `docs/brand/` would keep it in the repository without shipping it.
 
 ### Pause and resume for batches
 
@@ -95,7 +101,7 @@ Single YouTube and Instagram downloads can be paused. A batch cannot, because th
 - ffmpeg's Linux extraction shells out to the system `tar` binary rather than a bundled library. That is a safe assumption on almost every Linux distribution, but not a guarantee (see `DECISIONS.md` ADR-011).
 - macOS ffmpeg is x64-only; Apple Silicon runs it under Rosetta 2 rather than a native arm64 binary (deliberate trade-off, see `DECISIONS.md` ADR-011).
 - yt-dlp and ffmpeg's Linux builds target x86_64 only; arm64 Linux is not wired up.
-- `POST /api/v1/folders/pick` opens a PowerShell dialog and works on Windows only; elsewhere it answers 501 and the person types the path. Only the dev fallback outside Electron uses it. See `docs/philosophy/CROSS_PLATFORM.md`.
+- `POST /api/v1/folders/pick` uses PowerShell on Windows, osascript on macOS and zenity or kdialog on Linux (issue #5). Only Windows has been run for real; the other two are covered by tests with a fake process runner. Only the dev fallback outside Electron uses it. See `docs/philosophy/CROSS_PLATFORM.md`.
 - Several larger components (`SettingsPage`, the Instagram login dialog, the media views) have no tests yet. See `docs/workflows/TESTING.md`.
 - The pending-download store (`backend/src/stores/pendingDownloadStore.ts`) never prunes a record whose output folder has since been deleted. A stale "Resume" entry fails when clicked instead of being filtered out first. Low priority: the failure shows up as a normal, visible error.
 - yt-dlp's pinned version (`YTDLP_VERSION` in `backend/src/managers/ytdlp/ytdlpBinary.ts`) is still unbumped. It is the release used for the first install and for the "outdated" warning. A person does not have to wait for a bump: Settings can check yt-dlp's latest GitHub release and install it in place (`DECISIONS.md` ADR-022). Bumping the pin is routine maintenance.

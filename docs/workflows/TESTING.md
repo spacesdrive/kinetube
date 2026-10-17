@@ -42,8 +42,8 @@ Counted on 2026-10-17 from `cd backend && npm test` and `cd frontend && npx vite
 
 | Layer | Test files | Tests | Result |
 |---|---|---|---|
-| Backend | 22 | 150 (in 41 suites) | all pass |
-| Frontend | 12 | 64 | all pass |
+| Backend | 27 | 204 (in 55 suites) | all pass |
+| Frontend | 18 | 88 | all pass |
 
 ## Backend test setup
 
@@ -64,6 +64,7 @@ Counted on 2026-10-17 from `cd backend && npm test` and `cd frontend && npx vite
 
 - `frontend/vite.config.ts` sets the test environment to `jsdom`, includes `tests/**/*.test.{ts,tsx}`, and loads `tests/setup.ts` before each file.
 - Vitest globals stay off, so every test imports `describe`, `it`, `expect` and `vi` from `vitest`. Because of that, Testing Library cannot register its own cleanup between tests. `tests/setup.ts` registers `afterEach(cleanup)` once for every file. Without it, a query by role or position can match an element left over from the previous test.
+- jsdom has no `window.matchMedia`, and next-themes asks it for the system theme. `tests/setup.ts` adds one that always answers "light", so components that read the theme can render.
 - Tests import source files through the `@/` alias (for example `@/services/request`). Imports from `@shared/*` must be type-only, because Vitest does not resolve that alias at run time.
 - Tests that call the API stub `fetch` with `vi.stubGlobal('fetch', ...)` and undo it with `vi.unstubAllGlobals()` in `afterEach`. No test reaches a real backend.
 
@@ -101,20 +102,26 @@ Counted on 2026-10-17 from `cd backend && npm test` and `cd frontend && npx vite
 | `validators/downloadValidators.test.ts` | Channel and playlist links refused with their own message, a watch link with a list downloading one video, every playlist and Shorts entry accepted in a batch |
 | `validators/pathExamples.test.ts` | The folder and file path examples in error messages for Windows, macOS and Linux |
 
-### Frontend (12 files)
+### Frontend (18 files)
 
 | Test file | What it covers |
 |---|---|
-| `features/batch/batchResults.test.ts` | Reading pasted links, the first selection, building batch items |
+| `components/patterns/HoldToConfirmButton.test.tsx` | A plain click never fires, a full hold fires once, letting go early cancels, holding Space works from the keyboard |
+| `components/shell/CommandPalette.test.tsx` | Typing filters the commands and Enter runs the highlighted one, the arrow keys move the highlight, a pasted link becomes a fetch command, the message when nothing matches |
+| `features/batch/batchResults.test.ts` | Reading pasted links, the first selection, building batch items, entries that are not downloadable left out even when selected, a playlist treated as a collection of its entries |
 | `features/downloads/ProgressModal.test.tsx` | The progress dialog for one download and for a bulk download |
 | `features/downloads/ResumeDownloadsBanner.test.tsx` | The resume banner: empty, singular, plural, link fallback, Resume and Dismiss |
 | `features/downloads/downloadState.test.ts` | Applying stream events to download state, scaled progress, bulk downloads |
 | `features/downloads/fileNamePreview.test.ts` | The file name preview and custom naming detection |
+| `features/settings/AppearanceSection.test.tsx` | Choosing a theme applies it at once, with no Save |
 | `features/setup/toolSetupState.test.ts` | Applying tool install events to the setup screen state |
 | `features/transcribe/transcribeQueueState.test.ts` | Transcription queue items |
-| `lib/format.test.ts` | Formatting helpers (counts, dates, durations, sizes, speeds, word counts) |
+| `features/youtube/collectionFilters.test.ts` | Only available entries can be downloaded, search then filter chips, the download targets with and without ticked entries |
+| `lib/commands.test.ts` | `filterCommands`: every command for an empty query, every word matched in any order, no match, a pasted link turned into one fetch command |
+| `lib/format.test.ts` | Formatting helpers (counts, dates, durations under a minute and over an hour, sizes, speeds, word counts) |
+| `lib/qualities.test.ts` | Which qualities a video offers from its tallest stream, everything offered when the heights are unknown |
 | `lib/settings.test.ts` | Loading saved settings and turning them into file name options |
-| `lib/urlCleaners.test.ts` | Cleaning YouTube and Instagram links and spotting Instagram links |
+| `lib/urlCleaners.test.ts` | Cleaning YouTube links (share parameters, watch links with a list, youtu.be links with a playlist, playlist links, Shorts, channel tabs, a missing https), cleaning Instagram links, spotting Instagram links |
 | `services/eventStream.test.ts` | Parsing stream event blocks and the fetch-based stream reader |
 | `services/request.test.ts` | The request helper: the `/api/v1` prefix, `ApiError` from the error shape, a non-JSON error, an unreachable backend |
 
@@ -127,7 +134,8 @@ Add a test in the same change whenever you add a parser, mapper, validator, stor
 - Resuming a partial file. The tests cover the download records and the pause and resume flow with a fake yt-dlp. Whether yt-dlp continues a `.part` file instead of starting again is yt-dlp's own behavior and is checked by hand.
 - The yt-dlp update and the GitHub release check. The comparison logic is tested. The live call to GitHub and the binary download are checked by hand.
 - Electron. The window, the backend process, IPC and the auto-updater are checked by running the app.
-- Most React components. Only `ProgressModal` and `ResumeDownloadsBanner` have component tests. The other features are covered through their pure state modules.
+- Most React components. `ProgressModal`, `ResumeDownloadsBanner`, `HoldToConfirmButton`, `CommandPalette` and `AppearanceSection` have component tests. The other features are covered through their pure state modules.
+- The look of the app. Tokens, both themes, the 960 px window, animations and toasts are checked by hand against `docs/design-reference.md` and the screenshots in `docs/screenshots/after/`.
 
 ## Manual verification checklist
 
@@ -158,12 +166,14 @@ Run this before you ship any change the automated tests do not fully cover. Use 
 
 - [ ] Paste a public post or reel link: it loads and downloads without a login
 - [ ] Log in with an account that uses two-factor authentication: the code form appears and the account is listed after the code
-- [ ] Remove the account: it disappears from the list and its session file is deleted from the sessions folder
+- [ ] Remove the account from the sidebar: the dialog asks for a hold on "Hold to remove". A click does nothing, letting go early cancels, and a full hold removes the account and deletes its session file from the sessions folder
 - [ ] Paste a profile link: posts load with progress, and selected posts download one after another with a short pause between them
 
-### Batch mode
+### Batch download page
 
-- [ ] Paste several YouTube and Instagram links, one per line: each link resolves and can be downloaded in one batch
+- [ ] Open Batch download from the sidebar: it is its own page, and the Instagram accounts show in the sidebar
+- [ ] Paste several YouTube and Instagram links, one per line, including a playlist: each link resolves, single videos and posts start selected, and the selected items download in one batch
+- [ ] Go to another page and back: the pasted links and their results are still there
 - [ ] A link that can't be read shows its own error card, and the other links still download
 - [ ] Cancel a running batch: the current item stops and no yt-dlp or FFmpeg process is left running
 
@@ -179,13 +189,17 @@ Run this before you ship any change the automated tests do not fully cover. Use 
 - [ ] Start a large download and close the app while it runs (or end the Electron process)
 - [ ] Start the app again: the banner offers to resume it, with its title
 - [ ] Press Resume: it continues from about where it stopped
-- [ ] Repeat, but press Dismiss: the offer is gone after the next start, and the partial file stays on disk
+- [ ] Repeat, but press Dismiss: the download leaves the banner and a toast offers Undo. Press Undo: it comes back
+- [ ] Dismiss it again and let the toast close: the offer is gone after the next start, and the partial file stays on disk
 
 ### Transcription
 
 - [ ] On the Transcribe page, install whisper.cpp if asked, then download a model: it shows as ready in the model picker
 - [ ] Transcribe a local file: the text appears while it runs, and a `.txt` file with no timestamps is saved next to the source
 - [ ] Turn on "Transcribe after download", then download a video: the transcript appears when the download finishes and is saved next to the video
+- [ ] Copy a transcript: a "Transcript copied" toast appears
+- [ ] Open the language selector: the list opens below or above the field, not on top of it, and fades in. The quality select and the selects in Settings do the same
+- [ ] With a finished queue, "Hold to clear" empties it only after a full hold. A click does nothing
 
 ### Folder picker in a plain browser
 
@@ -196,10 +210,28 @@ Run this before you ship any change the automated tests do not fully cover. Use 
 
 ### Settings and yt-dlp update
 
-- [ ] Change the download folder, the file name options and the default quality, then restart the app: the settings are still there
+- [ ] Change the download folder, the file name options and the default quality, then press Save: a "Settings saved" toast appears. Restart the app: the settings are still there
+- [ ] About shows the app version from the root `package.json` (2.0.0), in the desktop app and in a plain browser
 - [ ] Settings shows the installed yt-dlp version. "Check for updates" says it is up to date or offers the newer release
 - [ ] Update yt-dlp: a progress bar runs and the new version shows afterwards. `yt-dlp --version` in a terminal shows the same version
 - [ ] With the network off, the yt-dlp check says GitHub could not be reached instead of saying it is up to date
+
+### Command palette
+
+- [ ] Press Ctrl and K (Cmd and K on macOS) on any page: the palette opens with the cursor in its field. Press it again: it closes
+- [ ] The search trigger in the top bar opens it too, and shows the shortcut
+- [ ] Type "batch": only the Batch download command is left. Enter opens that page
+- [ ] The arrow keys move the highlight, and Enter runs the highlighted command
+- [ ] Paste a YouTube or Instagram link: one "Fetch" command appears, and Enter opens the link on the right page
+- [ ] Run "Fetch the link on the clipboard" with a link copied: it opens. With plain text copied: an error toast says to copy a link first
+
+### Theme and appearance
+
+- [ ] Switch between Light, Dark and Match the system from the sidebar's theme menu, from Appearance in Settings and from the command palette: the whole app changes at once, with no Save
+- [ ] Restart the app: the chosen theme is still set
+- [ ] Every page reads well in both themes at 1440 px and at 960 px, and matches the screenshots in `docs/screenshots/after/`
+- [ ] Tab through a page: every control shows the same focus ring
+- [ ] Turn on reduced motion in the system settings: the brand mark and popups no longer animate
 
 ### App update dialog (packaged build only)
 

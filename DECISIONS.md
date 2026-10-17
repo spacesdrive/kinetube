@@ -630,3 +630,77 @@ Records every significant architectural decision, the alternatives considered, a
 **Reasoning:** 1.x had two download routes that shared most of their code and had drifted apart: different file-name cleaning, different format selectors, and no pause for Instagram.
 
 **Trade-offs:** an Instagram download now uses the YouTube format selectors. They also fit Instagram, which serves one combined stream per height.
+
+---
+
+## ADR-032: Layout from the ElevenLabs web app, identity from the kinetube brand kit
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** The frontend's structure (shell proportions, spacing, control sizes, hairlines, underline tabs, choice cards, list rows, the settings column beside a working surface) follows the ElevenLabs web app, measured in DevTools and recorded in `docs/design-reference.md`. Every colour, font, logo and accent comes from `frontend/public/kinetube-brand-kit/`. All of it goes through tokens in `frontend/src/styles/tokens.css`; components never name a palette colour.
+
+**Alternatives considered:**
+- Restyling the 1.x screens in place. Their colours were hard-coded light-theme fills (`bg-blue-50`, `text-green-700`), which is why the dark theme broke, so a token system had to come first either way.
+- Copying the reference's look. Its white primary button, neutral greys and logo would make kinetube look like someone else's product.
+
+**Where structure and skin disagreed:** buttons and chips are pills, because the brand kit makes round controls part of the identity, but they keep the reference's 32, 36 and 40 px heights. Inputs and rows use the reference's 10 and 8 px radii. Light-theme values come from the kit, because the reference was only measured in dark.
+
+**Trade-offs:** the kit has no state colours or lifted surfaces, so those are derived and recorded in `docs/design-reference.md` with their contrast ratios. Batch download moved from a mode of the YouTube page to its own page.
+
+---
+
+## ADR-033: Self-hosted brand fonts
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** Unbounded and DM Sans load from `@fontsource-variable/unbounded` and `@fontsource-variable/dm-sans`, bundled with the frontend. `@fontsource-variable/geist` is removed.
+
+**Reasoning:** the brand kit links Google Fonts, but a desktop app should look the same offline and should make no request the person did not ask for. Both families are under the SIL Open Font License. The variable files are small: the Latin subsets are 37 KB for DM Sans and 51 KB for Unbounded.
+
+---
+
+## ADR-034: Playlists, channel tabs and a status on every listed video
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** `GET /api/v1/youtube/media` answers playlist links (`/playlist?list=`) with a `YouTubePlaylist`, and channel links accept the videos, shorts, streams and playlists tabs. Every listed video is a `VideoEntry` with a `status` of available, upcoming, live or unavailable. A watch link with `list=` stays a video, but its `playlistUrl` lets the page offer to load the whole list. The single download route still refuses lists; the page sends the picked videos as a batch.
+
+**Reasoning:** 1.x refused playlist links and only listed the Videos and Shorts tabs. The Live tab lists upcoming and running streams, which yt-dlp cannot download as finished files, and playlists list private and deleted videos; the status lets the page show them without letting them be picked.
+
+**Trade-offs:** YouTube's playlist count can include videos it hides, so the page says how many are hidden. Playlist ids shorter than 10 characters (Watch later, Liked videos) are refused, because they need a login.
+
+---
+
+## ADR-035: Toasts for results, hold to confirm for destructive actions
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** Sonner's `Toaster` is mounted once in `frontend/src/main.tsx`. Toasts confirm results that leave the screen unchanged (settings saved, a transcript copied, a login saved) and report errors that have no field to sit under (an empty clipboard). Dismissing an unfinished download hides it at once and deletes the backend's record only when the toast closes without Undo. Removing an Instagram account and clearing the transcription queue need a press and hold, never a single click.
+
+**Reasoning:** `docs/WRITING_STANDARDS.md` asked for Sonner toasts since 1.x, but nothing showed one. A hold is a stronger guard than a confirmation click for actions that delete a saved login or unsaved transcripts, and it works from the keyboard by holding Space or Enter.
+
+---
+
+## ADR-036: Work is tracked in GitHub issues
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** Every piece of work starts as an issue in `spacesdrive/kinetube`. Commits name it (`Refs #n` while it is in progress, `Closes #n` in the commit that finishes it), and the issue is closed with a comment naming the commit as soon as the work lands on the working branch, because GitHub only closes issues automatically from the default branch.
+
+**Reasoning:** the owner asked for it, and it gives each change a place for its reason and its follow-ups.
+
+---
+
+## ADR-037: Version 2.0.0
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** The root, backend and frontend packages are all 2.0.0. The root `package.json` names the installer and is the version Electron reports; the frontend reads the same file at build time (`__APP_VERSION__` in `vite.config.ts`), so Settings shows the version in a plain browser too.
+
+**Reasoning:** the TypeScript rewrite, the `/api/v1` API and the redesign are breaking changes. The backend and frontend packages had drifted to 1.0.0 and 0.0.0, and the last local installer was still named 1.0.0.

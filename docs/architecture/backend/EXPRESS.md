@@ -13,7 +13,7 @@ The backend is one Express 5 app written in strict TypeScript as ES modules (`"t
 
 It logs the yt-dlp and FFmpeg status (`logToolStatus()`) only after the server emits `listening`. **The listener must start before any tool check.** Electron's `waitForBackend()` polls `/health` up to 40 times, half a second apart, before it opens the window. A slow tool check or download at startup would delay or break the app. Any new startup work goes after `listening` and must not block.
 
-If the port is taken (`EADDRINUSE`), the backend logs "Port 3001 is already in use. Close the other KineTube window and try again." and exits with code 1.
+If the port is taken (`EADDRINUSE`), the backend logs "Port 3001 is already in use. Close the other kinetube window and try again." and exits with code 1.
 
 How the backend is launched:
 

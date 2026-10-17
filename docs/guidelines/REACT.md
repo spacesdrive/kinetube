@@ -26,7 +26,7 @@ export default function UpdateDialog({ version, onDismiss }: UpdateDialogProps) 
 - A props interface can extend a shared one, as `DownloadPageProps extends MediaDownloadHandlers` does.
 - When a component takes a whole hook result, type it with `ReturnType<typeof useX>` or the type the hook file exports (`MediaLookup`, `BatchState`).
 
-Event handlers declared inside a component are named `handle<Event>` (`handleSave`, `handleSubmit`) or after what they do (`clearSearch`, `toggleBatch`).
+Event handlers declared inside a component are named `handle<Event>` (`handleSave`, `handleSubmit`) or after what they do (`clearSearch`, `downloadAll`).
 
 ## Hooks
 
@@ -101,12 +101,49 @@ const TITLES: Record<UpdatePhase, string> = {
 };
 ```
 
-Other examples: `TONE_LABELS` in `features/setup/ToolRow.tsx`, `APP_UPDATE_HINTS` in `features/settings/useAppUpdateCheck.ts`, `PLACEHOLDERS` in `pages/download/UrlForm.tsx`. The copy itself follows `docs/WRITING_STANDARDS.md`.
+Other examples: `TONE_BADGES` in `features/setup/ToolRow.tsx`, `STATUS_LABELS` in `features/youtube/collectionFilters.ts`, `APP_UPDATE_HINTS` in `features/settings/useAppUpdateCheck.ts`, `PLACEHOLDERS` in `pages/download/UrlForm.tsx`. The copy itself follows `docs/WRITING_STANDARDS.md`.
+
+## Styling
+
+Every visual value comes from `docs/design-reference.md` through the tokens in `frontend/src/styles/tokens.css`. See "Styling" in `docs/architecture/frontend/REACT_ARCHITECTURE.md` for the full list.
+
+- Use token classes: `bg-app`, `bg-surface`, `text-ink`, `text-ink-muted`, `border-line`, `rounded-control`, `rounded-card`, `shadow-popover`. Never a Tailwind palette class such as `bg-zinc-800` or `text-red-500`, and never a hex colour in a component. Both break the dark theme.
+- State colours have a plain and a soft token: `text-error` on `bg-error-soft`, `text-success` on `bg-success-soft`. Use `StatusBadge` or `Notice` instead of mixing them by hand.
+- The accent (`spin`) marks the one primary action per view, the active navigation icon, selection and progress. Keep it to that.
+- Use the type utilities for headings: `text-page-title`, `text-section`, `text-label`, and `text-hero` on the landing. Body text needs no class.
+- Use `transition-quiet` for hover and focus changes, and `scrollbar-quiet` for a scrolling popup or list.
+- Use the layout variables for widths: `max-w-[var(--content-narrow)]`, `lg:grid-cols-[minmax(0,1fr)_var(--panel-width)]`.
+- Join class names with `cn()` from `@/lib/utils`. When you add a font size, radius or shadow token, register it in the `extendTailwindMerge` call in `lib/utils.ts`, or `cn()` will drop it.
+- Shadows only go on layers that float: popovers, dialogs and the selection bar. Surfaces on the page are separated by tone.
+
+## Patterns before new markup
+
+`frontend/src/components/patterns/` has the building blocks of every page: `PageHeader`, `SectionHeader`, `SurfaceBox`, `MetricBox`, `ListRow`, `DetailPanel`, `SearchField`, `FilterChips`, `ChoiceCard`, `StatusBadge`, `Notice`, `MediaThumbnail`, `Kbd`, `CollectionHeader`, `ConfirmDialog`, `HoldToConfirmButton`, `EmptyState`, `LoadingState` and `ErrorState`.
+
+- Look for a pattern before you write markup for a header, a row, a status pill, a callout or an empty, loading or error state.
+- If a pattern almost fits, extend it with a prop instead of copying its markup into a feature.
+- A new pattern goes in `components/patterns/` only when a second feature needs it. Add it to the patterns table in `REACT_ARCHITECTURE.md`.
+- The app shell (sidebar, top bar, brand mark, theme switcher, command palette) lives in `components/shell/`. Features do not add their own copies of it.
+
+## Feedback
+
+- Show a short-lived result as a Sonner toast: `toast.success('Settings saved', { description: '...' })`. The `<Toaster>` is mounted once in `main.tsx`, so a component only imports `toast` from `sonner`.
+- A removal that is easy to take back gets a toast with an Undo action, as `useResumableDownloads().dismiss` does. Do the real work only when the toast closes without Undo.
+- An error that belongs to a field or a page stays inline, next to what failed: the link form, a queue item, a batch result card. Use a toast for an error only when there is no place on the screen for it, such as a clipboard read.
+- Never use `alert()` or a custom banner for short-lived feedback.
+
+## Destructive actions
+
+- An action that deletes something the person can't get back (a saved login, the transcription queue) uses `HoldToConfirmButton`, alone or inside `ConfirmDialog` with `isDestructive`.
+- The label says what the hold does: "Hold to remove", "Hold to clear".
+- A plain "Confirm" click is not enough for these. The hold is the confirmation, so a `ConfirmDialog` for a destructive action always sets `isDestructive`.
+- A removal that is easy to take back, such as dismissing an unfinished download, needs no hold. It gets an Undo toast instead.
 
 ## Accessibility
 
 - Every form field has a label. Use `<Label htmlFor>` when the label is visible. Use `aria-label` when it is not, as `<Textarea aria-label="Links to download">` and `<SelectTrigger aria-label="Quality">` do.
-- Every button that shows only an icon has an `aria-label` that names the action and its target: ``aria-label={`Remove @${username}`}``.
+- Every button that shows only an icon has an `aria-label` that names the action and its target: ``aria-label={`Remove @${username}`}``, ``aria-label={`Download ${video.title}`}``. Add a `title` or the sidebar's `tooltip` too, so the name shows on hover.
+- A decorative icon next to text gets `aria-hidden="true"`.
 - Every `<button>` and `<Button>` sets `type`. Use `type="submit"` only for the button that submits a form (`UrlForm`, `LoginForm`, `TwoFactorForm`), and `type="button"` everywhere else.
 - A button that opens and closes a section sets `aria-expanded`, as in `CollectionResultCard.tsx`.
 - Use `<button>` for actions and `<a>` for links. Every `<img>` has `alt`: an empty string for decoration, real text for a thumbnail.
@@ -114,9 +151,9 @@ Other examples: `TONE_LABELS` in `features/setup/ToolRow.tsx`, `APP_UPDATE_HINTS
 
 ## Performance
 
-- Use `useMemo` only when a computation is costly, such as filtering a channel or profile grid (`ChannelView.tsx`, `InstagramProfileView.tsx`).
+- Use `useMemo` only when a computation is costly, such as filtering a long video list or profile grid (`VideoCollection.tsx`, `InstagramProfileView.tsx`).
 - Use `useCallback` for functions a hook returns or passes to effects, so their identity stays stable.
-- Large grids (`ChannelView.tsx`, `InstagramProfileView.tsx`) should page or virtualize before they get more work per item.
+- Long lists (`VideoCollection.tsx`, `InstagramProfileView.tsx`) should page or virtualize before they get more work per item.
 
 ## Electron-aware components
 

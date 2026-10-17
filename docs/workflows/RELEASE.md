@@ -18,12 +18,14 @@ electron-builder reads the `build` section of the root `package.json`.
 
 All three use `build/icon.png`. `asar` is `false`, so the app files are shipped as plain files.
 
+The installer name comes from the root `package.json`: `productName` (`KineTube`) and `version`. For version 2.0.0 the Windows build writes `dist/KineTube-Setup-2.0.0.exe`, and `latest.yml` names the same file.
+
 ## What goes into the package
 
 `files` holds the Electron part of the app:
 
 - `electron/dist/**/*`: the compiled main process and preload script
-- `electron/loading.html`: the page shown until the backend answers `/health`
+- `electron/loading.html`: the page shown until the backend answers `/health`. It shows the brand mark and the `kinetube` wordmark on the dark ground, with the mark embedded as a data URI because nothing else is served yet.
 
 `extraResources` copies two folders next to the app, into `resources/`:
 
@@ -126,7 +128,17 @@ Each job runs these steps:
 
 ## Versioning and tagging
 
-The version in the root `package.json` is the app version and the tag name. Follow semantic versioning:
+The version in the root `package.json` is the app version and the tag name. The current version is 2.0.0. The last tag is still `v1.6.0`, so 2.0.0 has not been released yet.
+
+The root version reaches the person in three places:
+
+- the installer name and `latest.yml`, through electron-builder
+- `app.getVersion()` in Electron, which the About section in Settings shows
+- `__APP_VERSION__`, which `frontend/vite.config.ts` reads from the root `package.json` at build time. About shows it when the frontend runs without Electron.
+
+`backend/package.json` and `frontend/package.json` carry the same version, so every package matches the release. Change all three together.
+
+Follow semantic versioning:
 
 | Change | Bump | Example |
 |---|---|---|
@@ -137,7 +149,7 @@ The version in the root `package.json` is the app version and the tag name. Foll
 ## Cutting a release
 
 1. Check that the `[Unreleased]` section of `CHANGELOG.md` lists everything since the last tag.
-2. Bump `version` in the root `package.json`.
+2. Bump `version` in the root `package.json`, `backend/package.json` and `frontend/package.json`, then run `npm install` in each folder so the three lock files match.
 3. In `CHANGELOG.md`, move `[Unreleased]` under a new version heading with today's date.
 4. Commit, then tag and push:
 

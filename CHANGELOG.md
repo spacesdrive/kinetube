@@ -9,7 +9,29 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
+Every package is now version 2.0.0 (ADR-037). This section becomes the 2.0.0 entry when the release is tagged.
+
+### Added
+
+**Playlists and channel tabs** (issue #2)
+- Playlist links list every video in the playlist, so you can pick which to download. A video link that is part of a playlist offers to load the whole list. See ADR-034.
+- Channels have Videos, Shorts, Live and Playlists tabs. Upcoming and running streams and private or deleted videos are shown but can't be picked.
+
+**Redesign** (issue #1)
+- A new interface in the kinetube brand, laid out like the ElevenLabs web app: a sidebar with the brand lockup, a top bar with breadcrumbs, and pages built from shared patterns. Light and dark themes both meet WCAG AA. See ADR-032 and `docs/design-reference.md`.
+- Batch download is its own page in the sidebar.
+- A command palette opens with Ctrl or Cmd and K: go to a page, change the theme, or paste a link to fetch it.
+- The video view keeps the preview beside a download panel, and lists of videos have a search, filter chips and a bar that stays in reach.
+- Settings has an Appearance section for the theme, and About shows the version.
+- Toasts confirm saved settings, copied transcripts and logins, and dismissing an unfinished download can be undone. Removing an Instagram account or clearing the transcription queue needs a press and hold. See ADR-035.
+
+**Folder picker on macOS and Linux** (issue #5)
+- The browser fallback opens a native dialog with osascript on macOS and zenity or kdialog on Linux.
+
 ### Changed
+- yt-dlp now checks TLS certificates on every lookup and download; `--no-check-certificates` is gone (issue #4).
+- The app uses Unbounded and DM Sans, bundled with the app (ADR-033). Geist is removed.
+- Folder and transcription errors give a path example for the system the app runs on.
 
 **TypeScript rewrite**
 - The backend, frontend, Electron main process and helper scripts are now strict TypeScript. The request, response and stream-event types live in `shared/types/` and are shared by all three projects. See `DECISIONS.md` ADR-023 and ADR-028.
@@ -28,6 +50,9 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 - The folder picker no longer blocks the backend while its dialog is open.
 
 ### Fixed
+- **UI bugs** (issue #3): the thumbnail on a video's card showed as an empty box; durations under a minute read "19" instead of "0:19"; every quality up to 4K was offered on low resolution videos; light colours appeared in the dark theme; the whole page scrolled, header included; the Instagram page promised 4K and a login it no longer uses; channel rows showed a bare number for views; the language selector covered its own field and opened without animation.
+- **A paused download showed as failed.** The stream reader treated the paused event as a cut connection.
+- **The installer kept the 1.0.0 name and the packages disagreed on the version** (issue #7). Every package is 2.0.0 and the build is `KineTube-Setup-2.0.0.exe`.
 - **Any web page could control the app.** The backend listened on every network interface and, in the installed app, accepted requests from any origin. It now listens on 127.0.0.1 only and refuses requests with a foreign Host or Origin. See ADR-026.
 - **Command injection through bulk Instagram downloads.** A queue item such as `--exec=<command>` was passed to yt-dlp unparsed and ran a command. Every link is now parsed, and yt-dlp gets it after `--`.
 - **Path traversal when removing an Instagram account.** A username containing `../` reached files outside the sessions folder. Usernames are now validated.

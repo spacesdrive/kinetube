@@ -91,6 +91,16 @@ Write from the person's point of view, not from the code's.
 - Error messages say what went wrong and what to do next: "FFmpeg isn't installed, so the MP3 conversion will fail. Install it from the setup screen." Not "Setup error".
 - No apologies in error messages.
 - No vague messages such as "Something went wrong".
+- Sentence case for labels, titles and buttons: "Batch download", "Download options", not "Download Options".
+- No exclamation marks.
+
+### The brand name
+
+The brand kit writes the name as `kinetube`, always lowercase, even at the start of a sentence: "kinetube couldn't read the clipboard.", "Keep kinetube open until the download finishes." Use that spelling in every label, message, title and toast the person sees, and in the README.
+
+`productName` in the root `package.json` stays `KineTube`. It names the installer (`KineTube-Setup-<version>.exe`) and the folder that holds each person's data, so changing it would move their tools, models and sessions. Code comments and log lines may keep `KineTube` too.
+
+Some backend messages still say `KineTube`, such as `UNEXPECTED_ERROR_MESSAGE` in `backend/src/lib/errors.ts` and the origin guard's messages. Change them to `kinetube` when you work on those files.
 
 The backend writes most error messages, and the frontend shows them as they arrive. So these rules apply to the messages in `backend/src/` as much as to the labels in `frontend/src/`.
 
@@ -113,14 +123,16 @@ Follow Conventional Commits (see `docs/workflows/GIT.md` for the details).
 
 Every page must feel like part of the same app.
 
-Keep these the same across pages:
+`docs/design-reference.md` is the source of every visual decision: the tokens, the sizes and the page patterns. Keep these the same across pages:
 
-- page padding and spacing, matching the existing components in `frontend/src/features/` and `frontend/src/components/`
-- shadcn `Card` for grouped content
-- loading states, with the shadcn `Skeleton` or the `Spinner` primitive (`frontend/src/components/ui/spinner.tsx`)
-- toasts through Sonner (`frontend/src/components/ui/sonner.tsx`), never a custom alert or banner for short-lived feedback
-- icons (Lucide, with the same stroke width in one part of the UI)
-- button variants: primary for the main action, outline or ghost for the others
+- page width and spacing: the content column in `AppShell`, with `--content-narrow` for single-column pages
+- colours, radii, shadows and type from the tokens in `frontend/src/styles/tokens.css`, never a hard-coded colour
+- page and section headings with `PageHeader` and `SectionHeader`, and grouped content in `SurfaceBox` or a settings section, from `frontend/src/components/patterns/`
+- empty, loading and error states with `EmptyState`, `LoadingState` and `ErrorState`
+- toasts through Sonner for short-lived results. The `<Toaster>` is mounted in `frontend/src/main.tsx`. Settings saved, transcript copied, Instagram login, clipboard errors and the Undo after dismissing an unfinished download all use it. Never a custom alert or banner for short-lived feedback.
+- icons (Lucide, 16 px in navigation and controls, with the same stroke width in one part of the UI)
+- button variants: `default` (the accent) for the one primary action per view, `inverse` for secondary emphasis such as Close and Done, `outline` or `ghost` for the others
+- destructive actions with `HoldToConfirmButton`, labelled "Hold to remove" or "Hold to clear"
 - progress for long work: reuse the pattern of `frontend/src/features/downloads/ProgressModal.tsx` instead of building a new one per feature
 
 The whole project should feel like one finished desktop app, not separate screens built on their own.

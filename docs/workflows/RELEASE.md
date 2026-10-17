@@ -99,7 +99,7 @@ The script stops early if `7za-real.exe` already exists, so running it twice is 
 
 ## GitHub Actions release flow (`.github/workflows/release.yml`)
 
-Trigger: a pushed tag matching `v*`. The workflow has `contents: write` permission so it can create the release.
+Trigger: a pushed tag matching `v*`. The workflow has `contents: write` permission so it can create the release. It uses `actions/checkout@v7`, `actions/setup-node@v7` and `softprops/action-gh-release@v3`, which run on Node 24; GitHub deprecated the Node 20 runtime their older majors used (issue #19).
 
 | Matrix entry | Runner | Script | Uploaded files |
 |---|---|---|---|

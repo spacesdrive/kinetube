@@ -11,9 +11,9 @@
     "build:frontend": "cd frontend && npx vite build",
     "build:backend": "cd backend && npm install --omit=dev",
     "postinstall": "node scripts/patch-7zip.js",
-    "dist":       "npm run build:frontend && npm run build:backend && npx electron-builder --publish never",
-    "dist:win":   "npm run build:frontend && npm run build:backend && npx electron-builder --win --publish never",
-    "dist:mac":   "npm run build:frontend && npm run build:backend && npx electron-builder --mac --publish never",
+    "dist": "npm run build:frontend && npm run build:backend && npx electron-builder --publish never",
+    "dist:win": "npm run build:frontend && npm run build:backend && npx electron-builder --win --publish never",
+    "dist:mac": "npm run build:frontend && npm run build:backend && npx electron-builder --mac --publish never",
     "dist:linux": "npm run build:frontend && npm run build:backend && npx electron-builder --linux --publish never"
   },
   "build": {
@@ -56,7 +56,14 @@
       }
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.png"
     },
     "nsis": {
@@ -69,20 +76,37 @@
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "mac": {
-      "target": [{ "target": "dmg", "arch": ["x64", "arm64"] }],
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
       "category": "public.app-category.utilities"
     },
     "linux": {
-      "target": [{ "target": "AppImage", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.png",
       "category": "Utility"
     }
   },
   "devDependencies": {
+    "@types/node": "^22.20.5",
     "concurrently": "^8.2.2",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8",
+    "typescript": "~6.0.2",
     "wait-on": "^8.0.1"
   },
   "dependencies": {

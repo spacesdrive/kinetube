@@ -4,6 +4,10 @@ node_modules/
 # ── Build output ──────────────────────────────────────────────────────────────
 frontend/dist/
 frontend/dist-ssr/
+backend/dist/
+shared/dist/
+electron/dist/
+*.tsbuildinfo
 
 # ── Electron build output ─────────────────────────────────────────────────────
 dist/
@@ -48,3 +52,4 @@ Thumbs.db
 skills-lock.json
 .agents
 run-server.bat
+__pycache__/

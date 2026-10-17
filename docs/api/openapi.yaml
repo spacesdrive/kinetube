@@ -182,7 +182,11 @@ paths:
     get:
       tags: [media]
       operationId: getYouTubeMedia
-      summary: Metadata for a YouTube video, Shorts or channel
+      summary: Metadata for a YouTube video, Shorts, channel tab or playlist
+      description: >-
+        A video or Shorts link is opened in full, with its formats. A channel tab (videos, shorts, streams or
+        playlists) and a playlist are listed flat, without opening each video, with a 5 minute timeout instead of
+        60 seconds. A watch link with a valid list parameter stays a video and names its playlist in playlistUrl.
       parameters:
         - name: url
           in: query
@@ -192,7 +196,7 @@ paths:
             maxLength: 2048
       responses:
         '200':
-          description: The video or channel.
+          description: The video, channel tab or playlist.
           content:
             application/json:
               schema:
@@ -290,7 +294,8 @@ paths:
       summary: Start a download
       description: |
         Takes one YouTube video or Shorts link, or one Instagram post, reel or story link.
-        Channel and profile links are 400. Streams DownloadEvents:
+        Channel, playlist and profile links are 400. A watch link with a list parameter downloads only that video.
+        Streams DownloadEvents:
         - `start` (DownloadStartEvent): first, with the download and its id.
         - `title` (DownloadTitleEvent): the title read from the file name.
         - `progress` (DownloadProgressEvent).
@@ -407,6 +412,7 @@ paths:
       operationId: createDownloadBatch
       summary: Download a list of YouTube and Instagram links one after another
       description: |
+        Each item is one video link, such as the url of a VideoEntry picked from a channel tab or a playlist.
         Instagram items are paced. Streams DownloadBatchEvents:
         - `start` (BatchStartEvent): first, with the item count.
         - `itemStart` (BatchItemStartEvent).
@@ -654,8 +660,12 @@ paths:
     post:
       tags: [files]
       operationId: pickFolder
-      summary: Show the Windows folder dialog
-      description: Windows only, through PowerShell. The desktop app uses Electron's own dialog instead; this route serves the frontend in a plain browser.
+      summary: Show the system folder dialog
+      description: >-
+        Windows uses a PowerShell FolderBrowserDialog, macOS uses osascript (choose folder), and Linux tries
+        zenity and then kdialog. The desktop app uses Electron's own dialog instead; this route serves the frontend
+        in a plain browser. Answers 501 on Linux when neither zenity nor kdialog is installed, and on any other
+        system. Answers 502 when the dialog tool fails for another reason.
       responses:
         '200':
           description: The chosen folder, or a null path when the dialog was closed.
@@ -671,6 +681,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '501':
           $ref: '#/components/responses/NotSupported'
+        '502':
+          $ref: '#/components/responses/UpstreamFailed'
 
   /api/v1/folders/{folderPath}:
     parameters:
@@ -1031,6 +1043,7 @@ components:
         - likeCount
         - uploader
         - uploadDate
+        - playlistUrl
         - videoFormats
         - audioFormats
       properties:
@@ -1061,6 +1074,9 @@ components:
           type: [string, 'null']
         uploadDate:
           type: [string, 'null']
+        playlistUrl:
+          type: [string, 'null']
+          description: The clean playlist link when the watch link carried a valid list parameter, otherwise null.
         videoFormats:
           type: array
           items:
@@ -1069,9 +1085,15 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AudioFormat'
-    ChannelEntry:
+    VideoEntryStatus:
+      type: string
+      enum: [available, upcoming, live, unavailable]
+      description: >-
+        upcoming and live come from yt-dlp's live_status (is_upcoming, is_live). unavailable means a private,
+        members-only or deleted video. Only available entries can be downloaded.
+    VideoEntry:
       type: object
-      required: [id, title, url, thumbnailUrl, duration, durationText, viewCount, uploadDate]
+      required: [id, title, url, thumbnailUrl, duration, durationText, viewCount, uploadDate, status]
       properties:
         id:
           type: string
@@ -1079,6 +1101,7 @@ components:
           type: string
         url:
           type: string
+          description: A clean watch or Shorts link, which the download routes accept.
         thumbnailUrl:
           type: string
         duration:
@@ -1089,15 +1112,35 @@ components:
           type: [number, 'null']
         uploadDate:
           type: [string, 'null']
+        status:
+          $ref: '#/components/schemas/VideoEntryStatus'
+    PlaylistEntry:
+      type: object
+      required: [id, title, url, thumbnailUrl]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+          description: A clean playlist link, which GET /youtube/media opens as a playlist.
+        thumbnailUrl:
+          type: [string, 'null']
+    ChannelTab:
+      type: string
+      enum: [videos, shorts, streams, playlists]
     YouTubeChannel:
       type: object
-      required: [kind, urlType, url, channelPath, channelId, name, channelUrl, avatarUrl, videoCount, entries]
+      required: [kind, urlType, tab, url, channelPath, channelId, name, channelUrl, avatarUrl, videoCount, entries, playlists]
       properties:
         kind:
           const: channel
         urlType:
           type: string
-          enum: [channel, channel-videos, channel-shorts]
+          enum: [channel, channel-videos, channel-shorts, channel-streams, channel-playlists]
+        tab:
+          $ref: '#/components/schemas/ChannelTab'
         url:
           type: string
         channelPath:
@@ -1114,17 +1157,52 @@ components:
           type: number
         entries:
           type: array
+          description: The videos of the videos, shorts and streams tabs. Empty for the playlists tab.
           items:
-            $ref: '#/components/schemas/ChannelEntry'
+            $ref: '#/components/schemas/VideoEntry'
+        playlists:
+          type: array
+          description: The playlists of the playlists tab. Empty for every other tab.
+          items:
+            $ref: '#/components/schemas/PlaylistEntry'
+    YouTubePlaylist:
+      type: object
+      required: [kind, urlType, id, url, title, owner, ownerUrl, thumbnailUrl, videoCount, entries]
+      properties:
+        kind:
+          const: playlist
+        urlType:
+          const: playlist
+        id:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+        owner:
+          type: [string, 'null']
+        ownerUrl:
+          type: [string, 'null']
+        thumbnailUrl:
+          type: [string, 'null']
+        videoCount:
+          type: number
+          description: YouTube's own count, which can include unavailable videos it leaves out of entries.
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoEntry'
     YouTubeMedia:
       oneOf:
         - $ref: '#/components/schemas/YouTubeVideo'
         - $ref: '#/components/schemas/YouTubeChannel'
+        - $ref: '#/components/schemas/YouTubePlaylist'
       discriminator:
         propertyName: kind
         mapping:
           video: '#/components/schemas/YouTubeVideo'
           channel: '#/components/schemas/YouTubeChannel'
+          playlist: '#/components/schemas/YouTubePlaylist'
 
     # shared/types/instagram.ts
     InstagramUsername:

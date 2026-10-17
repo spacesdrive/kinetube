@@ -30,7 +30,7 @@ Tool binaries are written to `downloadsDir` (`downloads/` in the data folder). W
 | `ytdlpManager.ts` | `createYtdlpManager(downloadsDir, platform)` and the `YtdlpManager` interface |
 | `ytdlpBinary.ts` | `YTDLP_VERSION` (`2026.03.17`), the per-platform asset and binary names, release URLs |
 | `ytdlpRelease.ts` | `fetchLatestYtdlpTag()`: GitHub's `releases/latest` API, 8 second timeout, `null` on any failure |
-| `ytdlpArgs.ts` | `buildDownloadArgs()` and `buildMetadataArgs()`; both end with `--` and the link |
+| `ytdlpArgs.ts` | `buildDownloadArgs()` and `buildMetadataArgs()`; both end with `--` and the link. Neither passes `--no-check-certificates`, so yt-dlp always checks TLS certificates. `buildMetadataArgs()` with `isPlaylist` lists a channel tab or a playlist with `--flat-playlist --dump-single-json`; a video uses `-J`. |
 | `ytdlpFormats.ts` | `VIDEO_QUALITIES`, the format selectors, `qualityNeedsMerge()` |
 | `ytdlpFileNames.ts` | the output file name template, title and final path helpers |
 | `ytdlpOutput.ts` | `parseYtdlpLine()` turns a stdout line into progress, destination, post-processing or info; `summarizeErrorOutput()` |

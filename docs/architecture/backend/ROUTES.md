@@ -90,14 +90,27 @@ A paused download ends with `paused` (`{ download }`) instead of `done`. That is
 
 | Method | Path | Purpose | Success | Errors | Streams |
 |---|---|---|---|---|---|
-| GET | `/api/v1/youtube/media?url=` | Metadata for a YouTube video, Shorts or channel. A channel lists its videos without opening each one. | 200 `DataResponse<YouTubeMedia>` | 400 missing or non-YouTube link, 502 yt-dlp failed, 503 yt-dlp not installed, 504 timed out (60 s for a video, 5 min for a channel) | no |
+| GET | `/api/v1/youtube/media?url=` | Metadata for a YouTube video, Shorts, channel tab or playlist. A channel tab or a playlist is listed without opening each video. | 200 `DataResponse<YouTubeMedia>` | 400 missing or non-YouTube link, 502 yt-dlp failed, 503 yt-dlp not installed, 504 timed out (60 s for a video, 5 min for a channel tab or playlist) | no |
 | GET | `/api/v1/instagram/media?url=&account=` | Metadata for an Instagram post, reel, story or profile. With `Accept: text/event-stream` it streams profile progress instead. | 200 `DataResponse<InstagramMedia>`, or a stream of `InstagramMediaEvents` | 400 missing or non-Instagram link or bad `account`, 502 lookup failed, 503 yt-dlp (posts) or Python or instaloader (profiles) not installed, 504 timed out | when asked |
+
+`YouTubeMedia` has three kinds, picked from the link by `parseYouTubeUrl()`:
+
+| Link | `kind` | `urlType` | What comes back |
+|---|---|---|---|
+| `watch?v=<id>`, `youtu.be/<id>` | `video` | `video` | the video with its formats. A valid `list=` parameter does not turn it into a playlist; it fills `playlistUrl` with the clean playlist link, so the page can offer to open the whole list. Otherwise `playlistUrl` is `null`. |
+| `shorts/<id>` | `video` | `shorts` | the same, with `playlistUrl: null` |
+| `@name`, `channel/UC...`, `c/name` or `user/name`, with an optional `/videos`, `/shorts`, `/streams` or `/playlists` tab | `channel` | `channel` for a bare link, otherwise `channel-videos`, `channel-shorts`, `channel-streams` or `channel-playlists` | `tab` names the tab; a bare link opens `videos`. The videos, Shorts and streams tabs fill `entries` and leave `playlists` empty. The playlists tab fills `playlists` (each with a clean `playlist?list=` link) and leaves `entries` empty. |
+| `playlist?list=<id>` | `playlist` | `playlist` | the title, the owner and `entries`. `videoCount` is YouTube's own count, which can include unavailable videos YouTube leaves out of the listing. |
+
+A list id must be 10 to 64 letters, digits, `_` or `-`. Other channel pages (community, the current live video) and every other YouTube path are refused with 400.
+
+Each entry (`VideoEntry`) has a `status`. `upcoming` and `live` come from yt-dlp's `live_status` (`is_upcoming`, `is_live`). `unavailable` means the entry's `availability` is `private`, `needs_auth`, `premium_only` or `subscriber_only`, or its title is `[Private video]`, `[Deleted video]` or `[Unavailable video]`. Every other entry, including a finished stream, is `available`. An entry's `url` is always a clean watch or Shorts link, so the frontend can send the picked entries to `POST /download-batches` as they are.
 
 For Instagram, `account` names a saved account whose session the profile helper uses. If that account has no session, any saved account with a session is used. Posts, reels and stories are read logged out through yt-dlp (ADR-030), with one retry after 4 seconds if Instagram rate-limits the request. A profile is read through the instaloader helper, which stops after 500 posts and sets `isTruncated`. In the stream form, a missing Python or instaloader is reported in the `done` event, because that check runs after the stream opens.
 
 ## Downloads (`src/routes/downloadRoutes.ts`)
 
-A download is one YouTube video or Shorts link, or one Instagram post, reel or story link. Channel and profile links are refused (ADR-031). `downloadId` is 16 lowercase hex characters, derived from the link and the options, so the same request always gets the same id.
+A download is one YouTube video or Shorts link, or one Instagram post, reel or story link. Channel, playlist and profile links are refused (ADR-031). A YouTube channel or playlist link gets its own message, which says to open it on the YouTube page and pick the videos. A watch link with a `list=` parameter downloads only that video. `downloadId` is 16 lowercase hex characters, derived from the link and the options, so the same request always gets the same id.
 
 | Method | Path | Purpose | Success | Errors | Streams |
 |---|---|---|---|---|---|
@@ -114,7 +127,7 @@ A download is one YouTube video or Shorts link, or one Instagram post, reel or s
 
 | Method | Path | Purpose | Success | Errors | Streams |
 |---|---|---|---|---|---|
-| POST | `/api/v1/download-batches` | Downloads a list of YouTube and Instagram links one after another. Body: `CreateDownloadBatchRequest` with 1 to 1000 `items`. | 200 stream, `DownloadBatchEvents` | 400 bad body or any link that cannot be downloaded, 503 yt-dlp not installed | yes |
+| POST | `/api/v1/download-batches` | Downloads a list of YouTube and Instagram links one after another. Body: `CreateDownloadBatchRequest` with 1 to 1000 `items`, each one a single video link such as a picked `VideoEntry.url`. | 200 stream, `DownloadBatchEvents` | 400 bad body or any link that cannot be downloaded, 503 yt-dlp not installed | yes |
 
 Batch items have no pending record and cannot be paused. Instagram items are paced: yt-dlp waits 2 seconds between its own requests (`--sleep-requests 2`), and the batch waits 2.5 seconds between Instagram items. When `fileName.sequenceNumber` is set, each item counts up from it. A warning that applies to every item is sent once. One failed item does not stop the batch; its `itemDone` has `isSuccess: false` and a `message`. A cancelled batch ends with `done` code `CANCELLED`.
 
@@ -157,10 +170,18 @@ A login waiting for a two-factor code is kept for 5 minutes, then stopped. Start
 | Method | Path | Purpose | Success | Errors | Streams |
 |---|---|---|---|---|---|
 | GET | `/api/v1/folders/:folderPath` | Checks that a folder exists. `folderPath` is one URL-encoded path segment, such as `/folders/C%3A%5CUsers%5CVideos`. | 200 `DataResponse<Folder>` (`{ path, exists: true }`) | 400 not an absolute path, 404 not a folder | no |
-| POST | `/api/v1/folders/pick` | Shows the Windows folder dialog through PowerShell | 200 `DataResponse<PickedFolder>`; `path` is `null` if the person closed it | 501 on macOS and Linux | no |
+| POST | `/api/v1/folders/pick` | Shows the system folder dialog (see below) | 200 `DataResponse<PickedFolder>`; `path` is `null` if the person closed it or left it open for 2 minutes | 501 the dialog tool is missing or the platform has none, 502 the dialog tool failed | no |
 | GET | `/api/v1/images?url=` | Image proxy for YouTube and Instagram thumbnails, which block hotlinking | 200 with the image bytes and `Cache-Control: private, max-age=3600` | 400 missing or invalid URL, 403 not https or host not allowed, 502 the host failed, timed out, redirected more than 3 times, or did not answer with an image | no |
 
-The desktop app picks folders with Electron's own dialog (`window.electronAPI.openFolderDialog()`), on every platform. `POST /folders/pick` only serves the frontend when it runs in a plain browser. `/folders/pick` is registered before `/folders/:folderPath`, so `pick` is never read as a path.
+The desktop app picks folders with Electron's own dialog (`window.electronAPI.openFolderDialog()`), on every platform. `POST /folders/pick` only serves the frontend when it runs in a plain browser. Each platform has its own picker in `src/services/folders/`:
+
+| Platform | Dialog | Closed without choosing | Tool missing |
+|---|---|---|---|
+| Windows | PowerShell `FolderBrowserDialog` | prints nothing | 501 |
+| macOS | `osascript -e 'POSIX path of (choose folder with prompt "Select Download Folder")'`; the trailing slash is removed | exit code 1 with "User canceled. (-128)" | 501 |
+| Linux | `zenity --file-selection --directory`, then `kdialog --getexistingdirectory` if zenity is not installed | exit code 1 | 501 when neither is installed: "The folder picker needs zenity or kdialog. Install one of them, or type the folder path instead." |
+
+Any other exit code is a 502 with the tool's last error line. Any other platform answers 501. `/folders/pick` is registered before `/folders/:folderPath`, so `pick` is never read as a path.
 
 ## Old routes and their replacements
 

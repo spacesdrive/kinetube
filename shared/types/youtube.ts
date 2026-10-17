@@ -32,11 +32,16 @@ export interface YouTubeVideo {
   likeCount: number | null;
   uploader: string | null;
   uploadDate: string | null;
+  // a watch link with list= also names its playlist, so the page can offer to load the whole list
+  playlistUrl: string | null;
   videoFormats: VideoFormat[];
   audioFormats: AudioFormat[];
 }
 
-export interface ChannelEntry {
+// an upcoming or still-running stream has no file to download yet; private and deleted videos never will
+export type VideoEntryStatus = 'available' | 'upcoming' | 'live' | 'unavailable';
+
+export interface VideoEntry {
   id: string;
   title: string;
   url: string;
@@ -45,19 +50,45 @@ export interface ChannelEntry {
   durationText: string | null;
   viewCount: number | null;
   uploadDate: string | null;
+  status: VideoEntryStatus;
 }
+
+export interface PlaylistEntry {
+  id: string;
+  title: string;
+  url: string;
+  thumbnailUrl: string | null;
+}
+
+export type ChannelTab = 'videos' | 'shorts' | 'streams' | 'playlists';
 
 export interface YouTubeChannel {
   kind: 'channel';
-  urlType: 'channel' | 'channel-videos' | 'channel-shorts';
+  urlType: 'channel' | 'channel-videos' | 'channel-shorts' | 'channel-streams' | 'channel-playlists';
+  tab: ChannelTab;
   url: string;
   channelPath: string;
   channelId: string;
   name: string;
   channelUrl: string;
   avatarUrl: string | null;
+  // entries holds the videos of the videos, shorts and streams tabs; playlists holds the playlists tab
   videoCount: number;
-  entries: ChannelEntry[];
+  entries: VideoEntry[];
+  playlists: PlaylistEntry[];
 }
 
-export type YouTubeMedia = YouTubeVideo | YouTubeChannel;
+export interface YouTubePlaylist {
+  kind: 'playlist';
+  urlType: 'playlist';
+  id: string;
+  url: string;
+  title: string;
+  owner: string | null;
+  ownerUrl: string | null;
+  thumbnailUrl: string | null;
+  videoCount: number;
+  entries: VideoEntry[];
+}
+
+export type YouTubeMedia = YouTubeVideo | YouTubeChannel | YouTubePlaylist;

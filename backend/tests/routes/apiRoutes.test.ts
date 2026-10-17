@@ -10,12 +10,14 @@ import { createLogger } from '../../src/lib/logger.ts';
 import { createFakeManagers } from '../fixtures/fakeManagers.ts';
 import { parseSseBody } from '../fixtures/sseEvents.ts';
 import { makeTempPaths, removeDir } from '../fixtures/tempDir.ts';
+import { CHANNEL_PLAYLISTS_SAMPLE, PLAYLIST_SAMPLE } from '../fixtures/youtubeSamples.ts';
 
 import type { Express } from 'express';
 import type { FakeYtdlp } from '../fixtures/fakeManagers.ts';
 
 const PORT = 3001;
 const HOST = `localhost:${PORT}`;
+const PLAYLIST_LINK = 'https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI';
 
 describe('/api/v1', () => {
   let root = '';
@@ -118,6 +120,24 @@ describe('/api/v1', () => {
       assert.equal(res.body.data.title, 'Clip');
     });
 
+    test('a playlist is read flat from yt-dlp and returned with its entries', async () => {
+      ytdlp.metadataCalls.length = 0;
+      ytdlp.metadata = { exitCode: 0, stdout: JSON.stringify(PLAYLIST_SAMPLE), stderr: '', isTimedOut: false };
+      const res = await api.get(`/api/v1/youtube/media?url=${encodeURIComponent(PLAYLIST_LINK)}`);
+      assert.equal(res.status, 200);
+      assert.equal(res.body.data.kind, 'playlist');
+      assert.equal(res.body.data.entries[1].status, 'unavailable');
+      assert.ok(ytdlp.metadataCalls[0]?.args.includes('--flat-playlist'));
+    });
+
+    test('a channel playlists tab returns its playlists', async () => {
+      ytdlp.metadata = { exitCode: 0, stdout: JSON.stringify(CHANNEL_PLAYLISTS_SAMPLE), stderr: '', isTimedOut: false };
+      const res = await api.get(`/api/v1/youtube/media?url=${encodeURIComponent('https://www.youtube.com/@jawed/playlists')}`);
+      assert.equal(res.status, 200);
+      assert.equal(res.body.data.tab, 'playlists');
+      assert.equal(res.body.data.playlists.length, 1);
+    });
+
     test('a yt-dlp failure is a 502 that includes its reason', async () => {
       ytdlp.metadata = { exitCode: 1, stdout: '', stderr: 'ERROR: Video unavailable', isTimedOut: false };
       const res = await api.get('/api/v1/youtube/media?url=https://youtu.be/dQw4w9WgXcQ');
@@ -135,6 +155,13 @@ describe('/api/v1', () => {
       for (const body of [{ url: 'https://www.youtube.com/@some' }, { url: '--exec=calc' }, { url: 'https://youtu.be/dQw4w9WgXcQ', quality: '8k' }]) {
         assert.equal((await api.post('/api/v1/downloads').send(body)).status, 400, JSON.stringify(body));
       }
+    });
+
+    test('a playlist link is refused with 400 and a message that says to pick its videos', async () => {
+      const res = await api.post('/api/v1/downloads').send({ url: PLAYLIST_LINK });
+      assert.equal(res.status, 400);
+      assert.match(res.body.message, /channel or playlist link can't be downloaded in one go/);
+      assert.equal(ytdlp.runs.length, 0);
     });
 
     test('a download streams start then done, and the start event carries its id', async () => {

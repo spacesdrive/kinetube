@@ -28,6 +28,10 @@ export interface YtdlpEntryJson {
   view_count?: number | null;
   upload_date?: string | null;
   thumbnails?: YtdlpThumbnailJson[];
+  live_status?: string | null;
+  availability?: string | null;
+  // "Youtube" for a video, "YoutubeTab" for a playlist in a channel's playlists tab
+  ie_key?: string;
 }
 
 export interface YtdlpMediaJson extends YtdlpEntryJson {
@@ -36,9 +40,11 @@ export interface YtdlpMediaJson extends YtdlpEntryJson {
   like_count?: number | null;
   comment_count?: number | null;
   uploader?: string | null;
+  uploader_url?: string | null;
   channel?: string | null;
   channel_id?: string | null;
   channel_url?: string | null;
+  playlist_count?: number | null;
   width?: number | null;
   height?: number | null;
   formats?: YtdlpFormatJson[];

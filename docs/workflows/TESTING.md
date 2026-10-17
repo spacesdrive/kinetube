@@ -52,7 +52,8 @@ Counted on 2026-10-17 from `cd backend && npm test` and `cd frontend && npx vite
 
 | Fixture | What it gives a test |
 |---|---|
-| `fakeManagers.ts` | Fake yt-dlp, FFmpeg, whisper.cpp and instaloader managers that never run a binary. `createFakeYtdlp()` records every download run; the test feeds it output lines with `emit()` and ends it with `exit()`. `createFakeManagers()` returns all four. |
+| `fakeManagers.ts` | Fake yt-dlp, FFmpeg, whisper.cpp and instaloader managers that never run a binary. `createFakeYtdlp()` records every download run; the test feeds it output lines with `emit()` and ends it with `exit()`. It answers metadata lookups with `metadata` and records each one's arguments and timeout in `metadataCalls`. `createFakeManagers()` returns all four. |
+| `youtubeSamples.ts` | Trimmed real yt-dlp `--flat-playlist` output: a playlist (with a private entry added the way yt-dlp lists one), a channel playlists tab and a channel streams tab with upcoming, live and finished streams |
 | `tempDir.ts` | `makeTempDir()` and `removeDir()`, plus `makeTempPaths()`, a throwaway data folder laid out like `userData` so no test touches real downloads, models or sessions |
 | `sseEvents.ts` | `parseSseBody()`, which turns a stream response body into a list of `{ event, data }` objects and skips keepalive comments |
 
@@ -68,7 +69,7 @@ Counted on 2026-10-17 from `cd backend && npm test` and `cd frontend && npx vite
 
 ## What is covered
 
-### Backend (22 files)
+### Backend (27 files)
 
 | Test file | What it covers |
 |---|---|
@@ -85,15 +86,20 @@ Counted on 2026-10-17 from `cd backend && npm test` and `cd frontend && npx vite
 | `managers/ytdlp/ytdlpOutput.test.ts` | Parsing yt-dlp progress lines and summarizing its error output |
 | `platforms/instagram/instagramUrl.test.ts` | Instagram post, reel, story and profile links, reserved paths, tracking parameters |
 | `platforms/mediaUrl.test.ts` | `parseDownloadTarget` (which links can be downloaded) and `isInstagramUsername` |
-| `platforms/youtube/youtubeMetadata.test.ts` | Video and audio format lists, channel avatar choice, mapping yt-dlp JSON to videos and channels |
-| `platforms/youtube/youtubeUrl.test.ts` | Every supported YouTube link shape and rejected input |
-| `routes/apiRoutes.test.ts` | The origin guard (foreign Origin, foreign Host, Vite origin), the error shape, invalid JSON, `/health`, tools, YouTube media, downloads and batches, Instagram accounts, Whisper models and transcriptions, folders and images |
+| `platforms/youtube/youtubeEntries.test.ts` | Entry status (upcoming, live, unavailable from `availability` or a `[Private video]` title), clean watch and Shorts links for entries, playlist entries of a channel playlists tab |
+| `platforms/youtube/youtubeMetadata.test.ts` | Video and audio format lists, channel avatar choice, mapping yt-dlp JSON to videos (with `playlistUrl`), channel tabs (streams and playlists) and playlists |
+| `platforms/youtube/youtubeUrl.test.ts` | Every supported YouTube link shape and rejected input: playlists, watch and youtu.be links with a list, each channel tab, malformed list ids, other channel pages |
+| `routes/apiRoutes.test.ts` | The origin guard (foreign Origin, foreign Host, Vite origin), the error shape, invalid JSON, `/health`, tools, YouTube media (videos, playlists, a channel playlists tab), downloads (a playlist link refused) and batches, Instagram accounts, Whisper models and transcriptions, folders and images |
 | `services/downloadService.test.ts` | Finished, duplicate, paused, resumed, interrupted, cancelled and failed downloads, and yt-dlp missing |
+| `services/folderService.test.ts` | The folder picker on each platform with a fake process runner: a chosen folder, a closed dialog, a timeout, a missing tool (PowerShell, zenity and kdialog), a failing tool, an unsupported platform |
 | `services/downloads/downloadTracker.test.ts` | Tracking which downloads are running |
 | `services/imageProxyService.test.ts` | The image host allowlist (exact host or real subdomain) and the proxy's checks |
 | `services/toolService.test.ts` | One install at a time per tool, failed installs, yt-dlp-only updates, the latest-release check, instaloader without Python |
+| `services/youtubeMediaService.test.ts` | Playlists and channel tabs listed flat with the 5 minute timeout, a watch link with a list opened as one video, refused links, yt-dlp missing, a timeout |
 | `stores/instagramAccountStore.test.ts` | Saving, listing and removing Instagram accounts |
 | `stores/pendingDownloadStore.test.ts` | Saving, updating and removing download records, a missing or corrupt file, and records written by version 1.x |
+| `validators/downloadValidators.test.ts` | Channel and playlist links refused with their own message, a watch link with a list downloading one video, every playlist and Shorts entry accepted in a batch |
+| `validators/pathExamples.test.ts` | The folder and file path examples in error messages for Windows, macOS and Linux |
 
 ### Frontend (12 files)
 
@@ -139,10 +145,14 @@ Run this before you ship any change the automated tests do not fully cover. Use 
 
 - [ ] Paste a video link: the title, thumbnail and quality choices appear
 - [ ] Paste a Shorts link: it opens as a video, not as a channel
-- [ ] Paste a link with tracking parameters or a playlist parameter: it opens the single video
+- [ ] Paste a link with tracking parameters or a playlist parameter: it opens the single video, and offers to open the playlist
+- [ ] Paste a playlist link (`youtube.com/playlist?list=...`): the title, owner and videos load; private or deleted videos are marked and can't be selected; select several videos and download them
+- [ ] Try to download a playlist link as a single download: it is refused with a message that says to pick the videos
 - [ ] Download a video at 1080p or higher: FFmpeg merges video and audio into one file
 - [ ] Download as MP3: the file plays
 - [ ] Paste a channel link: the channel and its videos load; select several videos and download them
+- [ ] Open the channel's Shorts, Live and Playlists tabs (`/shorts`, `/streams`, `/playlists`): each loads its own list. On Live, upcoming and running streams are marked and can't be selected
+- [ ] On the Playlists tab, open one playlist: it loads as a playlist
 
 ### Instagram
 
@@ -176,6 +186,13 @@ Run this before you ship any change the automated tests do not fully cover. Use 
 - [ ] On the Transcribe page, install whisper.cpp if asked, then download a model: it shows as ready in the model picker
 - [ ] Transcribe a local file: the text appears while it runs, and a `.txt` file with no timestamps is saved next to the source
 - [ ] Turn on "Transcribe after download", then download a video: the transcript appears when the download finishes and is saved next to the video
+
+### Folder picker in a plain browser
+
+- [ ] Open the frontend in a plain browser instead of the desktop app and press the folder button: the system folder dialog opens on Windows, macOS and Linux, and the chosen folder fills the field
+- [ ] Close the dialog without choosing: the field keeps its old value and no error appears
+- [ ] On Linux without zenity or kdialog: the error says to install one of them or type the path
+- [ ] Type a relative folder path: the error gives an example in this system's path style
 
 ### Settings and yt-dlp update
 

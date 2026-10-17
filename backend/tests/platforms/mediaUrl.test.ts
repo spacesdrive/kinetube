@@ -13,9 +13,17 @@ describe('parseDownloadTarget', () => {
     assert.equal(parseDownloadTarget('https://www.instagram.com/reel/ABC123xyz/')?.platform, 'instagram');
   });
 
-  test('a channel or a profile is refused, so one request never downloads a whole page', () => {
+  test('a channel, a playlist or a profile is refused, so one request never downloads a whole page', () => {
     assert.equal(parseDownloadTarget('https://www.youtube.com/@somechannel'), null);
+    assert.equal(parseDownloadTarget('https://www.youtube.com/@somechannel/streams'), null);
+    assert.equal(parseDownloadTarget('https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI'), null);
     assert.equal(parseDownloadTarget('https://www.instagram.com/someuser/'), null);
+  });
+
+  test('a Shorts link and a watch link inside a playlist can be downloaded as one video', () => {
+    assert.equal(parseDownloadTarget('https://www.youtube.com/shorts/dQw4w9WgXcQ')?.cleanUrl, 'https://www.youtube.com/shorts/dQw4w9WgXcQ');
+    const fromPlaylist = parseDownloadTarget('https://www.youtube.com/watch?v=dQw4w9WgXcQ&list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI');
+    assert.equal(fromPlaylist?.cleanUrl, 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
   });
 
   test('a value that looks like a yt-dlp option is refused', () => {

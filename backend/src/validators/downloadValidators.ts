@@ -1,6 +1,7 @@
 import { NotFoundError, ValidationError } from '../lib/errors.ts';
 import { VIDEO_QUALITIES } from '../managers/ytdlp/ytdlpFormats.ts';
 import { parseDownloadTarget } from '../platforms/mediaUrl.ts';
+import { parseYouTubeUrl } from '../platforms/youtube/youtubeUrl.ts';
 import { DOWNLOAD_ID_PATTERN } from '../services/downloads/downloadIds.ts';
 import { parseOptionalUsername } from './instagramValidators.ts';
 import { oneOf, optionalBoolean, optionalInteger, optionalOneOf, optionalString, queryValue, readObject, requiredString } from './fields.ts';
@@ -21,11 +22,14 @@ const MAX_SEQUENCE_NUMBER = 99_999;
 const MAX_BATCH_ITEMS = 1_000;
 
 const NOT_DOWNLOADABLE = "That link can't be downloaded. Use a single YouTube video or Shorts link, or an Instagram post, reel or story.";
+const WHOLE_LIST_LINK = "A channel or playlist link can't be downloaded in one go. Open it on the YouTube page and pick the videos to download.";
 
 function parseTarget(value: unknown, field: string): DownloadTarget {
-  const target = parseDownloadTarget(requiredString(value, field));
-  if (!target) throw new ValidationError(NOT_DOWNLOADABLE);
-  return target;
+  const rawUrl = requiredString(value, field);
+  const target = parseDownloadTarget(rawUrl);
+  if (target) return target;
+  // every YouTube link that is not a single video is a channel tab or a playlist
+  throw new ValidationError(parseYouTubeUrl(rawUrl) ? WHOLE_LIST_LINK : NOT_DOWNLOADABLE);
 }
 
 function parseFileName(value: unknown): FileNameOptions {

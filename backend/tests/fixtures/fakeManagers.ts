@@ -16,9 +16,15 @@ export interface FakeDownloadRun {
   exit(code: number | null): void;
 }
 
+export interface FakeMetadataCall {
+  args: string[];
+  timeoutMs: number;
+}
+
 export interface FakeYtdlp extends YtdlpManager {
   installed: boolean;
   metadata: ProcessResult;
+  metadataCalls: FakeMetadataCall[];
   runs: FakeDownloadRun[];
 }
 
@@ -27,6 +33,7 @@ export function createFakeYtdlp(): FakeYtdlp {
   const fake: FakeYtdlp = {
     installed: true,
     metadata: { exitCode: 0, stdout: '{}', stderr: '', isTimedOut: false },
+    metadataCalls: [],
     runs: [],
     binaryPath: '/fake/yt-dlp',
     isInstalled: () => fake.installed,
@@ -34,7 +41,10 @@ export function createFakeYtdlp(): FakeYtdlp {
     install: async () => {},
     update: async () => '2026.09.01',
     fetchLatestVersion: async () => '2026.09.01',
-    runMetadata: async () => fake.metadata,
+    runMetadata: async (args, timeoutMs) => {
+      fake.metadataCalls.push({ args, timeoutMs });
+      return fake.metadata;
+    },
     startDownload(args: string[], handlers: YtdlpHandlers) {
       let resolveExit: (code: number | null) => void = () => {};
       const finished = new Promise<number | null>((resolve) => {

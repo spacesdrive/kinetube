@@ -128,7 +128,7 @@ Each job runs these steps:
 
 ## Versioning and tagging
 
-The version in the root `package.json` is the app version and the tag name. The current version is 2.0.0. The last tag is still `v1.6.0`, so 2.0.0 has not been released yet.
+The version in the root `package.json` is the app version and the tag name. The current version is 2.0.0, tagged `v2.0.0` on 2026-10-17. Its release notes label the macOS and Linux installers untested, as every release should until `docs/philosophy/CROSS_PLATFORM.md` records them as verified.
 
 The root version reaches the person in three places:
 

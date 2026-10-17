@@ -9,7 +9,9 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
-Every package is now version 2.0.0 (ADR-037). This section becomes the 2.0.0 entry when the release is tagged.
+## [2.0.0] - 2026-10-17
+
+Every package is now version 2.0.0 (ADR-037). The macOS and Linux installers are built by the release workflow but have not been run on real hardware yet, so this release labels them untested.
 
 ### Added
 

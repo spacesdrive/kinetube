@@ -22,7 +22,8 @@
   <a href="#features"><b>Features</b></a> ·
   <a href="#how-it-works"><b>How it works</b></a> ·
   <a href="#documentation"><b>Documentation</b></a> ·
-  <a href="CONTRIBUTING.md"><b>Contributing</b></a>
+  <a href="CONTRIBUTING.md"><b>Contributing</b></a> ·
+  <a href="https://kinetube.ujjwal.fyi"><b>Website</b></a>
 </p>
 
 <img src="docs/media/youtube-video.webp" alt="A YouTube video open in kinetube, with its preview beside the quality and format choices" width="800">
@@ -161,6 +162,7 @@ Progress arrives as a live stream from the server, so the window always shows th
 
 | Read this | To learn |
 |---|---|
+| [Website and docs](https://kinetube.ujjwal.fyi/docs) | The user docs, with search, on kinetube.ujjwal.fyi |
 | [User guide](docs/USER_GUIDE.md) | Settings, Instagram setup, keyboard shortcuts and known limitations |
 | [Contributing](CONTRIBUTING.md) | How to set up, test and build kinetube, and how a change gets in |
 | [Architecture overview](docs/architecture/OVERVIEW.md) | How the window, the server and the tools fit together |

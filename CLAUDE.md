@@ -10,7 +10,7 @@ KineTube is a privacy-first desktop application for downloading YouTube and Inst
 - GitHub repository: https://github.com/spacesdrive/kinetube
 - Version: 2.0.0 in every `package.json`; the root one names the installer and is the version the app shows
 
-The codebase is strict TypeScript in four projects: `backend/` (Express 5 API), `frontend/` (React 19 and Vite), `electron/` (main process and preload) and `shared/types/` (the API contract all three import).
+The codebase is strict TypeScript in four projects: `backend/` (Express 5 API), `frontend/` (React 19 and Vite), `electron/` (main process and preload) and `shared/types/` (the API contract all three import). The website at https://kinetube.ujjwal.fyi is a fifth, separate project in `site/` (`docs/workflows/SITE.md`).
 
 The brand is written `kinetube`, lowercase, in the UI. The interface follows the layout of the ElevenLabs web app in the kinetube brand (`frontend/public/kinetube-brand-kit/`), and every visual value is a token documented in `docs/design-reference.md`.
 
@@ -65,6 +65,7 @@ docs/
     GIT.md                     Commit format, branch rules, changelog policy
     RELEASE.md                 Build steps, electron-builder targets, GitHub Actions release flow
     DEMOS.md                   The Flute scenes behind the README animations and how to make them again
+    SITE.md                    The website in site/: how it is built, its docs pages, and how it deploys
   features/
     NEW_API_ROUTE.md           Add a route to the Express backend
     NEW_TOOL_MANAGER.md        Add or extend a managed external binary (yt-dlp-style)
@@ -73,6 +74,7 @@ docs/
     CROSS_PLATFORM.md          Per-platform tool support and what is still unverified
 
 CONTRIBUTING.md    Setup, checks, builds, project layout, how a change gets in
+site/              The website and its docs, deployed to kinetube.ujjwal.fyi on every push to main
 DECISIONS.md       Architectural decision log
 CHANGELOG.md       Version history and feature changes
 ROADMAP.md         Planned features and priorities
@@ -274,3 +276,4 @@ When anything changes, update every relevant docs file from the table below.
 | Feature guide added or changed | `docs/features/` (relevant file) |
 | README setup or feature list changes | `README.md`, `CONTRIBUTING.md` for setup and builds, `docs/USER_GUIDE.md` for settings and limitations |
 | A page shown in a README animation changed | Run `npm run demos` with `npm run dev` running and check the animations (`docs/workflows/DEMOS.md`) |
+| A feature, setting or limitation changed | The matching page in `site/content/docs/`, and the home page copy in `site/src/` if it names it (`docs/workflows/SITE.md`) |

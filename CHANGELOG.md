@@ -9,6 +9,9 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
+### Added
+- A website at https://kinetube.ujjwal.fyi with a home page and the user docs, in `site/` (issues #14 to #18, ADR-040). It follows the layout and motion of activepieces.com in the kinetube brand: a scroll story, product pictures driven by a cursor, the real app clips, and docs with search. `.github/workflows/deploy-site.yml` checks every change to `site/` and deploys `main` to Cloudflare Pages (`docs/workflows/SITE.md`).
+
 ### Changed
 - The README animations are animated WebP files instead of GIFs, about 4.7 MB in total instead of 23 MB, so the README loads much faster on GitHub. `npm run demos` now runs `scripts/make-demos.mts` (issue #13, ADR-039).
 

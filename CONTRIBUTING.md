@@ -61,6 +61,7 @@ kinetube/
   backend/src/       Express 5 API: routes, validators, controllers, services, stores, managers
   frontend/src/      React 19 interface: features, shell, patterns, shadcn ui, design tokens
   electron/src/      main process, backend process, updater, IPC, preload
+  site/              the website and its docs at kinetube.ujjwal.fyi
   scripts/           build and demo helpers
   docs/              architecture, guidelines, workflows, design reference, media
 ```
@@ -76,6 +77,10 @@ The backend is layered: routes, then validators, controllers and services, then 
 5. Run the checks above, then open a pull request that says what changed, why, and how you tested it.
 
 Code style is set out in [`docs/guidelines/TYPESCRIPT.md`](docs/guidelines/TYPESCRIPT.md) and [`docs/guidelines/REACT.md`](docs/guidelines/REACT.md). Writing rules for code comments, docs and interface text are in [`docs/WRITING_STANDARDS.md`](docs/WRITING_STANDARDS.md): no emoji, and no dashes used as punctuation.
+
+## The website
+
+The website and its docs live in `site/`, a separate project with its own `npm install`. Run it with `npm run site:dev` and check it with `npm run site:check`. A push to `main` that changes `site/` deploys it. [`docs/workflows/SITE.md`](docs/workflows/SITE.md) explains the rest.
 
 ## The README animations
 

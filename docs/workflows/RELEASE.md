@@ -120,6 +120,10 @@ Each job runs these steps:
 
 `fail-fast` is `false`, so a failure on one platform does not cancel the other two builds.
 
+## The website workflow (`.github/workflows/deploy-site.yml`)
+
+A second workflow builds and deploys the website in `site/`. It runs only when `site/` or the workflow changes, checks every pull request, and deploys `main` to the Cloudflare Pages project `kinetube-site` at https://kinetube.ujjwal.fyi with the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets. It is separate from the release flow and never touches installers. See `docs/workflows/SITE.md`.
+
 ## Auto-update
 
 `electron-updater` reads `latest.yml`, `latest-mac.yml` and `latest-linux.yml` from the GitHub Release to find out whether a newer version exists. The `publish` block in `package.json` (`provider: github`, `owner: spacesdrive`, `repo: kinetube`) tells it where to look. No other server is needed. See `docs/architecture/electron/MAIN_PROCESS.md` for the in-app flow: the app checks five seconds after start, and the person chooses when to download and install.

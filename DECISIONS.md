@@ -728,3 +728,16 @@ Flute's automatic Vite setup refused this project's `vite.config.ts` (it has `de
 **Decision:** `npm run demos` (`scripts/make-demos.mts`) turns each Flute MP4 into an animated WebP in `docs/media/` instead of a GIF: 12 frames a second, 800 pixels wide, lossy at quality 75, looping forever. The README points at the `.webp` files, and the GIFs are removed. This replaces the GIF part of ADR-038; the scenes and Flute stay as they are.
 
 **Reasoning:** the six GIFs came to about 23 MB, and GitHub fetches every image when it renders the README, so the page loaded slowly (issue #13). The same frames as WebP total about 4.7 MB, keep full colour instead of a 96-colour palette, and look as sharp. GitHub serves a repository's `.webp` files as `image/webp`, and every current browser plays animated WebP. A `<video>` tag was ruled out because GitHub only plays videos uploaded as issue or comment attachments, not files in the repository.
+
+---
+
+## ADR-040: A website in site/ on Cloudflare Pages
+
+**Date:** 2026-10-18
+**Status:** Accepted
+
+**Decision:** The website lives in `site/`, a separate Vite, React 19, Tailwind CSS 4 and TypeScript project with its own `package.json`, served by the Cloudflare Pages project `kinetube-site` at https://kinetube.ujjwal.fyi. It was built from the ProfileBox prompt "Activepieces.com Landing Page, Sign-in Page and Docs Style (v2)": the layout, scroll story, cursor-driven product pictures, navbar and docs frame follow activepieces.com, and the colours, fonts, logo and voice follow the kinetube brand kit. The prompt's sign-in part is left out because kinetube has no accounts. The docs are MDX pages ported from the existing guides, with a search index built at build time. `.github/workflows/deploy-site.yml` checks every change and deploys `main`.
+
+New packages, all in `site/` only: `motion` (the scroll story and product pictures, loaded after the hero), `react-router` 7 (routing; version 8 needs Node 22.22, above the repository's 22.18), `@mdx-js/rollup`, `@mdx-js/react`, `remark-gfm`, `shiki` and `@shikijs/rehype` (the docs pages and code highlighting), `minisearch` (docs search) and `wrangler` (deploys). The site's icons are Lucide, as the brand kit and the app use, instead of the prompt's default Solar set.
+
+**Reasoning:** the owner asked for a landing page at kinetube.ujjwal.fyi with a CI/CD workflow. A separate project keeps the site's packages out of the app, the installers and the release workflow, which runs on three operating systems. The site reuses the app's colour tokens and fonts so the two look like one product, and its pictures use the app's real labels and the same NASA sample data as the README recordings. Pages was created as a classic Pages project (`wrangler pages project create --force`), matching the owner's other sites, because wrangler 4.151 otherwise moves new Pages projects to Workers.

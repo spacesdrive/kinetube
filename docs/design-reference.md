@@ -211,6 +211,20 @@ Defined in `frontend/src/styles/tokens.css`, mapped into Tailwind in `frontend/s
 
 Icons are Lucide, at 16 px in navigation and controls and 18 to 20 px in empty states, with YouTube and Instagram brand glyphs in `components/icons/BrandIcons.tsx`. Every icon is a named import, so a missing icon fails the type check instead of showing an empty box.
 
+## Website
+
+The website in `site/` (`docs/workflows/SITE.md`) uses the app's tokens with the same values, switched by a `data-theme` attribute instead of the `dark` class, so the theme is set before the first paint. Any element can carry `data-theme`, which lets a picture show the other theme with real tokens. It adds a few tokens of its own:
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `panel-deep` | `#2d292d` | `#0e0c0e` | The ground a product picture sits on, and the closing band |
+| `on-deep` | `#f2eeea` | `#f2eeea` | Text on `panel-deep` (12.4:1 and 16.9:1) |
+| `on-deep-muted` | `#c9c2c6` | `#c9c2c6` | Secondary text on `panel-deep` (8.2:1 and 11.2:1) |
+| `on-deep-accent` | `#ff8a62` | `#ff8a62` | Accent words on `panel-deep` (6.2:1 and 8.4:1) |
+| `radius-panel` | 32px | 32px | Feature panels, as measured on activepieces.com |
+
+The brand kit has no graphic elements beyond the logo and forbids using the mark as decoration, so panels carry three open arcs (`OrbitArt` in `site/src/components/brand.tsx`) that echo the mark's turn without copying it: `spin` on `panel-deep`, and `spin-text` at 55% on `spin-soft`.
+
 ## Screenshots
 
 Before the redesign: `docs/screenshots/before/`. After: `docs/screenshots/after/`, each screen in light and dark at 1440 px, and the main screens at 960 px, the smallest window Electron allows.

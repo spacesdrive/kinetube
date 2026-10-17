@@ -61,6 +61,9 @@ export function runProcess(command: string, args: string[], options: RunProcessO
   });
 }
 
+// lets a caller take runProcess as a dependency, so a test can pass a fake
+export type ProcessRunner = typeof runProcess;
+
 // a cold Python start on Windows can take a few seconds; anything slower counts as missing
 const PROBE_TIMEOUT_MS = 8_000;
 

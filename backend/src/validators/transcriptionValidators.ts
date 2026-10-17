@@ -3,6 +3,7 @@ import path from 'node:path';
 import { NotFoundError, ValidationError } from '../lib/errors.ts';
 import { WHISPER_MODEL_IDS } from '../managers/whisper/whisperModels.ts';
 import { optionalOneOf, optionalString, readObject, requiredString } from './fields.ts';
+import { exampleFilePath } from './pathExamples.ts';
 
 import type { WhisperModelId } from '@shared/transcriptions.ts';
 import type { TranscriptionInput } from '../services/transcriptionService.ts';
@@ -25,7 +26,7 @@ function parseLanguage(value: unknown): string {
 export function parseCreateTranscription(body: unknown): TranscriptionInput {
   const fields = readObject(body);
   const filePath = requiredString(fields.filePath, 'filePath');
-  if (!path.isAbsolute(filePath)) throw new ValidationError('"filePath" must be a full path, such as C:\\Videos\\clip.mp4.');
+  if (!path.isAbsolute(filePath)) throw new ValidationError(`"filePath" must be a full path, such as ${exampleFilePath()}.`);
 
   return {
     filePath,

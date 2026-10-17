@@ -1,6 +1,6 @@
 # Architectural Decision Log
 
-Records every significant architectural decision, the alternatives considered, and the reasoning. Append new entries - never modify or delete existing ones.
+Records every significant architectural decision, the alternatives considered, and the reasoning. Append new entries. Never modify or delete existing ones.
 
 ---
 
@@ -17,12 +17,12 @@ Records every significant architectural decision, the alternatives considered, a
 
 **Reasoning:**
 - Route handlers, SSE streaming, and static file serving are a natural fit for a well-understood HTTP framework (Express) rather than reimplementing request routing over IPC
-- The backend can be developed and smoke-tested independently of Electron (`node server.js`, `curl`) - useful given the app has no automated integration test suite yet
+- The backend can be developed and smoke-tested independently of Electron (`node src/server.ts` in `backend/`, `curl`), which was useful while the app had no automated integration test suite
 - Keeps the main process focused on window/OS-level concerns
 
 **Trade-offs:**
 - Two runtimes to reason about (main process vs. backend child process) instead of one
-- Requires the `waitForServer()` readiness dance in `electron/main.js` before navigating the window
+- Requires a readiness wait before navigating the window (now `waitForBackend()` in `electron/src/backendProcess.ts`)
 
 ---
 
@@ -39,11 +39,11 @@ Records every significant architectural decision, the alternatives considered, a
 
 **Reasoning:**
 - A packaged app cannot assume the end user has Node.js installed; `utilityProcess.fork` runs the backend inside Electron's own bundled Node.js runtime
-- Matches Electron's recommended pattern for background Node.js work in a packaged app (per Electron's own documentation - verified via Context7 when this was implemented)
+- Matches Electron's recommended pattern for background Node.js work in a packaged app (per Electron's own documentation, verified via Context7 when this was implemented)
 
 **Trade-offs:**
 - Only available in Electron >= 22; not a concern here since the app targets Electron 33
-- `stdio: 'pipe'` output must be manually forwarded to the app's log file (`writeLog()` in `main.js`) rather than inheriting the parent's console automatically
+- `stdio: 'pipe'` output must be manually forwarded to the app's log file (`writeLog()`, now in `electron/src/backendLog.ts`) rather than inheriting the parent's console automatically
 
 ---
 
@@ -52,7 +52,7 @@ Records every significant architectural decision, the alternatives considered, a
 **Date:** 2025 (initial)
 **Status:** Accepted
 
-**Decision:** yt-dlp, FFmpeg, whisper.cpp, and instaloader are not bundled into the electron-builder output. `extraResources.filter` in `package.json` explicitly excludes their binaries, and each is downloaded into the writable data root on first use via a manager in `backend/utils/`.
+**Decision:** yt-dlp, FFmpeg, whisper.cpp, and instaloader are not bundled into the electron-builder output. `extraResources.filter` in `package.json` explicitly excludes their binaries, and each is downloaded into the writable data root on first use via a manager in `backend/src/managers/`.
 
 **Alternatives considered:**
 - Bundle all four tools into the installer for every platform
@@ -65,17 +65,17 @@ Records every significant architectural decision, the alternatives considered, a
 
 **Trade-offs:**
 - The app is non-functional on first launch until setup completes and the user has a working internet connection
-- As implemented, every manager's download logic is Windows-only - see `docs/philosophy/CROSS_PLATFORM.md` for the resulting gap on macOS/Linux
-- No automated test coverage for the download/extract/spawn path itself (network + subprocess dependent) - see `docs/workflows/TESTING.md`
+- As implemented, every manager's download logic is Windows-only. See `docs/philosophy/CROSS_PLATFORM.md` for the resulting gap on macOS/Linux
+- No automated test coverage for the download/extract/spawn path itself, since it depends on the network and on subprocesses. See `docs/workflows/TESTING.md`
 
 ---
 
-## ADR-004: `paths.js` as the single writable-data-root resolver
+## ADR-004: `backend/src/lib/paths.ts` as the single writable-data-root resolver
 
 **Date:** 2025 (initial)
 **Status:** Accepted
 
-**Decision:** All backend code that needs a writable path (downloaded binaries, whisper models, Instagram sessions) imports `DOWNLOADS_DIR`/`MODELS_DIR`/`SESSIONS_DIR` from `backend/utils/paths.js`, which resolves to `app.getPath('userData')` when `ELECTRON_USER_DATA` is set (packaged) and to `backend/` itself otherwise (dev).
+**Decision:** All backend code that needs a writable path (downloaded binaries, whisper models, Instagram sessions) gets it from `backend/src/lib/paths.ts` (`createAppPaths()`, which builds `downloadsDir`, `modelsDir` and `sessionsDir`). The data root these sit under is `app.getPath('userData')` when `ELECTRON_USER_DATA` is set (packaged) and `backend/` itself otherwise (dev); `backend/src/config.ts` makes that choice.
 
 **Alternatives considered:**
 - Each manager resolving its own path relative to `__dirname`
@@ -86,7 +86,7 @@ Records every significant architectural decision, the alternatives considered, a
 - Centralizing the resolution means the dev/packaged distinction is handled in exactly one place
 
 **Trade-offs:**
-- Anything that bypasses `paths.js` and hardcodes a path relative to its own file will silently work in dev and break in a packaged build - this is the most common regression class in this codebase's history and is called out explicitly in `docs/guidelines/JAVASCRIPT.md` and `CLAUDE.md`'s security invariants
+- Anything that bypasses `backend/src/lib/paths.ts` and hardcodes a path relative to its own file will silently work in dev and break in a packaged build. This is the most common regression class in this codebase's history and is called out explicitly in `CLAUDE.md`'s security invariants and the "Rules that hold everywhere" list in `docs/architecture/OVERVIEW.md`
 
 ---
 
@@ -106,11 +106,11 @@ Records every significant architectural decision, the alternatives considered, a
 - Polling would add latency and unnecessary request volume for what are often multi-minute operations (large downloads, transcription, big model downloads)
 
 **Trade-offs:**
-- Each streaming route hand-rolls its own SSE writer (`res.write(\`event: ...\ndata: ...\n\n\`)`) rather than using a shared middleware - acceptable given there are only a handful of these routes; revisit if the count grows significantly
+- Each streaming route hand-rolls its own SSE writer (`res.write(\`event: ...\ndata: ...\n\n\`)`) rather than using a shared middleware. That is acceptable given there are only a handful of these routes; revisit if the count grows significantly
 
 ---
 
-## ADR-006: No central `api.js` layer in the frontend
+## ADR-006: No central API client layer in the frontend
 
 **Date:** 2025 (initial)
 **Status:** Accepted
@@ -118,14 +118,14 @@ Records every significant architectural decision, the alternatives considered, a
 **Decision:** Frontend components call `fetch()` directly against `/api/...` paths rather than going through a shared API client module.
 
 **Alternatives considered:**
-- A single `api.js` exporting one function per backend endpoint (common pattern in larger SPAs)
+- A single API module exporting one function per backend endpoint (common pattern in larger SPAs)
 
 **Reasoning:**
 - The app has no auth headers, no shared base URL logic beyond same-origin/dev-proxy (handled by Vite's proxy config), and a small enough number of endpoints that a central module would mostly be indirection without meaningfully reducing duplication
 - SSE consumption in particular benefits from being colocated with the component that renders its progress, rather than abstracted behind a generic client
 
 **Trade-offs:**
-- If the number of distinct backend calls grows substantially, or auth/base-URL logic is ever introduced, revisit this and introduce a shared `api.js` - track that reconsideration in `ROADMAP.md` if it becomes relevant
+- If the number of distinct backend calls grows substantially, or auth/base-URL logic is ever introduced, revisit this and introduce a shared API module, and track that reconsideration in `ROADMAP.md` if it becomes relevant. ADR-016 did this, and ADR-027 finished it with `frontend/src/services/api.ts`
 
 ---
 
@@ -134,18 +134,18 @@ Records every significant architectural decision, the alternatives considered, a
 **Date:** 2025 (initial)
 **Status:** Accepted
 
-**Decision:** The entire project - Electron main process, Express backend, React frontend - is plain JavaScript/JSX.
+**Decision:** The entire project (Electron main process, Express backend, React frontend) is plain JavaScript/JSX.
 
 **Alternatives considered:**
 - TypeScript throughout
 - TypeScript for the backend only
 
 **Reasoning:**
-- Keeps the backend's CommonJS setup simple (no build step required to run `node server.js`)
+- Keeps the backend's CommonJS setup simple (no build step required to start the backend with Node)
 - The project is small enough that `docs/guidelines/NAMING.md` and consistent patterns provide adequate clarity without static types
 
 **Trade-offs:**
-- No compile-time type safety across the Electron IPC boundary or the SSE event payloads - mismatches surface at runtime, not build time
+- No compile-time type safety across the Electron IPC boundary or the SSE event payloads. Mismatches surface at runtime, not build time
 
 ---
 
@@ -154,19 +154,19 @@ Records every significant architectural decision, the alternatives considered, a
 **Date:** 2026-07-26
 **Status:** Accepted
 
-**Decision:** Backend unit tests use Node's built-in `node:test` + `node:assert/strict` (zero new dependencies). Frontend unit tests use Vitest (Vite-native, minimal config on top of the existing `vite.config.js`).
+**Decision:** Backend unit tests use Node's built-in `node:test` + `node:assert/strict` (zero new dependencies). Frontend unit tests use Vitest (Vite-native, minimal config on top of the existing Vite config, now `frontend/vite.config.ts`).
 
 **Alternatives considered:**
 - Jest for both layers (most common choice, but adds a heavier dependency and a separate transform pipeline that duplicates what Vite already does for the frontend)
 - Mocha + Chai for the backend
 
 **Reasoning:**
-- The backend is plain CommonJS targeting a Node runtime that already ships a capable built-in test runner (Node 18+; this project runs on Node 22 in the reference dev environment and Electron 33's bundled Node) - adding Jest would be a new dependency for something the runtime already provides
+- The backend is plain CommonJS targeting a Node runtime that already ships a capable built-in test runner (Node 18+; this project runs on Node 22 in the reference dev environment and Electron 33's bundled Node), so adding Jest would be a new dependency for something the runtime already provides
 - Vitest reuses the frontend's existing Vite config and ESM setup with minimal added configuration, and is the natural pairing for a Vite + React 19 frontend
 
 **Trade-offs:**
-- `node:test` has a smaller assertion/matcher ecosystem than Jest - acceptable given the initial test surface (pure functions: URL parsers, text cleanup, path resolution) needs only `node:assert/strict`
-- Two different test runners across the two layers, rather than one - acceptable given the backend and frontend already use two different module systems (CommonJS vs. ESM) and have no shared test infrastructure need
+- `node:test` has a smaller assertion/matcher ecosystem than Jest. That is acceptable given the initial test surface (pure functions: URL parsers, text cleanup, path resolution) needs only `node:assert/strict`
+- Two different test runners across the two layers, rather than one. That is acceptable given the backend and frontend already use two different module systems (CommonJS vs. ESM) and have no shared test infrastructure need
 
 ---
 
@@ -186,7 +186,7 @@ Records every significant architectural decision, the alternatives considered, a
 - A hub-and-spoke structure lets a change touching one layer (e.g. a new tool manager) pull in exactly the docs relevant to it, rather than requiring one document to cover everything at once
 
 **Trade-offs:**
-- Documentation now requires active maintenance discipline (see `CLAUDE.md`'s Documentation Maintenance Policy table) - stale docs referenced by the map would be worse than no map at all, since they'd be trusted and wrong
+- Documentation now requires active maintenance discipline (see `CLAUDE.md`'s Documentation Maintenance Policy table). Stale docs referenced by the map would be worse than no map at all, since they'd be trusted and wrong
 
 ---
 
@@ -195,20 +195,20 @@ Records every significant architectural decision, the alternatives considered, a
 **Date:** 2026-07-26
 **Status:** Accepted
 
-**Decision:** Deleted `instaloaderManager.js`'s `ensureInstaloader()`, `getInstaloaderPath()`, `isInstaloaderReady()`, `INSTALOADER_EXE`, `INSTALOADER_VERSION`, and `INSTALOADER_ZIP_URL`, and removed the `GET /api/instagram/setup` and `GET /api/instagram/setup/check` routes that called them.
+**Decision:** Deleted `ensureInstaloader()`, `getInstaloaderPath()`, `isInstaloaderReady()`, `INSTALOADER_EXE`, `INSTALOADER_VERSION`, and `INSTALOADER_ZIP_URL` from the instaloader manager (now `backend/src/managers/instaloader/instaloaderManager.ts`), and removed the `GET /api/instagram/setup` and `GET /api/instagram/setup/check` routes that called them. Both routes were removed outright and have no `/api/v1` replacement.
 
 **Alternatives considered:**
 - Make the standalone-exe path cross-platform (find/build equivalent macOS/Linux binaries)
 - Leave it in place as a legacy/unused fallback
 
 **Reasoning:**
-- Grepping the entire frontend confirmed no component ever calls `/api/instagram/setup` or `/api/instagram/setup/check` - `InstagramLoginModal.jsx` only calls `/api/instagram/setup/python/check` and `/api/instagram/setup/instaloader` (the `pip install instaloader` flow)
-- `App.jsx` already had a comment confirming this: "instaloader.exe is no longer required — Python + instaloader library handles everything"
-- The real Instagram scraping flow (`detectPython()`, `loginWithPython()`, `instaloader_login.py`/`instaloader_profile.py`) has been Python-module-based, and therefore already cross-platform, for some time - the dead code was actively misleading anyone auditing platform support, since it made instaloader look like a fourth Windows-only gap when it was not
-- `docs/guidelines/JAVASCRIPT.md`'s "No Unused Code" rule and `getInstaloaderPath` being imported-but-never-called made this an unambiguous deletion, not a judgment call
+- Grepping the entire frontend confirmed no component ever called `/api/instagram/setup` or `/api/instagram/setup/check`. The Instagram login dialog (now `frontend/src/features/instagram/InstagramLoginModal.tsx`) only called the Python check and the `pip install instaloader` route (now `GET /api/v1/tools/instaloader` and `POST /api/v1/tools/instaloader/install`)
+- The root `App` component of the time (since split into `frontend/src/App.tsx`, `frontend/src/AppShell.tsx` and the feature folders) already had a comment saying that `instaloader.exe` was no longer required, because Python and the instaloader library handle everything
+- The real Instagram scraping flow (`detectPython()`, `loginWithPython()`, `backend/python/instaloader_login.py`/`backend/python/instaloader_profile.py`) has been Python-module-based, and therefore already cross-platform, for some time. The dead code was actively misleading anyone auditing platform support, since it made instaloader look like a fourth Windows-only gap when it was not
+- The "No unused code" rule (now in `docs/guidelines/TYPESCRIPT.md`) and `getInstaloaderPath` being imported-but-never-called made this an unambiguous deletion, not a judgment call
 
 **Trade-offs:**
-- None identified - this is pure removal of unreachable code plus the two routes that only ever called it
+- None identified. This is pure removal of unreachable code plus the two routes that only ever called it
 
 ---
 
@@ -217,7 +217,7 @@ Records every significant architectural decision, the alternatives considered, a
 **Date:** 2026-07-26
 **Status:** Accepted
 
-**Decision:** `ytdlpManager.js` now resolves a platform-specific download source for both tools:
+**Decision:** The yt-dlp manager now resolves a platform-specific download source for both tools (today the yt-dlp sources live in `backend/src/managers/ytdlp/ytdlpBinary.ts` and the ffmpeg sources in `backend/src/managers/ffmpeg/ffmpegBinary.ts`):
 - yt-dlp: the same pinned GitHub release's platform-specific standalone binary (`yt-dlp.exe` / `yt-dlp_macos` / `yt-dlp_linux`)
 - ffmpeg: gyan.dev (Windows, unchanged), evermeet.cx's stable release-redirect zip (macOS, x64 only), johnvansickle.com's static tar.xz (Linux x64)
 
@@ -227,14 +227,14 @@ Records every significant architectural decision, the alternatives considered, a
 - Use a different Linux extraction approach (an npm `tar` package + separate xz-decompression library) instead of shelling out to the system `tar` binary
 
 **Reasoning:**
-- These are exactly the sources the `ffmpeg-static` npm package (1,300+ GitHub stars, widely used in Electron apps) uses internally - verified via its `build/index.sh`, so this isn't a novel or unvetted choice
+- These are exactly the sources the `ffmpeg-static` npm package (1,300+ GitHub stars, widely used in Electron apps) uses internally, verified via its `build/index.sh`, so this isn't a novel or unvetted choice
 - Bundling `ffmpeg-static` as a dependency would pull its own binary download at `npm install` time, which conflicts with this project's existing pattern of downloading managed tools into the user's data directory at first app run, not at build time (see ADR-003)
-- evermeet.cx publishes a documented, stable, version-agnostic redirect URL (`/ffmpeg/getrelease/ffmpeg/zip`); osxexperts.net's Apple Silicon builds only exist at version-specific filenames (e.g. `ffmpeg81arm.zip`) with no stable "latest" URL - even `ffmpeg-static` itself hardcodes a specific, aging osxexperts filename rather than trying to track their latest release automatically. Relying on Rosetta 2 (which macOS auto-installs on first x64 binary execution) avoids introducing a URL that would silently go stale between whisper.cpp app releases.
+- evermeet.cx publishes a documented, stable, version-agnostic redirect URL (`/ffmpeg/getrelease/ffmpeg/zip`); osxexperts.net's Apple Silicon builds only exist at version-specific filenames (e.g. `ffmpeg81arm.zip`) with no stable "latest" URL. Even `ffmpeg-static` itself hardcodes a specific, aging osxexperts filename rather than trying to track their latest release automatically. Relying on Rosetta 2 (which macOS auto-installs on first x64 binary execution) avoids introducing a URL that would silently go stale between whisper.cpp app releases.
 - `tar` and `xz-utils` are present on essentially every Linux distribution by default; adding an npm `tar` package would still require a separate xz-decompression library (Node's built-in `zlib` does not support xz/lzma), so shelling out to the system `tar -xJf` is less code and no new dependency, at the cost of assuming `tar` is on `PATH`
 
 **Trade-offs:**
 - Linux target is x86_64 only (`ffmpeg-release-amd64-static.tar.xz`); `arm64`/`armhf` Linux builds exist at johnvansickle.com but are not wired up
-- macOS Apple Silicon users get an x64 binary running under Rosetta 2 rather than a native arm64 binary - slightly worse performance for ffmpeg operations, traded for not having a static build source with a stale-URL problem
+- macOS Apple Silicon users get an x64 binary running under Rosetta 2 rather than a native arm64 binary: slightly worse performance for ffmpeg operations, traded for not having a static build source with a stale-URL problem
 - If `tar` is ever missing from a target Linux system (uncommon, but possible on a minimal container base image), ffmpeg setup fails with an explicit error naming the problem rather than silently working
 
 ---
@@ -244,7 +244,7 @@ Records every significant architectural decision, the alternatives considered, a
 **Date:** 2026-07-26
 **Status:** Accepted
 
-**Decision:** On macOS and Linux, `whisperManager.js` clones the pinned `whisper.cpp` tag and builds it locally with `cmake` (requiring `git`, `cmake`, and a C/C++ toolchain already on the machine), rather than downloading a prebuilt binary.
+**Decision:** On macOS and Linux, the whisper.cpp manager (the build steps are now in `backend/src/managers/whisper/whisperBuild.ts`) clones the pinned `whisper.cpp` tag and builds it locally with `cmake` (requiring `git`, `cmake`, and a C/C++ toolchain already on the machine), rather than downloading a prebuilt binary.
 
 **Alternatives considered:**
 - Download prebuilt binaries from `jiang1997/whisper.cpp-release`, a third-party GitHub repo that does publish cross-platform prebuilt whisper.cpp binaries via its own CI
@@ -252,36 +252,36 @@ Records every significant architectural decision, the alternatives considered, a
 - Ship a bundled precompiled binary per platform as part of the KineTube release itself
 
 **Reasoning:**
-- ggml-org's own GitHub releases (`https://github.com/ggml-org/whisper.cpp/releases`) confirmed to only publish Windows zips and WASM/xcframework artifacts - there is no official macOS/Linux CLI binary to point at
-- `jiang1997/whisper.cpp-release` was created 2026-05-14, has 0 stars, and is maintained by a single individual with no track record. Downloading and executing an arbitrary binary from a brand-new, unaudited, single-maintainer source on every user's machine is a supply-chain risk this project declines to take, independent of whether that specific repo is currently trustworthy - the risk is in depending on it going forward with no ability to audit changes
-- Building from source uses only the upstream project's own repository and a locally-installed, user-controlled toolchain (`git`, `cmake`, a compiler) - nothing is trusted except ggml-org's own source code, the same trust boundary the Windows path already has (an official ggml-org-published binary)
+- ggml-org's own GitHub releases (`https://github.com/ggml-org/whisper.cpp/releases`) confirmed to only publish Windows zips and WASM/xcframework artifacts. There is no official macOS/Linux CLI binary to point at
+- `jiang1997/whisper.cpp-release` was created 2026-05-14, has 0 stars, and is maintained by a single individual with no track record. Downloading and executing an arbitrary binary from a brand-new, unaudited, single-maintainer source on every user's machine is a supply-chain risk this project declines to take, independent of whether that specific repo is currently trustworthy. The risk is in depending on it going forward with no ability to audit changes
+- Building from source uses only the upstream project's own repository and a locally-installed, user-controlled toolchain (`git`, `cmake`, a compiler). Nothing is trusted except ggml-org's own source code, the same trust boundary the Windows path already has (an official ggml-org-published binary)
 
 **Trade-offs:**
-- This is meaningfully heavier than the other three tools: it requires a full C/C++ compiler toolchain already present on the machine (Xcode Command Line Tools on macOS, `build-essential` or equivalent on Linux), not just `git` and `cmake`. A missing compiler surfaces as a raw `cmake`/build error rather than a friendly upfront message, since verifying "is there a working C++ compiler" robustly across all Linux distributions and macOS versions is nontrivial - tracked as a rough edge in `docs/philosophy/CROSS_PLATFORM.md`
-- A source build takes meaningfully longer than downloading a prebuilt zip (multi-minute compile vs. a fast download) - the SSE progress events reflect discrete phases (`cloning`, `configuring`, `building`) rather than a fine-grained percentage, since `cmake --build` doesn't expose one
-- Not yet verified on real macOS/Linux hardware in this session (this dev environment is Windows-only) - see the verification table in `docs/philosophy/CROSS_PLATFORM.md`
+- This is meaningfully heavier than the other three tools: it requires a full C/C++ compiler toolchain already present on the machine (Xcode Command Line Tools on macOS, `build-essential` or equivalent on Linux), not just `git` and `cmake`. A missing compiler surfaces as a raw `cmake`/build error rather than a friendly upfront message, since verifying "is there a working C++ compiler" robustly across all Linux distributions and macOS versions is nontrivial. This is tracked as a rough edge in `docs/philosophy/CROSS_PLATFORM.md`
+- A source build takes meaningfully longer than downloading a prebuilt zip (multi-minute compile vs. a fast download). The SSE progress events reflect discrete phases (`cloning`, `configuring`, `building`) rather than a fine-grained percentage, since `cmake --build` doesn't expose one
+- Not yet verified on real macOS/Linux hardware in this session (this dev environment is Windows-only). See the verification table in `docs/philosophy/CROSS_PLATFORM.md`
 
 ---
 
-## ADR-013: `server.js` exports the Express `app`, guarded by `require.main === module`
+## ADR-013: The backend entry file exports the Express `app`, guarded by `require.main === module`
 
 **Date:** 2026-07-26
 **Status:** Accepted
 
-**Decision:** `backend/server.js` now does `module.exports = app;` right after all routes/middleware are registered, and only calls `startServer()` (port bind + binary setup checks) inside `if (require.main === module) { ... }`.
+**Decision:** The 1.x backend entry file now does `module.exports = app;` right after all routes/middleware are registered, and only calls `startServer()` (port bind + binary setup checks) inside `if (require.main === module) { ... }`. The TypeScript rewrite replaced this guard with two files: `backend/src/app.ts` builds the app with `createApp()` and never listens, and `backend/src/server.ts` is the entry point that starts it (see `docs/architecture/backend/EXPRESS.md`).
 
 **Alternatives considered:**
-- Leave `server.js` as an entry-point-only script and write a separate `app.js` that both `server.js` and tests import
-- Test only via a real running server (spin up `node server.js` as a child process in a test harness, hit it over HTTP)
+- Leave the entry file as an entry-point-only script and write a separate app module that both the entry file and tests import (the shape the TypeScript rewrite later adopted, as noted above)
+- Test only via a real running server (start the backend with Node as a child process in a test harness, hit it over HTTP)
 
 **Reasoning:**
-- `require.main === module` is Node's standard, well-understood idiom for "this file's own code should only auto-run when it's the process entry point" - it needed no restructuring of the existing single-file layout, just moving the export earlier and adding the guard
-- It is true for both of this file's actual entry-point invocations (`node server.js` in dev, Electron's `utilityProcess.fork(getServerPath())` in a packaged build) and false when a test file does `require('../server')`, which is exactly the distinction needed
-- A separate `app.js` would have been a bigger diff for no behavioral benefit, and spinning up a real child-process server per test run would be slower and flakier (port collisions, startup race conditions) than driving the in-process `app` object with `supertest`
+- `require.main === module` is Node's standard, well-understood idiom for "this file's own code should only auto-run when it's the process entry point". It needed no restructuring of the existing single-file layout, just moving the export earlier and adding the guard
+- It is true for both of this file's actual entry-point invocations (running it with `node` in dev, Electron's `utilityProcess.fork(getServerPath())` in a packaged build) and false when a test file does `require('../server')`, which is exactly the distinction needed
+- A separate app module would have been a bigger diff for no behavioral benefit, and spinning up a real child-process server per test run would be slower and flakier (port collisions, startup race conditions) than driving the in-process `app` object with `supertest`
 
 **Trade-offs:**
-- Anyone reading `server.js` for the first time needs to know this idiom; it's called out explicitly in a comment at the export site and documented in `docs/architecture/backend/EXPRESS.md`
-- Adds `supertest` as a new backend devDependency (see `docs/workflows/TESTING.md`) - the one exception to this project's general zero-new-test-dependency preference for the backend, justified because there is no way to drive Express routes via `node:test` alone without either this pattern or a real bound port
+- Anyone reading the entry file for the first time needed to know this idiom; it was called out explicitly in a comment at the export site and documented in `docs/architecture/backend/EXPRESS.md` at the time
+- Adds `supertest` as a new backend devDependency (see `docs/workflows/TESTING.md`), the one exception to this project's general zero-new-test-dependency preference for the backend. It is justified because there is no way to drive Express routes via `node:test` alone without either this pattern or a real bound port
 
 ---
 
@@ -292,64 +292,64 @@ Records every significant architectural decision, the alternatives considered, a
 
 **Decision:** Set `build.nsis.artifactName` in `package.json` (root) to `${productName}-Setup-${version}.${ext}` instead of leaving it unset (electron-builder's NSIS default: `${productName} Setup ${version}.${ext}`, with literal spaces).
 
-**Root cause found:** v1.3.0's in-app updater failed with `Cannot download ".../KineTube-Setup-1.3.0.exe", status 404`. This release workflow runs `electron-builder` with `--publish never` and then separately uploads `dist/*.exe` via `softprops/action-gh-release` - it never goes through electron-builder's own GitHub publish plugin, which is the only path that renames a built artifact to match the space-free name it also writes into `latest.yml`. Two independent things happened to the same unset-default filename (`KineTube Setup 1.3.0.exe`) and produced two different results: electron-builder's own `computeSafeArtifactNameIfNeeded()` (`app-builder-lib/out/platformPackager.js`) replaced the spaces with dashes when writing `dist/latest.yml` (`KineTube-Setup-1.3.0.exe`), while GitHub's release-asset upload API silently rewrote the same spaces to dots when the raw file was uploaded (`KineTube.Setup.1.3.0.exe`). `electron-updater` reads the dash name from `latest.yml`, requests it from the release, and gets a 404 because the asset that actually exists has dots.
+**Root cause found:** v1.3.0's in-app updater failed with `Cannot download ".../KineTube-Setup-1.3.0.exe", status 404`. This release workflow runs `electron-builder` with `--publish never` and then separately uploads `dist/*.exe` via `softprops/action-gh-release`. It never goes through electron-builder's own GitHub publish plugin, which is the only path that renames a built artifact to match the space-free name it also writes into `latest.yml`. Two independent things happened to the same unset-default filename (`KineTube Setup 1.3.0.exe`) and produced two different results: electron-builder's own `computeSafeArtifactNameIfNeeded()` (`app-builder-lib/out/platformPackager.js`) replaced the spaces with dashes when writing `dist/latest.yml` (`KineTube-Setup-1.3.0.exe`), while GitHub's release-asset upload API silently rewrote the same spaces to dots when the raw file was uploaded (`KineTube.Setup.1.3.0.exe`). `electron-updater` reads the dash name from `latest.yml`, requests it from the release, and gets a 404 because the asset that actually exists has dots.
 
 **Alternatives considered:**
 - Have the CI step rename `dist/*.exe` to strip spaces before upload, matching whatever electron-builder happened to write into `latest.yml`
 - Switch the workflow to let electron-builder publish directly (`--publish always`) instead of a separate upload step
 
 **Reasoning:**
-- Pinning `artifactName` to an already GitHub-safe pattern (no spaces) makes `computeSafeArtifactNameIfNeeded()` a no-op (the suggested name is already safe, so `latest.yml` uses the real installer filename verbatim) and means GitHub's own upload sanitization has nothing to rewrite - both names converge on the same string with no second system in the loop
+- Pinning `artifactName` to an already GitHub-safe pattern (no spaces) makes `computeSafeArtifactNameIfNeeded()` a no-op (the suggested name is already safe, so `latest.yml` uses the real installer filename verbatim) and means GitHub's own upload sanitization has nothing to rewrite. Both names converge on the same string with no second system in the loop
 - A CI-side rename step would work but leaves the underlying default (a space-containing filename) as a trap for the next platform target or config change
 - Switching to `--publish always` is a larger change to the release flow (electron-builder would then own asset upload/retry/auth end-to-end) that isn't warranted just to fix a filename mismatch
 
 **Trade-offs:**
-- Anyone adding another Windows target (e.g. a portable build) needs to keep its `artifactName` space-free too, or this class of bug reappears - called out in `docs/workflows/RELEASE.md`'s Auto-Update section
-- Every future release must be spot-checked (`latest*.yml` filename vs. actual uploaded asset filename) until this is caught by an automated CI check instead of manual verification - tracked in `ROADMAP.md`
+- Anyone adding another Windows target (e.g. a portable build) needs to keep its `artifactName` space-free too, or this class of bug reappears. This is called out in `docs/workflows/RELEASE.md`'s Auto-Update section
+- Every future release must be spot-checked (`latest*.yml` filename vs. actual uploaded asset filename) until this is caught by an automated CI check instead of manual verification (tracked in `ROADMAP.md`)
 
 ---
 
-## ADR-015: Extracted `downloadFileWithProgress()` into a shared `backend/utils/download.js`
+## ADR-015: Extracted `downloadFileWithProgress()` into a shared download module (now `backend/src/lib/httpDownload.ts`)
 
 **Date:** 2026-07-27
 **Status:** Accepted
 
-**Decision:** `backend/utils/ytdlpManager.js` and `backend/utils/whisperManager.js` no longer each define their own copy of the HTTPS/HTTP redirect-following, progress-reporting download function. Both now import `downloadFileWithProgress()` from a new `backend/utils/download.js`. The dead, never-called, never-exported `downloadFile()` (no-progress variant) in `ytdlpManager.js` was deleted outright rather than migrated, since nothing used it.
+**Decision:** The yt-dlp and whisper.cpp managers no longer each define their own copy of the HTTPS/HTTP redirect-following, progress-reporting download function. Both now import `downloadFileWithProgress()` from a new shared module, now `backend/src/lib/httpDownload.ts` (imported today by the yt-dlp, ffmpeg and whisper.cpp managers under `backend/src/managers/`). The dead, never-called, never-exported `downloadFile()` (no-progress variant) in the yt-dlp manager was deleted outright rather than migrated, since nothing used it.
 
 **Alternatives considered:**
 - Leave the duplication in place (the original position in ADR-003's trade-offs and `ROADMAP.md`, pending "a fifth consumer or a cross-cutting bug fix")
 - Extract only a subset (e.g. keep the simpler yt-dlp version, drop whisper's extra robustness)
 
 **Reasoning:**
-- The two copies had already drifted: whisper.cpp's version supported both `http:` and `https:` redirect targets (Hugging Face model downloads sometimes redirect through plain `http:`), guarded against double-resolve/reject with a `settled` flag, and explicitly handled a response-stream `error` event by destroying the partial file - the yt-dlp copy did none of these, meaning a dropped connection mid-download would have left an unresolved, hanging promise instead of a rejection. That is exactly the "bug fix needs to be applied in more than one place" trigger `ROADMAP.md` named as the reason to extract.
-- The unified implementation is the whisper.cpp version verbatim (the more correct one), so `ytdlpManager.js` gained the missing robustness for free rather than whisper.cpp losing anything.
-- Both managers already only used the progress-reporting variant - `ytdlpManager.js`'s non-progress `downloadFile()` had no remaining callers, so it was deleted rather than carried into the shared module.
+- The two copies had already drifted: whisper.cpp's version supported both `http:` and `https:` redirect targets (Hugging Face model downloads sometimes redirect through plain `http:`), guarded against double-resolve/reject with a `settled` flag, and explicitly handled a response-stream `error` event by destroying the partial file. The yt-dlp copy did none of these, meaning a dropped connection mid-download would have left an unresolved, hanging promise instead of a rejection. That is exactly the "bug fix needs to be applied in more than one place" trigger `ROADMAP.md` named as the reason to extract.
+- The unified implementation is the whisper.cpp version verbatim (the more correct one), so the yt-dlp manager gained the missing robustness for free rather than whisper.cpp losing anything.
+- Both managers already only used the progress-reporting variant. The yt-dlp manager's non-progress `downloadFile()` had no remaining callers, so it was deleted rather than carried into the shared module.
 
 **Trade-offs:**
-- None identified - this is a pure de-duplication with no behavior change for either manager's existing call sites.
-- Covered by `backend/test/download.test.js` (redirects, redirect-limit exhaustion, non-200 responses, mid-stream connection drops, missing destination directories), which is now the only place this logic needs to be tested instead of being implicitly exercised through two managers' setup flows.
+- None identified. This is a pure de-duplication with no behavior change for either manager's existing call sites.
+- Covered by the shared helper's tests, now `backend/tests/lib/httpDownload.test.ts` (redirects, redirect-limit exhaustion, non-200 responses, mid-stream connection drops, missing destination directories), which is now the only place this logic needs to be tested instead of being implicitly exercised through two managers' setup flows.
 
 ---
 
-## ADR-016: Centralized frontend `frontend/src/lib/api.js` for plain fetch endpoints
+## ADR-016: Centralized frontend request helpers for plain fetch endpoints
 
 **Date:** 2026-07-27
 **Status:** Supersedes ADR-006
 
-**Decision:** Added `getJSON`, `postJSON`, `postJSONStrict`, `postRequest`, and `deleteRequest` helpers in `frontend/src/lib/api.js`, and migrated every component's plain (non-SSE, non-FormData, non-streaming-response) `fetch()` call to use them: `App.jsx`, `DownloadSettings.jsx`, `SettingsPage.jsx`, `InstagramLoginModal.jsx`, and `TranscribePage.jsx`.
+**Decision:** Added `getJSON`, `postJSON`, `postJSONStrict`, `postRequest`, and `deleteRequest` helpers in a new frontend request module, and migrated every component's plain (non-SSE, non-FormData, non-streaming-response) `fetch()` call to use them: the root `App` component, the download settings panel, the Settings page, the Instagram login dialog and the Transcribe page. The TypeScript rewrite replaced these helpers with `frontend/src/services/request.ts` and `frontend/src/services/api.ts` (ADR-027). The components are now `frontend/src/App.tsx` (and the files split out of it), `frontend/src/features/downloads/DownloadSettingsPanel.tsx`, `frontend/src/features/settings/SettingsPage.tsx`, `frontend/src/features/instagram/InstagramLoginModal.tsx` and `frontend/src/features/transcribe/TranscribePage.tsx`.
 
 **Alternatives considered:**
 - Leave `fetch()` calls inline in every component, as ADR-006 originally decided
 - A single opinionated `apiRequest()` that always throws on `!res.ok`, forcing every call site onto one error contract
 
 **Reasoning:**
-- ADR-006 explicitly named its own reconsideration trigger: "if the number of distinct backend calls grows substantially... revisit." The app now has roughly 20 fetch/EventSource call sites across 6 components, calling around 15 distinct endpoints - well past where it was when ADR-006 was written.
-- The backend does not have one uniform response contract: some routes always return `200` with a `status`/`valid`/`path` field even on logical failure (`/api/dialog/folder`, `/api/instagram/login`), while others use `{ error, hint?, detail? }` with a non-2xx status (`/api/info`, `/api/instagram/info`). Forcing a single throwing helper onto both would either break the no-throw call sites or silence the strict ones, so the module exposes both `postJSON` (no throw, matches the no-ok-check call sites' existing behavior exactly) and `postJSONStrict` (throws using the `error`/`hint`/`detail` convention already documented in `docs/guidelines/ERROR_HANDLING.md`) rather than picking one.
-- SSE streams (`new EventSource(...)`) and the two request/response shapes that need the raw `Response` (the `multipart/form-data` transcription upload, and the two `transcribe/file` calls that read `resp.body.getReader()` for their own SSE-like line stream) are deliberately left untouched - ADR-006's reasoning that SSE consumption belongs colocated with the component that renders its progress still holds, and forcing those into a JSON-in/JSON-out helper would lose the raw `Response`/`FormData` they need.
+- ADR-006 explicitly named its own reconsideration trigger: "if the number of distinct backend calls grows substantially... revisit." The app now has roughly 20 fetch/EventSource call sites across 6 components, calling around 15 distinct endpoints, well past where it was when ADR-006 was written.
+- The 1.x backend did not have one uniform response contract: some routes always returned `200` with a `status`/`valid`/`path` field even on logical failure (the folder dialog and the Instagram login, now `POST /api/v1/folders/pick` and `POST /api/v1/instagram/accounts`), while others used `{ error, hint?, detail? }` with a non-2xx status (the YouTube and Instagram metadata lookups, now `GET /api/v1/youtube/media` and `GET /api/v1/instagram/media`). ADR-024 later gave every route one error shape. Forcing a single throwing helper onto both would either break the no-throw call sites or silence the strict ones, so the module exposes both `postJSON` (no throw, matches the no-ok-check call sites' existing behavior exactly) and `postJSONStrict` (throws using the `error`/`hint`/`detail` convention documented at the time in `docs/guidelines/ERROR_HANDLING.md`) rather than picking one.
+- SSE streams (`new EventSource(...)`) and the two request/response shapes that need the raw `Response` (the `multipart/form-data` transcription upload, and the two `transcribe/file` calls that read `resp.body.getReader()` for their own SSE-like line stream) are deliberately left untouched. ADR-006's reasoning that SSE consumption belongs colocated with the component that renders its progress still held (until ADR-025 and ADR-027), and forcing those into a JSON-in/JSON-out helper would lose the raw `Response`/`FormData` they need.
 
 **Trade-offs:**
-- Two POST helpers (`postJSON` vs. `postJSONStrict`) instead of one means a future call site has to pick the right one by checking how the target route actually reports failure - documented in `frontend/src/lib/api.js`'s own comments and `docs/guidelines/ERROR_HANDLING.md`.
-- Covered by `frontend/src/lib/__tests__/api.test.js`; component-level behavior is unchanged (no new component tests were needed since no call site's semantics changed).
+- Two POST helpers (`postJSON` vs. `postJSONStrict`) instead of one means a future call site has to pick the right one by checking how the target route actually reports failure. This is documented in the request module's own comments and `docs/guidelines/ERROR_HANDLING.md`.
+- Covered by the request helpers' tests, now `frontend/tests/services/request.test.ts`; component-level behavior is unchanged (no new component tests were needed since no call site's semantics changed).
 
 ---
 
@@ -358,48 +358,48 @@ Records every significant architectural decision, the alternatives considered, a
 **Date:** 2026-07-27
 **Status:** Accepted
 
-**Decision:** `backend/routes/download.js` records every in-flight single-video download's request parameters to a small JSON file (`backend/utils/pendingDownloads.js`, stored at `PENDING_DOWNLOADS_FILE` from `paths.js`) when it starts, and removes that record the moment the request ends for any reason handled in-process: success, failure, or the user cancelling (SSE `res.on('close')`). A new `GET /api/download/pending` route returns whatever records are still present - which can only be downloads that were in flight when the whole app process was killed, since every other end-of-download path already cleaned up. The frontend (`App.jsx` + a new `ResumeDownloadsBanner.jsx`) fetches this list on mount and offers to resume each one by re-issuing the exact original request.
+**Decision:** The single-video download route (its logic is now in `backend/src/services/downloadService.ts` and `backend/src/services/downloads/`) records every in-flight single-video download's request parameters to a small JSON file when it starts, and removes that record the moment the request ends for any reason handled in-process: success, failure, or the user cancelling (SSE `res.on('close')`). The record is kept by the pending-download store (now `backend/src/stores/pendingDownloadStore.ts`) in `pending-downloads.json`, at the path `backend/src/lib/paths.ts` gives it (`pendingDownloadsFile`). A new route (now `GET /api/v1/downloads`) returns whatever records are still present. Those can only be downloads that were in flight when the whole app process was killed, since every other end-of-download path already cleaned up. The frontend (now `frontend/src/features/downloads/useResumableDownloads.ts` and a new `frontend/src/features/downloads/ResumeDownloadsBanner.tsx`) fetches this list on mount and offers to resume each one by re-issuing the exact original request.
 
 **Alternatives considered:**
 - Do nothing beyond yt-dlp's own default `--continue`-on-restart behavior (yt-dlp already resumes a partial `.part` file for free if re-invoked with the identical output path) and rely on the user manually re-pasting the same URL with the same settings
 - A full persistent job queue (survives restarts, tracks progress, retries automatically)
-- Detect resumability by scanning `DOWNLOADS_DIR` for `.part` files at startup instead of recording requests explicitly
+- Detect resumability by scanning the downloads folder for `.part` files at startup instead of recording requests explicitly
 
 **Reasoning:**
-- yt-dlp's resume-by-default behavior only helps if the app re-issues the *exact* original request (same URL, quality, output path, naming options) - the missing piece was remembering what that request was and surfacing it to the user, not teaching yt-dlp to resume.
+- yt-dlp's resume-by-default behavior only helps if the app re-issues the *exact* original request (same URL, quality, output path, naming options). The missing piece was remembering what that request was and surfacing it to the user, not teaching yt-dlp to resume.
 - A full job queue is a much bigger feature (persistent progress, retry policy, multi-download scheduling) than "don't lose a single interrupted download when the app closes" calls for; `ROADMAP.md` explicitly scoped this as an investigation into surfacing yt-dlp's existing resume behavior, not a new download-orchestration system.
-- Scanning for `.part` files can't reconstruct the original request parameters (quality, naming template, numbering) needed to resume correctly, and yt-dlp's partial-file naming isn't uniformly predictable across formats - recording the actual request at start time is strictly more reliable.
-- Removing the record on every in-process termination path (not just success) is what makes a stale record mean "the process itself died" rather than "a download is currently running" or "the user cancelled" - both of the latter would be misleading to resurrect as a resume prompt on next launch.
+- Scanning for `.part` files can't reconstruct the original request parameters (quality, naming template, numbering) needed to resume correctly, and yt-dlp's partial-file naming isn't uniformly predictable across formats. Recording the actual request at start time is strictly more reliable.
+- Removing the record on every in-process termination path (not just success) is what makes a stale record mean "the process itself died" rather than "a download is currently running" or "the user cancelled". Both of the latter would be misleading to resurrect as a resume prompt on next launch.
 
 **Trade-offs:**
-- Only single-video downloads are covered - bulk/sequential downloads and Instagram downloads are not tracked by this registry; resuming a bulk batch mid-sequence is a materially bigger feature and is tracked as a separate `ROADMAP.md` item rather than folded in here.
+- Only single-video downloads are covered. Bulk/sequential downloads and Instagram downloads are not tracked by this registry; resuming a bulk batch mid-sequence is a materially bigger feature and is tracked as a separate `ROADMAP.md` item rather than folded in here.
 - The record is best-effort: if the app is killed before the `Destination:` line is even parsed, the resume prompt falls back to showing the raw URL instead of a title. This is a cosmetic gap, not a functional one.
-- Covered by `backend/test/pendingDownloads.test.js` (id stability/collision, title updates, removal, corrupt/missing state file) and a `backend/test/routes.test.js` case for the two new routes; the frontend banner has its own test (`frontend/src/components/__tests__/ResumeDownloadsBanner.test.jsx`).
+- Covered by the pending-download store's tests, now `backend/tests/stores/pendingDownloadStore.test.ts` (id stability/collision, title updates, removal, corrupt/missing state file), and by route cases for the two new routes, now in `backend/tests/routes/apiRoutes.test.ts`; the frontend banner has its own test (now `frontend/tests/features/downloads/ResumeDownloadsBanner.test.tsx`).
 
 ---
 
-## ADR-018: `scripts/run-electron.js` strips `ELECTRON_RUN_AS_NODE` before launching Electron in dev
+## ADR-018: `scripts/run-electron.mts` strips `ELECTRON_RUN_AS_NODE` before launching Electron in dev
 
 **Date:** 2026-07-27
 **Status:** Accepted
 
-**Decision:** `npm run dev`'s Electron step no longer invokes the `electron` binary directly (`electron --no-deprecation .`). It now runs `node scripts/run-electron.js`, a small wrapper that resolves the real Electron binary path via `require('electron')`, deletes `ELECTRON_RUN_AS_NODE` from the child's environment, and spawns it with `stdio: 'inherit'`.
+**Decision:** `npm run dev`'s Electron step no longer invokes the `electron` binary directly (`electron --no-deprecation .`). It now runs `node scripts/run-electron.mts`, a small wrapper that resolves the real Electron binary path via `require('electron')`, deletes `ELECTRON_RUN_AS_NODE` from the child's environment, and spawns it with `stdio: 'inherit'`.
 
-**Root cause found:** `npm run dev` crashed on startup with `TypeError: Cannot read properties of undefined (reading 'getVersion')` inside `electron-updater`'s `ElectronAppAdapter`, before any window opened. The trace showed the crash running under plain `Node.js v20.18.3`, not Electron's runtime - `ELECTRON_RUN_AS_NODE=1` was present in the shell's environment (confirmed via `env | grep -i electron`), which makes any Electron binary behave as a bare Node.js process instead of launching the Chromium/Electron runtime. In that mode, `electron.app` never exists, so `electron-updater`'s constructor (which reads `app.getVersion()` at construction time, the moment `require('electron-updater')` first touches its `autoUpdater` getter in `electron/main.js`) throws immediately. This variable is commonly inherited from an Electron-based host process (VS Code, Cursor, and other Electron-based terminals set it for their own internal Node child processes), so it can appear in a dev shell without the user ever setting it themselves.
+**Root cause found:** `npm run dev` crashed on startup with `TypeError: Cannot read properties of undefined (reading 'getVersion')` inside `electron-updater`'s `ElectronAppAdapter`, before any window opened. The trace showed the crash running under plain `Node.js v20.18.3`, not Electron's runtime: `ELECTRON_RUN_AS_NODE=1` was present in the shell's environment (confirmed via `env | grep -i electron`), which makes any Electron binary behave as a bare Node.js process instead of launching the Chromium/Electron runtime. In that mode, `electron.app` never exists, so `electron-updater`'s constructor (which reads `app.getVersion()` at construction time, the moment `require('electron-updater')` first touches its `autoUpdater` getter in the Electron main process, whose updater code is now in `electron/src/updater.ts`) throws immediately. This variable is commonly inherited from an Electron-based host process (VS Code, Cursor, and other Electron-based terminals set it for their own internal Node child processes), so it can appear in a dev shell without the user ever setting it themselves.
 
 **Alternatives considered:**
 - Tell the user to `unset ELECTRON_RUN_AS_NODE` (or the Windows equivalent) before running `npm run dev` every time
-- Defer `require('electron-updater')` in `electron/main.js` until inside `app.whenReady()`, so the crash only happens if `setupAutoUpdater()` actually runs (it already early-returns in dev via `if (isDev) return;`)
+- Defer `require('electron-updater')` in the main process (the import is now in `electron/src/updater.ts`) until inside `app.whenReady()`, so the crash only happens if `setupAutoUpdater()` actually runs (it already early-returns in dev via `if (isDev) return;`)
 - A `cross-env`-based `package.json` script to clear the variable inline
 
 **Reasoning:**
-- The variable is environmental, not something this project's own scripts set, and not something a contributor should have to know to unset by hand every session just to run `npm start` - the fix belongs in the repo, not in a setup instruction nobody will remember
-- Deferred `require('electron-updater')` was considered but doesn't fully solve it: the top-level `const { autoUpdater } = require('electron-updater');` in `electron/main.js` triggers the crash the instant the file is loaded (accessing the `autoUpdater` export is itself a lazy getter that constructs the updater), before any `isDev` check ever runs - moving the require would work but couples a workaround for an environment quirk into application code, rather than into the process-launch step where the actual problem (wrong environment) lives
+- The variable is environmental, not something this project's own scripts set, and not something a contributor should have to know to unset by hand every session just to run `npm start`. The fix belongs in the repo, not in a setup instruction nobody will remember
+- Deferred `require('electron-updater')` was considered but doesn't fully solve it: the top-level `const { autoUpdater } = require('electron-updater');` in the main process file triggers the crash the instant the file is loaded (accessing the `autoUpdater` export is itself a lazy getter that constructs the updater), before any `isDev` check ever runs. Moving the require would work but couples a workaround for an environment quirk into application code, rather than into the process-launch step where the actual problem (wrong environment) lives
 - A dedicated Node wrapper needs no new dependency (`electron` is already a devDependency, and `require('electron')` from plain Node returns the resolved binary path, which is the documented way to spawn it programmatically) and fixes the problem at its actual source: the environment the Electron process inherits
 
 **Trade-offs:**
-- `dist:*`/`electron-builder` packaging scripts are unaffected - they invoke `electron-builder`, not `electron` directly, so this class of crash cannot happen during a build, only during `npm run dev`
-- The packaged, installed app is also unaffected - end users launch the built `.exe`/`.dmg`/`.AppImage` directly, not through this wrapper
+- `dist:*`/`electron-builder` packaging scripts are unaffected. They invoke `electron-builder`, not `electron` directly, so this class of crash cannot happen during a build, only during `npm run dev`
+- The packaged, installed app is also unaffected. End users launch the built `.exe`/`.dmg`/`.AppImage` directly, not through this wrapper
 
 ---
 
@@ -408,20 +408,20 @@ Records every significant architectural decision, the alternatives considered, a
 **Date:** 2026-07-27
 **Status:** Accepted
 
-**Decision:** `SettingsPage.jsx`'s About card now shows the running app version (`window.electronAPI.getAppVersion()`, backed by a new `get-app-version` IPC handler that returns Electron's `app.getVersion()`) next to a "Check for Updates" button (`window.electronAPI.checkForUpdates()`, backed by a new `check-for-updates` IPC handler calling `autoUpdater.checkForUpdates()`). `electron/main.js`'s `setupAutoUpdater()` now also forwards the `checking-for-update` and `update-not-available` autoUpdater events (previously only `update-available`, `download-progress`, `update-downloaded`, and `error` were forwarded), so the button can show "Checking…" and "You're on the latest version" instead of doing nothing when there's no update.
+**Decision:** The About card in Settings (now `frontend/src/features/settings/AboutCard.tsx`) now shows the running app version (`window.electronAPI.getAppVersion()`, backed by a new `get-app-version` IPC handler, now in `electron/src/ipcHandlers.ts`, that returns Electron's `app.getVersion()`) next to a "Check for Updates" button (`window.electronAPI.checkForUpdates()`, backed by a new `check-for-updates` IPC handler, now in `electron/src/updater.ts`, calling `autoUpdater.checkForUpdates()`). The main process's `setupAutoUpdater()` (now `setUpAutoUpdater()` in `electron/src/updater.ts`) now also forwards the `checking-for-update` and `update-not-available` autoUpdater events (previously only `update-available`, `download-progress`, `update-downloaded`, and `error` were forwarded), so the button can show "Checking…" and "You're on the latest version" instead of doing nothing when there's no update.
 
 **Alternatives considered:**
 - Only show the version, no manual check button (rely entirely on the existing 5-second-after-launch automatic check)
 - Read the version from a Vite build-time constant instead of an IPC round-trip
 
 **Reasoning:**
-- The existing auto-update flow only checks once, five seconds after launch - a user who dismisses `UpdateDialog` (or whose app was open before a release went out) has no way to ask again without restarting the app. A manual check closes that gap.
-- `electron-updater`'s `checkForUpdates()` requires `app-update.yml`, which `electron-builder` only generates for a packaged build (see ADR-018) - calling it in dev would throw. The `check-for-updates` handler special-cases `isDev` and returns `{ devMode: true }` instead, which the Settings UI surfaces as "Update checks only run in a packaged build" rather than a confusing error.
+- The existing auto-update flow only checks once, five seconds after launch. A user who dismisses `UpdateDialog` (or whose app was open before a release went out) has no way to ask again without restarting the app. A manual check closes that gap.
+- `electron-updater`'s `checkForUpdates()` requires `app-update.yml`, which `electron-builder` only generates for a packaged build (see ADR-018), so calling it in dev would throw. The `check-for-updates` handler special-cases `isDev` and returns `{ devMode: true }` instead, which the Settings UI surfaces as "Update checks only run in a packaged build" rather than a confusing error.
 - `app.getVersion()` via IPC is the authoritative source (reads the actual running app's `package.json`, correct in both dev and packaged builds) versus a Vite `define` constant, which would need to be kept in sync separately and wouldn't reflect what's actually installed if a build were ever run against a stale checkout.
 - The version/update UI is guarded by `window.electronAPI?.getAppVersion` and hides entirely when absent (e.g. the frontend loaded outside Electron), matching the existing guard pattern used everywhere else `window.electronAPI` is called.
 
 **Trade-offs:**
-- No dedicated test coverage was added for this - it's thin IPC plumbing (three one-line handlers, a getter, a button) with no meaningful logic to unit test beyond what `UpdateDialog.jsx`'s existing manual-verification checklist already covers; exercised via the manual checklist in `docs/workflows/TESTING.md` instead.
+- No dedicated test coverage was added for this. It's thin IPC plumbing (three one-line handlers, a getter, a button) with no meaningful logic to unit test beyond what the manual-verification checklist for `frontend/src/components/UpdateDialog.tsx` already covers; exercised via the manual checklist in `docs/workflows/TESTING.md` instead.
 
 ---
 
@@ -430,71 +430,71 @@ Records every significant architectural decision, the alternatives considered, a
 **Date:** 2026-07-27
 **Status:** Accepted
 
-**Decision:** `ProgressModal.jsx` gets a "Pause" button during an active single-video download (next to Cancel) and a "Resume" button once paused. Pause calls a new `POST /api/download/:id/pause` route, which looks up the in-progress request in a module-level `activeDownloads` Map (keyed by the same `pendingId` used by the resume-after-restart registry from ADR-017) and kills the yt-dlp process with `SIGTERM` - the identical mechanism `Cancel` already used. The only difference is bookkeeping: a paused request keeps its `pendingDownloads.json` record and sends a new `paused` SSE event instead of `done`, so `Resume` can replay the exact original request and yt-dlp continues the same `.part` file. `Resume` on the frontend does not call any resume-registry endpoint - it directly replays the arguments last passed to `startSingleDownload` (`lastSingleDownloadArgsRef`), since the download is still this session's state, not a lookup from disk.
+**Decision:** The progress modal (now `frontend/src/features/downloads/ProgressModal.tsx`) gets a "Pause" button during an active single-video download (next to Cancel) and a "Resume" button once paused. Pause calls a new route (now `POST /api/v1/downloads/:downloadId/pause`), which looks up the in-progress request in a module-level `activeDownloads` Map (keyed by the same `pendingId` used by the resume-after-restart registry from ADR-017; the map of running downloads is now in `backend/src/services/downloads/downloadRunner.ts`) and kills the yt-dlp process with `SIGTERM`, the identical mechanism `Cancel` already used. The only difference is bookkeeping: a paused request keeps its `pending-downloads.json` record and sends a new `paused` SSE event instead of `done`, so `Resume` can replay the exact original request and yt-dlp continues the same `.part` file. `Resume` on the frontend does not call any resume-registry endpoint. It directly replays the arguments last passed to `startSingleDownload` (`lastSingleDownloadArgsRef`), since the download is still this session's state, not a lookup from disk. Since the TypeScript rewrite, Resume calls `POST /api/v1/downloads/:downloadId/resume` instead (ADR-024).
 
 **Alternatives considered:**
 - True OS-level process suspension (Unix `SIGSTOP`/`SIGCONT`) so the download freezes mid-flight and resumes exactly where the TCP connection left off
 - A native addon (e.g. `ntsuspend`) to get suspend/resume parity on Windows, which has no signal-based process suspension
-- Route Resume-from-pause through `GET /api/download/pending` (the same list `ResumeDownloadsBanner` uses) instead of replaying local state
+- Route Resume-from-pause through the pending-download list (now `GET /api/v1/downloads`, the same list `ResumeDownloadsBanner` uses) instead of replaying local state
 
 **Reasoning:**
-- Real process suspension doesn't have a cross-platform story: POSIX has `SIGSTOP`/`SIGCONT` natively, but Windows has no equivalent without a native addon (`process.kill(pid, 'SIGSTOP')` is a no-op/unsupported on Windows per Node's own docs) - and Windows is this project's only fully-verified platform (see `docs/philosophy/CROSS_PLATFORM.md`), so a Windows-incompatible pause button would be a regression on the one platform that has to work.
-- yt-dlp already writes its `.part` file incrementally as it downloads, so killing the process (same as Cancel) and letting yt-dlp's own default `--continue` behavior pick it back up on the next identical request is exactly as reliable as true suspension for this app's purposes, with none of the platform risk. This is the same insight ADR-017 already relied on for crash recovery - Pause is really just "cancel, but remember it as resumable" rather than a new resume mechanism.
-- Reusing `pendingDownloads.js`'s existing record (rather than inventing a second, parallel "paused download" store) means a paused-then-force-closed download is *also* correctly offered back by `ResumeDownloadsBanner` on the next launch - pause and crash-recovery resume compose for free instead of needing to be kept in sync.
-- Replaying `lastSingleDownloadArgsRef` locally (rather than fetching from `/api/download/pending`) avoids an unnecessary round-trip and race: the frontend already has the exact args it used to start the download, in the same session, in memory.
-- A separate in-memory `activeDownloads` Map (rather than trying to derive "is this pending record currently running" from the JSON file alone) is necessary because `POST /:id/pause` is a different HTTP request than the `GET /download` SSE stream - the two only share state through this module-level registry, cleared in every exit path (`finish()`, `proc.on('error')`, `res.on('close')`) so it can never point at a dead process.
+- Real process suspension doesn't have a cross-platform story: POSIX has `SIGSTOP`/`SIGCONT` natively, but Windows has no equivalent without a native addon (`process.kill(pid, 'SIGSTOP')` is a no-op/unsupported on Windows per Node's own docs). Windows is this project's only fully-verified platform (see `docs/philosophy/CROSS_PLATFORM.md`), so a Windows-incompatible pause button would be a regression on the one platform that has to work.
+- yt-dlp already writes its `.part` file incrementally as it downloads, so killing the process (same as Cancel) and letting yt-dlp's own default `--continue` behavior pick it back up on the next identical request is exactly as reliable as true suspension for this app's purposes, with none of the platform risk. This is the same insight ADR-017 already relied on for crash recovery: Pause is really just "cancel, but remember it as resumable" rather than a new resume mechanism.
+- Reusing the pending-download store's existing record (now `backend/src/stores/pendingDownloadStore.ts`), rather than inventing a second, parallel "paused download" store, means a paused-then-force-closed download is *also* correctly offered back by `ResumeDownloadsBanner` on the next launch. Pause and crash-recovery resume compose for free instead of needing to be kept in sync.
+- Replaying `lastSingleDownloadArgsRef` locally (rather than fetching the pending-download list, now `GET /api/v1/downloads`) avoids an unnecessary round-trip and race: the frontend already has the exact args it used to start the download, in the same session, in memory.
+- A separate in-memory `activeDownloads` Map (rather than trying to derive "is this pending record currently running" from the JSON file alone) is necessary because the pause request (now `POST /api/v1/downloads/:downloadId/pause`) is a different HTTP request than the download SSE stream (now `POST /api/v1/downloads`). The two only share state through this module-level registry, cleared in every exit path (`finish()`, `proc.on('error')`, `res.on('close')`) so it can never point at a dead process.
 
 **Trade-offs:**
-- Only single-video downloads are covered, matching ADR-017's scope decision - bulk/sequential downloads have no Pause button.
-- Like ADR-017, this is best-effort: if the whole app is killed while paused, the record persists and shows up in `ResumeDownloadsBanner` on next launch (a feature, not a bug - see above) - but there's no dedicated integration test exercising a real pause-mid-download-and-resume cycle, since that requires a real yt-dlp process and real network access, consistent with this project's existing policy of not automating real tool execution (see `docs/workflows/TESTING.md`). Covered by unit/route tests for the pieces that don't require a live download (the 404-when-nothing-active case) and by `ProgressModal.jsx`'s test suite for the UI states.
+- Only single-video downloads are covered, matching ADR-017's scope decision. Bulk/sequential downloads have no Pause button.
+- Like ADR-017, this is best-effort: if the whole app is killed while paused, the record persists and shows up in `ResumeDownloadsBanner` on next launch (a feature, not a bug; see above). But there's no dedicated integration test exercising a real pause-mid-download-and-resume cycle, since that requires a real yt-dlp process and real network access, consistent with this project's existing policy of not automating real tool execution (see `docs/workflows/TESTING.md`). Covered by unit/route tests for the pieces that don't require a live download (the 404-when-nothing-active case) and by the progress modal's test suite (now `frontend/tests/features/downloads/ProgressModal.test.tsx`) for the UI states.
 
 ## ADR-021: Kill the whole yt-dlp process tree, not just the spawned PID, for Pause/Cancel
 
 **Date:** 2026-07-27
 **Status:** Accepted
 
-**Decision:** Add `backend/utils/processTree.js`, exporting `killProcessTree(proc)`. On Windows it shells out to `taskkill /pid <pid> /t /f`; elsewhere it sends `SIGTERM` to the negative PID of a process spawned with `detached: true` (killing the whole POSIX process group). Every place that kills a yt-dlp-spawned process - `backend/routes/download.js`'s Pause (ADR-020) and Cancel, and the three yt-dlp spawns in `backend/routes/instagram.js` (single-video download cancel, bulk-download cancel, and the metadata-fetch timeout) - now calls this instead of `proc.kill('SIGTERM')`/`proc.kill()`.
+**Decision:** Add `backend/src/lib/processTree.ts`, exporting `killProcessTree(proc)`. On Windows it shells out to `taskkill /pid <pid> /t /f`; elsewhere it sends `SIGTERM` to the negative PID of a process spawned with `detached: true` (killing the whole POSIX process group). Every place that kills a yt-dlp-spawned process now calls this instead of `proc.kill('SIGTERM')`/`proc.kill()`: the download route's Pause (ADR-020) and Cancel, and the three yt-dlp spawns in the Instagram routes (single-video download cancel, bulk-download cancel, and the metadata-fetch timeout). Since the TypeScript rewrite, every yt-dlp process starts and stops through `backend/src/managers/ytdlp/ytdlpProcess.ts`, which uses the same helper.
 
-**Root cause:** Reported as "Pause doesn't work while downloading, only once merging starts, and even then it's not where I clicked Pause." Reproduced directly against the backend (bypassing the UI) by opening the `GET /api/download` SSE stream for a real video and firing `POST /:id/pause` immediately after the first `progress` event. The pause request returned `200 {"success":true}` in under 100ms, but `progress` events kept arriving normally for the *entire* rest of the video and audio download - the file finished downloading and merging in full in the background, and only once yt-dlp's own process genuinely exited did the stream finally emit `paused` (at that point misreporting a fully-completed file as "paused"). `tasklist`/`Get-CimInstance Win32_Process` during a live download showed **two** `yt-dlp.exe` processes, a small one (the one Node's `spawn()` PID pointed at) that was the parent of a second, larger one doing the real work. This is standard PyInstaller "onefile" behavior on Windows: the process yt-dlp.exe presents is a launcher/bootloader that unpacks itself and execs a second process to do the actual work, then waits on it and relays its stdio. `proc.kill('SIGTERM')` (via Node -> libuv -> `TerminateProcess`) only ever reached the launcher. The real worker was orphaned and kept running, and kept its handle to the shared stdout pipe open, which is also why Node's `'close'` event (which waits for stdio to fully drain, not just for the process to exit) didn't fire until that orphan finished on its own.
+**Root cause:** Reported as "Pause doesn't work while downloading, only once merging starts, and even then it's not where I clicked Pause." Reproduced directly against the backend (bypassing the UI) by opening the download SSE stream (now `POST /api/v1/downloads`) for a real video and firing the pause request (now `POST /api/v1/downloads/:downloadId/pause`) immediately after the first `progress` event. The pause request returned `200 {"success":true}` in under 100ms, but `progress` events kept arriving normally for the *entire* rest of the video and audio download. The file finished downloading and merging in full in the background, and only once yt-dlp's own process genuinely exited did the stream finally emit `paused` (at that point misreporting a fully-completed file as "paused"). `tasklist`/`Get-CimInstance Win32_Process` during a live download showed **two** `yt-dlp.exe` processes, a small one (the one Node's `spawn()` PID pointed at) that was the parent of a second, larger one doing the real work. This is standard PyInstaller "onefile" behavior on Windows: the process yt-dlp.exe presents is a launcher/bootloader that unpacks itself and execs a second process to do the actual work, then waits on it and relays its stdio. `proc.kill('SIGTERM')` (via Node -> libuv -> `TerminateProcess`) only ever reached the launcher. The real worker was orphaned and kept running, and kept its handle to the shared stdout pipe open, which is also why Node's `'close'` event (which waits for stdio to fully drain, not just for the process to exit) didn't fire until that orphan finished on its own.
 
 **Alternatives considered:**
-- Listen for `'exit'` instead of `'close'` on the parent process, so `finish()` fires as soon as the launcher dies - rejected because it doesn't address the actual defect (the real download keeps running and keeps writing/finishing the file in the background regardless of which Node event ends the SSE stream), it would just make the frontend's "Paused" state appear sooner while the download silently continues anyway.
-- A native module for real PID-tree enumeration/termination - unnecessary; `taskkill /t` already walks the live process tree and ships with every Windows install.
+- Listen for `'exit'` instead of `'close'` on the parent process, so `finish()` fires as soon as the launcher dies. Rejected because it doesn't address the actual defect (the real download keeps running and keeps writing/finishing the file in the background regardless of which Node event ends the SSE stream); it would just make the frontend's "Paused" state appear sooner while the download silently continues anyway.
+- A native module for real PID-tree enumeration/termination. Unnecessary: `taskkill /t` already walks the live process tree and ships with every Windows install.
 
 **Reasoning:**
 - `taskkill /pid <pid> /t /f` is the standard, dependency-free way to kill an entire Windows process tree; it's what Task Manager's "End process tree" and most cross-language process-tree-kill libraries shell out to under the hood.
 - POSIX process groups (`detached: true` at spawn + `process.kill(-pid, 'SIGTERM')`) are the equivalent mechanism on macOS/Linux, and yt-dlp's macOS/Linux releases are PyInstaller onefile builds too, so the same launcher/worker split is expected there even though it's unverified on real hardware (tracked in `docs/philosophy/CROSS_PLATFORM.md`).
-- This bug was never specific to Pause - `Cancel` used the exact same `proc.kill('SIGTERM')` call and had the identical defect: clicking Cancel closed the SSE stream and hid the modal, but the download kept running to completion in the background, consuming bandwidth and disk the user believed they'd stopped. Every yt-dlp-spawning kill site got the same fix rather than patching only the reported one.
+- This bug was never specific to Pause. `Cancel` used the exact same `proc.kill('SIGTERM')` call and had the identical defect: clicking Cancel closed the SSE stream and hid the modal, but the download kept running to completion in the background, consuming bandwidth and disk the user believed they'd stopped. Every yt-dlp-spawning kill site got the same fix rather than patching only the reported one.
 
 **Trade-offs:**
 - `taskkill` is spawned as a fire-and-forget subprocess rather than awaited; this is intentional (killing is best-effort and the caller doesn't block on it), but it means a `killProcessTree()` call gives no direct signal of success or failure back to the caller.
-- Verified by direct reproduction against the real backend (see above) rather than a unit test, since it depends on real yt-dlp process behavior - consistent with this project's existing policy of not automating real tool execution (`docs/workflows/TESTING.md`).
+- Verified by direct reproduction against the real backend (see above) rather than a unit test, since it depends on real yt-dlp process behavior, consistent with this project's existing policy of not automating real tool execution (`docs/workflows/TESTING.md`).
 
 ## ADR-022: Live yt-dlp update check against GitHub's latest release
 
 **Date:** 2026-07-27
 **Status:** Accepted
 
-**Decision:** Add `checkForYtdlpUpdate()` and `updateYtdlp()` to `backend/utils/ytdlpManager.js`. The former calls GitHub's `GET /repos/yt-dlp/yt-dlp/releases/latest` API and compares its `tag_name` against the installed binary's `--version` output using a new pure helper, `isNewerYtdlpVersion()`; the latter re-downloads the platform-appropriate asset for whatever tag that check found, overwriting the current binary in place. Two new routes expose this: `GET /api/ytdlp-update-check` (plain JSON) and `GET /api/ytdlp-update` (an SSE download stream, same shape as `/api/setup`). `SettingsPage.jsx` gets a yt-dlp row in the About card - a "Check for Updates" button (manual, like the app's own updater above it) that becomes an "Update to `<version>`" button when one is found, with a progress bar during the download.
+**Decision:** Add `checkForYtdlpUpdate()` and `updateYtdlp()` to the yt-dlp manager (now `fetchLatestVersion()` and `update()` in `backend/src/managers/ytdlp/ytdlpManager.ts`, with the GitHub call in `backend/src/managers/ytdlp/ytdlpRelease.ts`). The former calls GitHub's `GET /repos/yt-dlp/yt-dlp/releases/latest` API and compares its `tag_name` against the installed binary's `--version` output using a new pure helper, `isNewerYtdlpVersion()` (now `isNewerVersion()` in `backend/src/lib/versions.ts`); the latter re-downloads the platform-appropriate asset for whatever tag that check found, overwriting the current binary in place. Two new routes expose this, now `GET /api/v1/tools/ytdlp/releases/latest` (plain JSON) and `POST /api/v1/tools/ytdlp/update` (an SSE download stream, same shape as the install route, now `POST /api/v1/tools/:toolId/install`). The Settings page's About card gets a yt-dlp row (now `frontend/src/features/settings/YtdlpVersionRow.tsx`): a "Check for Updates" button (manual, like the app's own updater above it) that becomes an "Update to `<version>`" button when one is found, with a progress bar during the download.
 
-**Root cause / gap being closed:** `checkYtdlpStatus()` already had a `needsUpdate` flag, but it only compares the installed binary against `YTDLP_VERSION` - the version constant pinned in this codebase, bumped manually as "a separate, routine maintenance task" (`ROADMAP.md`). That check can only ever tell a user their binary doesn't match what *this copy of KineTube* was tested against; it has no way to know yt-dlp has published something newer upstream if `YTDLP_VERSION` itself is stale, which is exactly the common case for a tool like yt-dlp that ships frequent releases to keep up with YouTube's own changes. Confirmed live during implementation: at the time this shipped, the pinned `YTDLP_VERSION` was `2026.03.17` while yt-dlp's actual latest GitHub release was `2026.08.19` - a real, several-month-old gap the old check had no way to surface.
+**Root cause / gap being closed:** `checkYtdlpStatus()` already had a `needsUpdate` flag, but it only compares the installed binary against `YTDLP_VERSION`, the version constant pinned in this codebase, bumped manually as "a separate, routine maintenance task" (`ROADMAP.md`). That check can only ever tell a user their binary doesn't match what *this copy of KineTube* was tested against; it has no way to know yt-dlp has published something newer upstream if `YTDLP_VERSION` itself is stale, which is exactly the common case for a tool like yt-dlp that ships frequent releases to keep up with YouTube's own changes. Confirmed live during implementation: at the time this shipped, the pinned `YTDLP_VERSION` was `2026.03.17` while yt-dlp's actual latest GitHub release was `2026.08.19`, a real, several-month-old gap the old check had no way to surface.
 
-**A bug this surfaced:** `checkYtdlpStatus()`'s original `needsUpdate` was a plain inequality (`normCurrent !== normRequired`), not a "which is newer" comparison. Verified end-to-end against the real backend: after using the new "Update yt-dlp" button to install `2026.08.19`, the *existing* pinned-version check immediately started reporting `needsUpdate: true` again - now pointing an "outdated" warning at a binary that was actually newer than what KineTube expected, not older. Fixed by rewriting that comparison to use the same `isNewerYtdlpVersion()` helper (`isNewerYtdlpVersion(YTDLP_VERSION, currentVersion)` - "is the pinned version newer than what's installed"), so drift in the "ahead of pinned" direction is no longer misreported as "behind."
+**A bug this surfaced:** `checkYtdlpStatus()`'s original `needsUpdate` was a plain inequality (`normCurrent !== normRequired`), not a "which is newer" comparison. Verified end-to-end against the real backend: after using the new "Update yt-dlp" button to install `2026.08.19`, the *existing* pinned-version check immediately started reporting `needsUpdate: true` again, now pointing an "outdated" warning at a binary that was actually newer than what KineTube expected, not older. Fixed by rewriting that comparison to use the same `isNewerYtdlpVersion()` helper (`isNewerYtdlpVersion(YTDLP_VERSION, currentVersion)`, meaning "is the pinned version newer than what's installed"), so drift in the "ahead of pinned" direction is no longer misreported as "behind." That comparison is now in `backend/src/services/tools/toolStatus.ts`.
 
 **Alternatives considered:**
-- Rolling the live GitHub check into `checkYtdlpStatus()` itself, so every caller gets live data - rejected: `checkYtdlpStatus()` is called from several hot, synchronous-feeling paths (`/api/ytdlp-status`, `/api/info`, `setupToolsWithProgress`) and making all of them wait on a GitHub round-trip (or silently swallow one more failure mode) is a worse trade than one dedicated, opt-in check the user triggers from Settings - the same reasoning the app's own "Check for Updates" button already uses for `electron-updater`.
-- Auto-downloading and installing the update without a confirmation step - rejected as inconsistent with this app's "no silent background changes to installed tools" posture, and with how the app's own auto-updater already requires an explicit click (`autoDownload = false` in `electron/main.js`).
+- Rolling the live GitHub check into `checkYtdlpStatus()` itself, so every caller gets live data. Rejected: `checkYtdlpStatus()` is called from several hot, synchronous-feeling paths (the yt-dlp status and metadata routes, now `GET /api/v1/tools/ytdlp` and `GET /api/v1/youtube/media`, and `setupToolsWithProgress`), and making all of them wait on a GitHub round-trip (or silently swallow one more failure mode) is a worse trade than one dedicated, opt-in check the user triggers from Settings. That is the same reasoning the app's own "Check for Updates" button already uses for `electron-updater`.
+- Auto-downloading and installing the update without a confirmation step. Rejected as inconsistent with this app's "no silent background changes to installed tools" posture, and with how the app's own auto-updater already requires an explicit click (`autoDownload = false`, now in `electron/src/updater.ts`).
 
 **Reasoning:**
-- GitHub's `releases/latest` API needs no auth for a public repo at this call volume (one manual click, not a poll), and returns `tag_name` directly - no HTML scraping or extra dependency.
-- yt-dlp's calendar-style tags (`2026.03.17`, occasionally `2026.03.17.1`) sort incorrectly under plain string comparison once any part reaches two digits differently (`"2026.3.9" > "2026.3.10"` as strings). `isNewerYtdlpVersion()` splits on `.`/`-` and compares each part numerically instead, and is unit tested directly (`backend/test/ytdlpManager.platform.test.js`) rather than only indirectly through a route.
+- GitHub's `releases/latest` API needs no auth for a public repo at this call volume (one manual click, not a poll), and returns `tag_name` directly, with no HTML scraping or extra dependency.
+- yt-dlp's calendar-style tags (`2026.03.17`, occasionally `2026.03.17.1`) sort incorrectly under plain string comparison once any part reaches two digits differently (`"2026.3.9" > "2026.3.10"` as strings). `isNewerYtdlpVersion()` splits on `.`/`-` and compares each part numerically instead, and is unit tested directly (now as `isNewerVersion()` in `backend/tests/lib/versions.test.ts`) rather than only indirectly through a route.
 - `updateYtdlp()` re-fetches the latest tag itself rather than trusting a tag the caller passed in from an earlier `checkForYtdlpUpdate()` call, so a click on "Update" several minutes after the check still gets whatever is actually latest at click time, not a stale tag.
 - The update-check network call resolves `{ checked: false, error }` on any failure rather than rejecting or returning a 5xx, matching this app's error-handling convention that a route feeding a background/optional check must degrade gracefully (`docs/guidelines/ERROR_HANDLING.md`).
 
 **Trade-offs:**
-- Scoped to yt-dlp only, matching what was actually requested - ffmpeg's three download sources (gyan.dev, evermeet.cx, johnvansickle.com) aren't GitHub releases and have no equivalent "latest tag" API, so the same mechanism doesn't directly extend to it.
-- No automated route test for `/api/ytdlp-update-check` or `/api/ytdlp-update` themselves, since both require real network access (GitHub, then a real binary download) - consistent with this project's existing policy of not automating real tool execution (`docs/workflows/TESTING.md`). Verified manually end-to-end during implementation (check found a real pending update, update downloaded it, binary's own `--version` reflected the new release afterward).
-- `YTDLP_VERSION` (the pinned constant used elsewhere - the initial-install URL, and now also the "outdated" comparison target) was deliberately left unbumped, consistent with `ROADMAP.md`'s existing note that this is routine maintenance handled separately from feature work; this ADR is what gives a user a way to get current without waiting on that.
+- Scoped to yt-dlp only, matching what was actually requested. ffmpeg's three download sources (gyan.dev, evermeet.cx, johnvansickle.com) aren't GitHub releases and have no equivalent "latest tag" API, so the same mechanism doesn't directly extend to it.
+- No automated route test for the check and update routes themselves (now `GET /api/v1/tools/ytdlp/releases/latest` and `POST /api/v1/tools/ytdlp/update`), since both require real network access (GitHub, then a real binary download), consistent with this project's existing policy of not automating real tool execution (`docs/workflows/TESTING.md`). Verified manually end-to-end during implementation (check found a real pending update, update downloaded it, binary's own `--version` reflected the new release afterward).
+- `YTDLP_VERSION` (the pinned constant used elsewhere: the initial-install URL, and now also the "outdated" comparison target) was deliberately left unbumped, consistent with `ROADMAP.md`'s existing note that this is routine maintenance handled separately from feature work. This ADR is what gives a user a way to get current without waiting on that.
 
 ---
 

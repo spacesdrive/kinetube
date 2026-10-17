@@ -1,10 +1,8 @@
 # Roadmap
 
-Planned features, improvements, and known gaps. Items within each section are roughly prioritized - top items first.
+Planned features, improvements, and known gaps. Items within each section are roughly prioritized, top items first.
 
 Update this file whenever a feature ships (move to `CHANGELOG.md`) or when priorities change.
-
-Entries marked as shipped before 2026-10-17 name the 1.x JavaScript files and routes. The TypeScript rewrite moved them; `docs/architecture/backend/ROUTES.md` maps each old route to its new one.
 
 ---
 
@@ -18,7 +16,7 @@ Entries marked as shipped before 2026-10-17 name the 1.x JavaScript files and ro
 
 ### Verify cross-platform tool support on real macOS/Linux hardware
 
-**Status as of 2026-07-26: implemented, not yet hardware-verified.** yt-dlp, ffmpeg, and whisper.cpp all now have platform-aware download/build logic (see `docs/philosophy/CROSS_PLATFORM.md` and `DECISIONS.md` ADR-011/ADR-012), and instaloader was confirmed already cross-platform via its existing pip/Python-module path (dead Windows-only exe code removed, see ADR-010). Everything was implemented from verified current documentation of each tool's real release assets and covered by unit tests for the pure platform-resolution logic - but this development environment is Windows-only, so none of the macOS/Linux code paths have actually been run end-to-end on real hardware yet.
+**Status as of 2026-07-26: implemented, not yet hardware-verified.** yt-dlp, ffmpeg, and whisper.cpp all now have platform-aware download/build logic (see `docs/philosophy/CROSS_PLATFORM.md` and `DECISIONS.md` ADR-011/ADR-012), and instaloader was confirmed already cross-platform via its existing pip/Python-module path (dead Windows-only exe code removed, see ADR-010). Everything was implemented from verified current documentation of each tool's real release assets and covered by unit tests for the pure platform-resolution logic. But this development environment is Windows-only, so none of the macOS/Linux code paths have actually been run end-to-end on real hardware yet.
 
 **Remaining work:**
 - Run the full setup flow on a real Mac (both Intel and Apple Silicon, to confirm the Rosetta 2 fallback for ffmpeg actually works) and a real Linux box, for all four tools
@@ -47,7 +45,7 @@ yt-dlp cannot read instaloader's session file, so post lookups and downloads run
 
 ### Shared `downloadFileWithProgress()` helper
 
-**Shipped 2026-07-27.** `backend/utils/ytdlpManager.js` and `backend/utils/whisperManager.js` now both import a single implementation from `backend/utils/download.js`, unifying two copies that had already drifted (whisper's was more robust - `http:` redirect support, a `settled` guard, response-error cleanup - and is now what both managers get). See `DECISIONS.md` ADR-015 and `backend/test/download.test.js`.
+**Shipped 2026-07-27.** The yt-dlp and whisper.cpp managers (now under `backend/src/managers/ytdlp/` and `backend/src/managers/whisper/`) both import a single implementation, now `backend/src/lib/httpDownload.ts`, unifying two copies that had already drifted. Whisper's copy was more robust (`http:` redirect support, a `settled` guard, response-error cleanup) and is now what both managers get. See `DECISIONS.md` ADR-015 and `backend/tests/lib/httpDownload.test.ts`.
 
 ### One frontend API client
 
@@ -55,14 +53,14 @@ yt-dlp cannot read instaloader's session file, so post lookups and downloads run
 
 ### Resume a download interrupted by the app closing
 
-**Shipped 2026-07-27** for single-video YouTube downloads. `backend/utils/pendingDownloads.js` records an in-flight download's request and clears it on any normal end (success, failure, cancel); a record surviving to the next launch means the app itself was killed mid-download. `ResumeDownloadsBanner.jsx` offers to resume it, re-issuing the identical request so yt-dlp's own `--continue` behavior picks up the partial file. See `DECISIONS.md` ADR-017.
+**Shipped 2026-07-27** for single-video YouTube downloads. The pending-download store (now `backend/src/stores/pendingDownloadStore.ts`) records an in-flight download's request and clears it on any normal end (success, failure, cancel); a record surviving to the next launch means the app itself was killed mid-download. The resume banner (now `frontend/src/features/downloads/ResumeDownloadsBanner.tsx`) offers to resume it, re-issuing the identical request so yt-dlp's own `--continue` behavior picks up the partial file. See `DECISIONS.md` ADR-017.
 
-**Live Pause/Resume, shipped 2026-07-27.** `ProgressModal.jsx` now has a Pause button during an active single-video download (`POST /api/download/:id/pause`) and a Resume button once paused - same kill-and-continue mechanism as the crash-recovery resume above, just triggered explicitly instead of by the app closing. See `DECISIONS.md` ADR-020.
+**Live Pause/Resume, shipped 2026-07-27.** The progress modal (now `frontend/src/features/downloads/ProgressModal.tsx`) has a Pause button during an active single-video download (now `POST /api/v1/downloads/:downloadId/pause`) and a Resume button once paused. It uses the same kill-and-continue mechanism as the crash-recovery resume above, just triggered explicitly instead of by the app closing. See `DECISIONS.md` ADR-020.
 
 **Remaining work:**
 - Instagram downloads can be paused and resumed since 2026-10-17 (ADR-031). Batches still cannot: resuming one needs the queue position and the state of each item, not just one request
-- No verification yet that yt-dlp's resume actually re-attaches to a `.part` file compared to just re-downloading from 0% - added to the manual checklist in `docs/workflows/TESTING.md`, but not yet confirmed on a real large download
-- If the user changes their download folder in Settings between the interrupted attempt and clicking Resume, the resume still targets the *original* folder (correct for the underlying `.part` file, but potentially surprising) - consider surfacing the target folder in the banner
+- No verification yet that yt-dlp's resume actually re-attaches to a `.part` file compared to just re-downloading from 0%. It is on the manual checklist in `docs/workflows/TESTING.md`, but not yet confirmed on a real large download
+- If the user changes their download folder in Settings between the interrupted attempt and clicking Resume, the resume still targets the *original* folder (correct for the underlying `.part` file, but potentially surprising). Consider surfacing the target folder in the banner
 
 ---
 
@@ -70,7 +68,7 @@ yt-dlp cannot read instaloader's session file, so post lookups and downloads run
 
 ### Linux packaging beyond AppImage
 
-Consider `deb`/`rpm` targets in addition to `AppImage` once the underlying cross-platform tool support (see above) is actually complete - no point expanding packaging formats for a build that doesn't yet work end-to-end.
+Consider `deb`/`rpm` targets in addition to `AppImage` once the underlying cross-platform tool support (see above) is actually complete. There is no point expanding packaging formats for a build that doesn't yet work end-to-end.
 
 ### macOS code signing and notarization
 
@@ -86,7 +84,7 @@ Single YouTube and Instagram downloads can be paused. A batch cannot, because th
 
 ### CI check for release-asset name consistency
 
-**Added 2026-07-26**, following the v1.3.0 auto-update 404 (`DECISIONS.md` ADR-014). The fix (pinning `nsis.artifactName`) is in place, but nothing in CI would catch a future regression - e.g. a new Windows target whose `artifactName` reintroduces a space. Add a post-build CI step that parses each uploaded `latest*.yml` and confirms its referenced filename(s) exactly match the filenames actually present in the release assets, failing the workflow if not, instead of relying on the manual check in `docs/workflows/RELEASE.md`'s "Cutting a Release" checklist.
+**Added 2026-07-26**, following the v1.3.0 auto-update 404 (`DECISIONS.md` ADR-014). The fix (pinning `nsis.artifactName`) is in place, but nothing in CI would catch a future regression, such as a new Windows target whose `artifactName` reintroduces a space. Add a post-build CI step that parses each uploaded `latest*.yml` and confirms its referenced filename(s) exactly match the filenames actually present in the release assets, failing the workflow if not, instead of relying on the manual check in `docs/workflows/RELEASE.md`'s "Cutting a Release" checklist.
 
 ---
 

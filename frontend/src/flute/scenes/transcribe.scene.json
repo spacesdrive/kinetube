@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "id": "transcribe",
+  "title": "Transcribe with Whisper",
+  "description": "The Transcribe page in the dark theme, with the files, the queue and the Whisper model settings.",
+  "definition": {
+    "scene": {
+      "version": 3,
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "z": 0,
+        "perspective": 1400,
+        "rotateX": 8,
+        "rotateY": 20,
+        "rotateZ": 0
+      },
+      "focus": {
+        "distance": 1300,
+        "fStop": 5.6,
+        "focalLength": 50,
+        "maxBlur": 6
+      },
+      "nodes": [
+        {
+          "id": "page",
+          "transform": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "rotateX": 0,
+            "rotateY": 0,
+            "rotateZ": 0,
+            "scale": 1
+          }
+        }
+      ]
+    },
+    "motion": {
+      "durationMs": 3500,
+      "speed": 0.5,
+      "tracks": [
+        {
+          "target": {
+            "kind": "camera"
+          },
+          "property": "x",
+          "keyframes": [
+            {
+              "timeMs": 0,
+              "value": 160,
+              "easing": "cinematic"
+            },
+            {
+              "timeMs": 3500,
+              "value": -160,
+              "easing": "cinematic"
+            }
+          ]
+        }
+      ]
+    },
+    "width": 1600,
+    "height": 1000
+  }
+}

@@ -704,3 +704,16 @@ Records every significant architectural decision, the alternatives considered, a
 **Decision:** The root, backend and frontend packages are all 2.0.0. The root `package.json` names the installer and is the version Electron reports; the frontend reads the same file at build time (`__APP_VERSION__` in `vite.config.ts`), so Settings shows the version in a plain browser too.
 
 **Reasoning:** the TypeScript rewrite, the `/api/v1` API and the redesign are breaking changes. The backend and frontend packages had drifted to 1.0.0 and 0.0.0, and the last local installer was still named 1.0.0.
+
+---
+
+## ADR-038: README demos filmed with Flute
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** The README shows animated GIFs of the real interface instead of still screenshots. They are filmed with Flute (`@webprodigies/flute` 0.1.2, a frontend dev dependency pinned to an exact version). Scenes live in `frontend/src/flute/scenes/` and render real components with fixture data from `frontend/src/flute/demo/`. `main.tsx` loads Flute's adapter only in development and only with `?flute-preview=1`, so the production bundle is unchanged. `npm run demos` exports each scene to MP4 with Flute and turns it into a GIF in `docs/media/` with FFmpeg (`docs/workflows/DEMOS.md`).
+
+Flute's automatic Vite setup refused this project's `vite.config.ts` (it has `define`, a proxy and a test block), so the project uses Flute's portable React adapter: `npx flute init` and `npx flute sync` generate `ProjectPreview.jsx` and `catalog.js`, and `ProjectPreview.d.ts` types them. Flute's CLI only accepts that generated file as the host entry.
+
+**Reasoning:** the owner asked for the README to use Flute and many GIFs. Filming the live components keeps the demos true to the app: a change to a page shows up in its GIF the next time `npm run demos` runs, with no redrawn mockups to maintain. The package has no install scripts and never reaches a production build. The GIFs are kept near 5 MB each (800 px, 12 frames a second, 96 colours), because a moving camera changes every pixel of every frame and GIF compression gains little from that.

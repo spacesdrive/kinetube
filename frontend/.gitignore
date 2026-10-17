@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Flute MP4 exports; the README keeps only the GIFs made from them (docs/media/)
+.flute/exports

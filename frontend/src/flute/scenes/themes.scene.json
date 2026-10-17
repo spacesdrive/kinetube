@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "id": "themes",
+  "title": "Light and dark",
+  "description": "The same channel page in both themes. The dark page slides in front of the light one.",
+  "definition": {
+    "scene": {
+      "version": 3,
+      "camera": {
+        "x": 0,
+        "y": 0,
+        "z": 0,
+        "perspective": 1600,
+        "rotateX": 8,
+        "rotateY": -12,
+        "rotateZ": 0
+      },
+      "focus": {
+        "distance": 1600,
+        "fStop": 5.6,
+        "focalLength": 50,
+        "maxBlur": 6
+      },
+      "nodes": [
+        {
+          "id": "light",
+          "transform": {
+            "x": -720,
+            "y": -40,
+            "z": -200,
+            "rotateX": 0,
+            "rotateY": 0,
+            "rotateZ": 0,
+            "scale": 1
+          }
+        },
+        {
+          "id": "dark",
+          "transform": {
+            "x": 640,
+            "y": 40,
+            "z": 0,
+            "rotateX": 0,
+            "rotateY": 0,
+            "rotateZ": 0,
+            "scale": 1
+          }
+        }
+      ]
+    },
+    "motion": {
+      "durationMs": 3500,
+      "speed": 0.5,
+      "tracks": [
+        {
+          "target": {
+            "kind": "surface",
+            "id": "dark"
+          },
+          "property": "x",
+          "keyframes": [
+            {
+              "timeMs": 0,
+              "value": 1800,
+              "easing": "cinematic"
+            },
+            {
+              "timeMs": 2625,
+              "value": 640,
+              "easing": "cinematic"
+            }
+          ]
+        },
+        {
+          "target": {
+            "kind": "surface",
+            "id": "dark"
+          },
+          "property": "opacity",
+          "keyframes": [
+            {
+              "timeMs": 0,
+              "value": 0,
+              "easing": "cinematic"
+            },
+            {
+              "timeMs": 1225,
+              "value": 1,
+              "easing": "cinematic"
+            }
+          ]
+        },
+        {
+          "target": {
+            "kind": "camera"
+          },
+          "property": "z",
+          "keyframes": [
+            {
+              "timeMs": 0,
+              "value": 620,
+              "easing": "cinematic"
+            },
+            {
+              "timeMs": 3500,
+              "value": 1000,
+              "easing": "cinematic"
+            }
+          ]
+        },
+        {
+          "target": {
+            "kind": "camera"
+          },
+          "property": "x",
+          "keyframes": [
+            {
+              "timeMs": 0,
+              "value": -140,
+              "easing": "cinematic"
+            },
+            {
+              "timeMs": 3500,
+              "value": 220,
+              "easing": "cinematic"
+            }
+          ]
+        },
+        {
+          "target": {
+            "kind": "camera"
+          },
+          "property": "y",
+          "keyframes": [
+            {
+              "timeMs": 0,
+              "value": 150,
+              "easing": "cinematic"
+            },
+            {
+              "timeMs": 3500,
+              "value": 110,
+              "easing": "cinematic"
+            }
+          ]
+        }
+      ]
+    },
+    "width": 1600,
+    "height": 1000
+  }
+}

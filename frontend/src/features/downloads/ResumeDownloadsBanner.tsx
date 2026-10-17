@@ -33,7 +33,7 @@ export default function ResumeDownloadsBanner({ downloads, onResume, onDismiss }
             trailing={(
               <>
                 <Button type="button" size="sm" variant="secondary" onClick={() => onResume(download)}><RotateCcw /> Resume</Button>
-                <Button type="button" size="icon-sm" variant="ghost" aria-label="Dismiss" title="Dismiss" onClick={() => onDismiss(download)}><X /></Button>
+                <Button type="button" size="icon-sm" variant="ghost" aria-label={`Dismiss ${download.title || download.url}`} title="Dismiss" onClick={() => onDismiss(download)}><X /></Button>
               </>
             )}
           />

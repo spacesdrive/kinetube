@@ -27,7 +27,7 @@ const upload = multer({
       callback(null, true);
       return;
     }
-    callback(new ValidationError(`"${file.originalname}" isn't an audio or video file KineTube can transcribe.`));
+    callback(new ValidationError(`"${file.originalname}" isn't an audio or video file kinetube can transcribe.`));
   },
 });
 

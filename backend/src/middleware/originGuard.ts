@@ -19,11 +19,11 @@ export function originGuard(port: number): RequestHandler {
     const { origin } = req.headers;
 
     if (!hosts.has(host)) {
-      next(new ForbiddenError('This API only answers requests for KineTube on this computer.'));
+      next(new ForbiddenError('This API only answers requests for kinetube on this computer.'));
       return;
     }
     if (origin !== undefined && !origins.has(origin)) {
-      next(new ForbiddenError('This API only answers requests from the KineTube app.'));
+      next(new ForbiddenError('This API only answers requests from the kinetube app.'));
       return;
     }
     next();

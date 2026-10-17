@@ -8,7 +8,7 @@ export function createMainWindow(): BrowserWindow {
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    title: 'KineTube',
+    title: 'kinetube',
     icon: iconPath,
     webPreferences: { preload: preloadPath, contextIsolation: true, nodeIntegration: false },
     // shown once painted, so there is no white flash before the page draws

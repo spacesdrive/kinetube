@@ -61,7 +61,7 @@ export class UpstreamTimeoutError extends AppError {
   }
 }
 
-export const UNEXPECTED_ERROR_MESSAGE = 'KineTube hit an unexpected error. Try again, and restart the app if it keeps happening.';
+export const UNEXPECTED_ERROR_MESSAGE = 'kinetube hit an unexpected error. Try again, and restart the app if it keeps happening.';
 
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

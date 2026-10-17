@@ -43,7 +43,7 @@ describe('ResumeDownloadsBanner', () => {
     render(<ResumeDownloadsBanner downloads={[download]} onResume={onResume} onDismiss={onDismiss} />);
 
     fireEvent.click(screen.getByRole('button', { name: /Resume/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Dismiss/ }));
     expect(onResume).toHaveBeenCalledWith(download);
     expect(onDismiss).toHaveBeenCalledWith(download);
   });

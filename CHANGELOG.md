@@ -9,6 +9,9 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
+### Changed
+- The README animations are animated WebP files instead of GIFs, about 4.7 MB in total instead of 23 MB, so the README loads much faster on GitHub. `npm run demos` now runs `scripts/make-demos.mts` (issue #13, ADR-039).
+
 ## [2.0.0] - 2026-10-17
 
 Every package is now version 2.0.0 (ADR-037). The macOS and Linux installers are built by the release workflow but have not been run on real hardware yet, so this release labels them untested.

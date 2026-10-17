@@ -41,7 +41,7 @@ docs/
   USER_GUIDE.md               Settings, Instagram setup, keyboard shortcuts, privacy, known limitations
   design-reference.md         Measured reference layout, brand kit findings, tokens, contrast, page mapping
   screenshots/                Before and after screenshots of every screen, light and dark
-  media/                      The README lockups and GIFs (made by npm run demos)
+  media/                      The README lockups and WebP animations (made by npm run demos)
   api/
     openapi.yaml               OpenAPI 3.1 description of /api/v1
   architecture/
@@ -64,7 +64,7 @@ docs/
     TESTING.md                 Test runners, what is covered, manual verification checklist
     GIT.md                     Commit format, branch rules, changelog policy
     RELEASE.md                 Build steps, electron-builder targets, GitHub Actions release flow
-    DEMOS.md                   The Flute scenes behind the README GIFs and how to make them again
+    DEMOS.md                   The Flute scenes behind the README animations and how to make them again
   features/
     NEW_API_ROUTE.md           Add a route to the Express backend
     NEW_TOOL_MANAGER.md        Add or extend a managed external binary (yt-dlp-style)
@@ -273,4 +273,4 @@ When anything changes, update every relevant docs file from the table below.
 | Testing approach changed | `docs/workflows/TESTING.md` |
 | Feature guide added or changed | `docs/features/` (relevant file) |
 | README setup or feature list changes | `README.md`, `CONTRIBUTING.md` for setup and builds, `docs/USER_GUIDE.md` for settings and limitations |
-| A page shown in a README GIF changed | Run `npm run demos` with `npm run dev` running and check the GIFs (`docs/workflows/DEMOS.md`) |
+| A page shown in a README animation changed | Run `npm run demos` with `npm run dev` running and check the animations (`docs/workflows/DEMOS.md`) |

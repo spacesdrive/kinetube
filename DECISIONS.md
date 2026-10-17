@@ -717,3 +717,14 @@ Records every significant architectural decision, the alternatives considered, a
 Flute's automatic Vite setup refused this project's `vite.config.ts` (it has `define`, a proxy and a test block), so the project uses Flute's portable React adapter: `npx flute init` and `npx flute sync` generate `ProjectPreview.jsx` and `catalog.js`, and `ProjectPreview.d.ts` types them. Flute's CLI only accepts that generated file as the host entry.
 
 **Reasoning:** the owner asked for the README to use Flute and many GIFs. Filming the live components keeps the demos true to the app: a change to a page shows up in its GIF the next time `npm run demos` runs, with no redrawn mockups to maintain. The package has no install scripts and never reaches a production build. The GIFs are kept near 5 MB each (800 px, 12 frames a second, 96 colours), because a moving camera changes every pixel of every frame and GIF compression gains little from that.
+
+---
+
+## ADR-039: README animations as animated WebP
+
+**Date:** 2026-10-18
+**Status:** Accepted
+
+**Decision:** `npm run demos` (`scripts/make-demos.mts`) turns each Flute MP4 into an animated WebP in `docs/media/` instead of a GIF: 12 frames a second, 800 pixels wide, lossy at quality 75, looping forever. The README points at the `.webp` files, and the GIFs are removed. This replaces the GIF part of ADR-038; the scenes and Flute stay as they are.
+
+**Reasoning:** the six GIFs came to about 23 MB, and GitHub fetches every image when it renders the README, so the page loaded slowly (issue #13). The same frames as WebP total about 4.7 MB, keep full colour instead of a 96-colour palette, and look as sharp. GitHub serves a repository's `.webp` files as `image/webp`, and every current browser plays animated WebP. A `<video>` tag was ruled out because GitHub only plays videos uploaded as issue or comment attachments, not files in the repository.

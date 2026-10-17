@@ -79,4 +79,4 @@ Code style is set out in [`docs/guidelines/TYPESCRIPT.md`](docs/guidelines/TYPES
 
 ## The README animations
 
-The GIFs in the README show the real interface, filmed with [Flute](https://github.com/webprodigies-org/flute). If your change alters a page they show, run `npm run demos` with `npm run dev` running to make them again. [`docs/workflows/DEMOS.md`](docs/workflows/DEMOS.md) explains the scenes and the settings.
+The animations in the README show the real interface, filmed with [Flute](https://github.com/webprodigies-org/flute). If your change alters a page they show, run `npm run demos` with `npm run dev` running to make them again. [`docs/workflows/DEMOS.md`](docs/workflows/DEMOS.md) explains the scenes and the settings.

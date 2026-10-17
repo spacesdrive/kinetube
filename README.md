@@ -25,7 +25,7 @@
   <a href="CONTRIBUTING.md"><b>Contributing</b></a>
 </p>
 
-<img src="docs/media/youtube-video.gif" alt="A YouTube video open in kinetube, with its preview beside the quality and format choices" width="800">
+<img src="docs/media/youtube-video.webp" alt="A YouTube video open in kinetube, with its preview beside the quality and format choices" width="800">
 
 </div>
 
@@ -42,27 +42,27 @@ The real work is done by open-source tools you may already trust. [yt-dlp](https
 <table>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/media/youtube-playlist.gif" alt="A playlist in kinetube with videos being ticked one by one">
+      <img src="docs/media/youtube-playlist.webp" alt="A playlist in kinetube with videos being ticked one by one">
       <p><b>Pick from a playlist.</b> Open a playlist link, search it and tick the videos you want. Private and deleted videos are marked so you can't pick them.</p>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/media/youtube-channel.gif" alt="The Live tab of a YouTube channel in kinetube, with live and upcoming streams marked">
+      <img src="docs/media/youtube-channel.webp" alt="The Live tab of a YouTube channel in kinetube, with live and upcoming streams marked">
       <p><b>Browse a whole channel.</b> Switch between its Videos, Shorts, Live and Playlists tabs. Streams that are live or still to come are marked.</p>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
-      <img src="docs/media/batch-download.gif" alt="The batch download page in kinetube with a video, a playlist and a channel read at once">
+      <img src="docs/media/batch-download.webp" alt="The batch download page in kinetube with a video, a playlist and a channel read at once">
       <p><b>Download in batches.</b> Paste many YouTube and Instagram links, one per line. Each one opens so you can pick from it, then it all downloads in one run.</p>
     </td>
     <td width="50%" valign="top">
-      <img src="docs/media/transcribe.gif" alt="The Transcribe page in kinetube with the Whisper model settings">
+      <img src="docs/media/transcribe.webp" alt="The Transcribe page in kinetube with the Whisper model settings">
       <p><b>Transcribe on your computer.</b> whisper.cpp turns audio and video into text. Pick a model from Tiny to Large and a language, or let it detect one.</p>
     </td>
   </tr>
   <tr>
     <td colspan="2" align="center">
-      <img src="docs/media/themes.gif" alt="The same kinetube page in the light and the dark theme" width="600">
+      <img src="docs/media/themes.webp" alt="The same kinetube page in the light and the dark theme" width="600">
       <p><b>Light, dark or your system's theme.</b> The fonts ship with the app, so nothing loads from the internet to draw the page.</p>
     </td>
   </tr>

@@ -1,16 +1,16 @@
 # README demos
 
-The animated GIFs in the README are the real interface, filmed with [Flute](https://github.com/webprodigies-org/flute) (`@webprodigies/flute`, a frontend dev dependency, ADR-038). Flute places live React components on surfaces in a 3D scene, moves a camera across them and exports the result as an MP4. `scripts/make-demo-gifs.mts` then turns each MP4 into a GIF in `docs/media/`.
+The animations in the README are the real interface, filmed with [Flute](https://github.com/webprodigies-org/flute) (`@webprodigies/flute`, a frontend dev dependency, ADR-038). Flute places live React components on surfaces in a 3D scene, moves a camera across them and exports the result as an MP4. `scripts/make-demos.mts` then turns each MP4 into an animated WebP in `docs/media/`.
 
-## Make the GIFs again
+## Make the animations again
 
-Do this when a change alters a page that a GIF shows.
+Do this when a change alters a page that an animation shows.
 
 1. Start the app in development: `npm run dev`. The scenes load from the Vite dev server, and the Transcribe scene asks the backend for the real Whisper models.
 2. Run `npm run demos` from the repository root. Pass scene ids to make only some, such as `npm run demos -- youtube-playlist themes`.
-3. Look at every GIF before you commit it.
+3. Look at every animation before you commit it.
 
-You need FFmpeg on your `PATH` and Playwright's Chromium (`npx playwright install chromium` in `frontend/`). The MP4s stay in `frontend/.flute/exports/`, which git ignores.
+You need FFmpeg built with libwebp on your `PATH` and Playwright's Chromium (`npx playwright install chromium` in `frontend/`). The MP4s stay in `frontend/.flute/exports/`, which git ignores.
 
 ## How the pieces fit
 
@@ -40,6 +40,6 @@ Things learned while making the first six scenes:
 - Lazy images never load on a page tilted in 3D, so `DemoShell` switches them to eager loading.
 - Recipes use authored time at Flute's default half speed: 3500 authored milliseconds play for 7 seconds.
 
-## GIF settings
+## Animation settings
 
-`scripts/make-demo-gifs.mts` plays each scene at 0.7 times its length, at 12 frames a second, 800 pixels wide, with a 96-colour palette and no dithering. A moving camera changes every pixel of every frame, so GIF compression gains little. These settings keep the text sharp and each GIF near 5 MB.
+`scripts/make-demos.mts` plays each scene at 0.7 times its length, at 12 frames a second, 800 pixels wide, as a lossy animated WebP at quality 75 that loops forever. A moving camera changes every pixel of every frame, which GIF compresses badly: the first GIFs were near 5 MB each, about 23 MB for the README, and loaded slowly on GitHub (issue #13). The WebP files keep full colour and are about a fifth of that size. GitHub serves `.webp` from a repository as `image/webp`, and every current browser plays it (ADR-039).

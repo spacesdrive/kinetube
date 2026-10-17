@@ -9,7 +9,38 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+
+**TypeScript rewrite**
+- The backend, frontend, Electron main process and helper scripts are now strict TypeScript. The request, response and stream-event types live in `shared/types/` and are shared by all three projects. See `DECISIONS.md` ADR-023 and ADR-028.
+- The backend is split into layers: route tables, validators, controllers, services, stores, tool managers and URL parsers. Only the tool managers start yt-dlp, FFmpeg, whisper.cpp or Python.
+- The packaged app runs compiled JavaScript, because Electron 33 runs the backend on Node 20. Development needs Node 22.18 or newer. See ADR-029.
+
+**Versioned REST API**
+- Every route moved to `/api/v1` and is named after a resource. Actions are POST requests with JSON bodies, and every error has the same shape. `docs/architecture/backend/ROUTES.md` lists each 1.x route next to its replacement, and `docs/api/openapi.yaml` describes the whole API. See ADR-024.
+- Long tasks still stream server-sent events, but the frontend now reads them with `fetch`, and every stream ends with one `done` event (a paused download ends with `paused`). See ADR-025.
+- All requests go through one typed client, `frontend/src/services/api.ts`. See ADR-027.
+
+**Downloads**
+- YouTube and Instagram downloads share one runner. Instagram downloads can now be paused, resumed, and offered again after the app closes. See ADR-031.
+- A single download refuses channel and profile links, so pasting one can no longer start a download of a whole page.
+- The default quality chosen in Settings is now applied to new downloads.
+- The folder picker no longer blocks the backend while its dialog is open.
+
+### Fixed
+- **Any web page could control the app.** The backend listened on every network interface and, in the installed app, accepted requests from any origin. It now listens on 127.0.0.1 only and refuses requests with a foreign Host or Origin. See ADR-026.
+- **Command injection through bulk Instagram downloads.** A queue item such as `--exec=<command>` was passed to yt-dlp unparsed and ran a command. Every link is now parsed, and yt-dlp gets it after `--`.
+- **Path traversal when removing an Instagram account.** A username containing `../` reached files outside the sessions folder. Usernames are now validated.
+- **Image proxy host check.** `evilinstagram.com` passed the allowlist because hosts were matched with `endsWith`. Hosts now match exactly or as a real subdomain, over https only, and every redirect is checked.
+- **Instagram lookups failed with an account selected.** The instaloader session was handed to yt-dlp as a cookie file, which yt-dlp cannot read. Post lookups and downloads now run logged out, and profiles still use the session. See ADR-030.
+- **A failed yt-dlp update deleted the working binary.** The update now downloads to a temporary file and replaces the old binary only after the download finishes.
+- **Saved Instagram sessions could end up in the installer.** `extraResources` now leaves out `backend/sessions/`.
+- **Reopening the window on macOS showed a loading page forever.** Closing the last window stopped the backend, and a window reopened from the dock never started it again. The backend now runs until the app quits.
+- **macOS and Linux tool binaries were not excluded.** The packaging filter and `.gitignore` only matched Windows file names, so a local build on a Mac or Linux machine could ship its own copies of yt-dlp, FFmpeg and whisper-cli. Both now list the extensionless names and the `.so` and `.dylib` libraries.
+
+### Removed
+- `axios` and `cors`, which are no longer needed.
+- The emoji startup banner in the backend log.
 
 ---
 

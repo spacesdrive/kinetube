@@ -1,4 +1,4 @@
-# Git Workflow
+# Git workflow
 
 ## Repository
 
@@ -7,155 +7,182 @@
 - Author name: spacesdrive
 - Author email: valzorx7@gmail.com
 
-Commits in this repository use the spacesdrive author identity. The local git config for this repo is set to this - do not override it per-commit with a different author.
+Commits in this repository use the spacesdrive author identity. The local git config for this repository is already set to it. Do not override it per commit with a different author.
 
-## Commit Cadence
+## Commit cadence
 
-Commit after every meaningful, self-contained change. Do not accumulate unrelated changes into one large commit. Do not leave work uncommitted between sessions.
+Commit after every meaningful, self-contained change. Do not collect unrelated changes into one large commit, and do not leave work uncommitted between sessions.
 
 A meaningful change is one that:
-- Adds a working feature (even a small one)
+
+- Adds a working feature, even a small one
 - Fixes a bug
-- Updates documentation to reflect a real change
+- Updates documentation to match a real change
 - Refactors without changing behavior
 
-Do not commit work-in-progress that breaks the build.
+Do not commit work in progress that breaks the type check, the tests or the build.
 
-## Commit Message Format
+## Commit message format
 
 Use Conventional Commits with an optional scope:
 
 ```
 type(scope): short description in present tense
 
-Optional body explaining WHY, not WHAT. Wrap at 72 characters.
+Optional body explaining why, not what. Wrap at 72 characters.
 ```
 
 ### Types
 
 | Type | When to use |
 |---|---|
-| `feat` | New feature or capability |
-| `fix` | Bug fix |
+| `feat` | A new feature or capability |
+| `fix` | A bug fix |
 | `docs` | Documentation only |
-| `refactor` | Code restructuring, no behavior change |
+| `refactor` | Restructured code with no behavior change |
 | `style` | Formatting or whitespace, no logic change |
-| `perf` | Performance improvement |
+| `perf` | A performance improvement |
 | `test` | Adding or updating tests |
+| `build` | The toolchain, TypeScript setup or packaging config |
 | `chore` | Maintenance, dependency updates, tooling |
-| `release` | Version bump and changelog update |
+| `release` | A version bump and changelog update |
 
-### Scope (optional)
+### Scope
 
-Use scope to name the area affected, matching this codebase's layers:
+The scope is optional. It names the area the change touches. The history uses the layer names and a few feature names:
 
-- `feat(transcribe):`
-- `fix(ytdlp):`
-- `fix(instaloader):`
-- `docs(architecture):`
-- `chore(deps):`
-- `chore(release):`
+- Layers: `backend`, `frontend`, `electron`, `ci`, `release`, `build`
+- Areas: `download`, `ytdlp`, `updater`, `managers`, `dev`, `ui`, `theme`
+
+For example: `feat(backend):`, `fix(ci):`, `fix(download):`, `chore(frontend):`.
+
+### Breaking changes
+
+Mark a breaking change with `!` after the type or scope, and add a `BREAKING CHANGE:` footer that says what breaks:
+
+```
+refactor(backend)!: rewrite the backend in TypeScript with a versioned REST API
+
+BREAKING CHANGE: every /api route changed. The frontend is updated in the
+next commit.
+```
 
 ### Subject line rules
 
-- Present tense: "add" not "added", "fix" not "fixed"
-- No period at the end
-- Under 72 characters total including type and scope
+- Present tense: "add", not "added"; "fix", not "fixed"
+- No full stop at the end
+- Under 72 characters, including the type and scope
 - Lowercase after the colon
-- No emojis, no em dashes
+- No emoji, no em dashes
 
-Do not add "Co-Authored-By" lines referencing AI tools. Commits should show only the project author.
+### Body
+
+The body explains why the change was made and what a reader would not guess from the diff. Short bullet lists are fine for several related fixes. Name the ADR in `DECISIONS.md` when the change follows one.
+
+Do not add `Co-Authored-By` lines that name AI tools. None of the commits in this repository have one; commits show only the project author.
 
 ### Examples
 
+These are taken from the history of this repository:
+
 ```
-feat(whisper): stream partial transcription chunks over SSE
+feat(ytdlp): live update check against yt-dlp's latest GitHub release
 
-fix(ytdlp): handle yt-dlp exit code 1 with empty stdout as a soft failure
+fix(download): kill the whole yt-dlp process tree for Pause and Cancel
 
-docs(architecture): document the SSE phase/progress/done/error contract
+fix(dev): strip ELECTRON_RUN_AS_NODE before launching Electron in dev
 
-refactor(instaloader): extract 2FA process registry into its own map
+build: add the TypeScript toolchain and the shared API types
 
-test(urlParser): cover youtu.be and shorts URL variants
+refactor(electron)!: rewrite the main process and scripts in TypeScript
 
-chore(deps): bump electron-updater to latest
-
-release: v1.2.0 - transcription language auto-detect
+release: v1.6.0 - live yt-dlp update check and one-click update
 ```
 
-## What to Commit Together
+## What to commit together
 
-### Always group these in a single commit:
-- A new route + its manager function(s) + the frontend call site that uses it
-- A new component + its wiring into `App.jsx`
-- A bug fix + updated docs if the fix changes documented behavior
-- A new feature + `CHANGELOG.md` update + relevant architecture doc updates
+### Group these in one commit
 
-### Never commit:
-- `backend/.env` (if one is ever introduced)
-- `backend/downloads/*.exe`, `*.dll`, `*.zip`, downloaded media
-- `backend/models/*.bin`
-- `backend/sessions/` contents (session cookies, `accounts.json`)
+- A new endpoint: its shared types in `shared/types/`, the route, validator, controller and service in `backend/src/`, the method in `frontend/src/services/api.ts`, the feature code that calls it, and its tests
+- A new frontend feature folder and its wiring into `frontend/src/AppShell.tsx` or the download page
+- A bug fix and the docs it changes, if the fix changes documented behavior
+- A feature, its `CHANGELOG.md` entry and the architecture docs it changes
+
+A change that spans layers can also be split by layer, as long as each commit leaves the type check and tests passing. The TypeScript rewrite was split into a shared-types commit, a backend commit, a frontend commit and an Electron commit, and the backend commit said that the frontend followed in the next one.
+
+### Never commit
+
+- `backend/.env` or any other `.env` file
+- Tool binaries in `backend/downloads/`: `*.exe`, `*.dll`, `*.zip`, and on macOS and Linux the extensionless `yt-dlp`, `ffmpeg` and `whisper-cli`
+- Downloaded media in `backend/downloads/`
+- Whisper models in `backend/models/` (`*.bin`)
+- `backend/sessions/` (Instagram session files and `accounts.json`)
+- `backend/pending-downloads.json`
 - `node_modules/`
-- `dist/` build output
-- Editor or OS metadata files (`.DS_Store`, `Thumbs.db`)
+- Build output: `dist/`, `backend/dist/`, `frontend/dist/`, `electron/dist/`, `shared/dist/`, `*.tsbuildinfo`
+- Logs and editor or OS files (`*.log`, `.DS_Store`, `Thumbs.db`)
 
-Check `.gitignore` covers all of the above before adding new writable-data paths anywhere in the tree.
+`.gitignore` covers this whole list, including the extensionless binaries and the `.so` and `.dylib` libraries that macOS and Linux create. Update `.gitignore` before you add a new writable path anywhere in the tree.
 
-## Documentation in Commits
+## Documentation in commits
 
-Every feature commit must include documentation updates where `CLAUDE.md`'s Documentation Maintenance Policy table requires them. A feature is not complete until:
-- `CHANGELOG.md` is updated (Unreleased section)
-- Relevant architecture docs reflect the change
+Every feature commit includes the documentation updates that the Documentation Maintenance Policy table in `CLAUDE.md` asks for. A feature is not complete until:
 
-## Release Tagging
+- `CHANGELOG.md` has an entry under `[Unreleased]`
+- The architecture docs match the change
 
-Tag releases after shipping a meaningful set of changes.
+## Release tagging
+
+Tag a release after shipping a meaningful set of changes.
 
 ### Version numbering
 
 | Change type | Version bump | Example |
 |---|---|---|
-| Bug fix | Patch: x.x.N+1 | v1.1.0 -> v1.1.1 |
-| New feature | Minor: x.N+1.0 | v1.1.1 -> v1.2.0 |
-| Breaking change | Major: N+1.0.0 | v1.2.0 -> v2.0.0 |
+| Bug fix | Patch | v1.6.0 to v1.6.1 |
+| New feature | Minor | v1.6.1 to v1.7.0 |
+| Breaking change | Major | v1.7.0 to v2.0.0 |
 
 ### Release process
 
-See `docs/workflows/RELEASE.md` for the full packaging and GitHub Actions release flow - tagging `v*` is what triggers `.github/workflows/release.yml` to build and publish Windows/macOS/Linux artifacts.
+Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds and publishes the Windows, macOS and Linux installers. See `docs/workflows/RELEASE.md` for the full flow.
 
 ```bash
 git add CHANGELOG.md package.json
-git commit -m "release: v1.2.0 - short description of release"
-git tag -a v1.2.0 -m "v1.2.0 - short description"
+git commit -m "release: v1.7.0 - short description of the release"
+git tag -a v1.7.0 -m "v1.7.0 - Short description"
 git push origin main --tags
 ```
 
-## Branch Strategy
+The commit subject is lowercase after the colon. The tag message starts with a capital letter, as in the existing tags (`v1.6.0 - Live yt-dlp update check and one-click update`).
 
-Small changes and fixes go directly to `main`. For larger features spanning multiple sessions, use a feature branch:
+## Branch strategy
+
+Small changes and fixes go straight to `main`. For a larger change that spans several sessions, use a branch named `type/short-topic`, such as `refactor/typescript-rest` or `feat/cross-platform-ytdlp`:
 
 ```bash
 git checkout -b feat/cross-platform-ytdlp
-# work, commit incrementally
+# work and commit in small steps
 git push origin feat/cross-platform-ytdlp
-# merge to main when ready
+# merge into main when it is ready
 ```
 
 Delete the branch after merging:
+
 ```bash
 git push origin --delete feat/cross-platform-ytdlp
 git branch -d feat/cross-platform-ytdlp
 ```
 
-## Pre-Commit Checklist
+## Pre-commit checklist
 
-1. `cd backend && npm test` - backend tests pass
-2. `cd frontend && npm test` - frontend tests pass
-3. `cd frontend && npm run build` - frontend must build without errors
-4. `cd frontend && npm run lint` - no lint errors
-5. `git status` - verify only intended files are staged
-6. `git diff --staged` - review the full diff before committing
-7. Confirm no session cookies, downloaded binaries, or media files are staged
-8. Verify `CHANGELOG.md` is updated if the commit adds a feature or fix
+1. `npm run typecheck` from the root: shared, Electron, backend and frontend all type check
+2. `npm test` from the root: backend and frontend tests pass
+3. `cd frontend && npm run lint`: no lint errors
+4. `npm run build:frontend`: the frontend builds
+5. `git status`: only the files you meant to change are staged
+6. `git diff --staged`: review the whole diff
+7. No session files, tool binaries, models or media are staged
+8. `CHANGELOG.md` is updated if the commit adds a feature or a fix
+
+Do not use `npm run build` or `npm run build:backend` as a pre-commit check. They prune the backend's dev dependencies, and you would need `cd backend && npm install` before the next test run.

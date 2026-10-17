@@ -1,118 +1,159 @@
-# Feature Development Workflow
+# Feature development workflow
 
-Every feature - large or small - follows this sequence. Steps that don't apply to a specific feature can be skipped, but must be consciously skipped, not forgotten.
+Every feature, large or small, follows this sequence. You can skip a step that does not apply, but skip it on purpose and not by accident.
+
+For the two most common changes there is a detailed guide:
+
+- A new endpoint under `/api/v1`: `docs/features/NEW_API_ROUTE.md`
+- A new or changed external tool (yt-dlp, FFmpeg, whisper.cpp, instaloader): `docs/features/NEW_TOOL_MANAGER.md`
 
 ---
 
 ## Phase 1: Understand
 
-**Step 1 - Read `CLAUDE.md`**
-Confirm project context and which docs to load. This is required before starting any task in this repository.
+### Step 1: Read `CLAUDE.md`
 
-**Step 2 - Load relevant documentation**
-- Electron/main-process change -> `docs/architecture/electron/MAIN_PROCESS.md`
-- Backend/route change -> `docs/architecture/backend/EXPRESS.md`, `ROUTES.md`
-- Tool manager change -> `docs/architecture/backend/MANAGERS.md`, `docs/philosophy/CROSS_PLATFORM.md`
-- Frontend change -> `docs/architecture/frontend/REACT_ARCHITECTURE.md`
-- New platform target / packaging change -> `docs/workflows/RELEASE.md`, `docs/philosophy/CROSS_PLATFORM.md`
+It names the project rules and the docs to load for each kind of change. Read it before any task in this repository.
 
-**Step 3 - Read the existing code in the affected area**
-Read every file you will modify and its siblings. Do not start implementing until you understand the pattern already in use (e.g. read `ytdlpManager.js` in full before touching `whisperManager.js`).
+### Step 2: Load the docs for the area you touch
 
-**Step 4 - Search for existing implementations**
-Grep for relevant function/component names. Is there already a manager, route, or component that does part of what you need?
+| Change | Read |
+|---|---|
+| Electron main process, IPC, updater | `docs/architecture/electron/MAIN_PROCESS.md` |
+| Backend pipeline, config, env vars | `docs/architecture/backend/EXPRESS.md` |
+| Routes, status codes, stream events | `docs/architecture/backend/ROUTES.md` |
+| Tool managers | `docs/architecture/backend/MANAGERS.md`, `docs/philosophy/CROSS_PLATFORM.md` |
+| Frontend pages, features, components | `docs/architecture/frontend/REACT_ARCHITECTURE.md` |
+| Packaging or a new platform target | `docs/workflows/RELEASE.md`, `docs/philosophy/CROSS_PLATFORM.md` |
+| Code style | `docs/guidelines/TYPESCRIPT.md`, `docs/guidelines/REACT.md`, `docs/guidelines/NAMING.md`, `docs/guidelines/ERROR_HANDLING.md` |
+
+### Step 3: Read the code you will change
+
+Read every file you will modify and its siblings in the same folder. For example, read `backend/src/controllers/toolController.ts` and `backend/src/routes/toolRoutes.ts` before you add a controller and a route table of your own.
+
+### Step 4: Search for code that already does part of the job
+
+Search `backend/src/lib/`, `backend/src/services/`, `frontend/src/hooks/` and `frontend/src/lib/` first. Helpers for streams (`lib/sse.ts`, `controllers/http.ts`), child processes (`lib/runProcess.ts`, `lib/processTree.ts`), file downloads (`lib/httpDownload.ts`) and archives (`lib/archives.ts`) already exist.
 
 ---
 
 ## Phase 2: Research
 
-**Step 5 - Look up library documentation (Context7)**
-For Express 5, React 19, Electron APIs, `electron-updater`/`electron-builder`, `multer`, `unzipper` - confirm current API shape before writing code against training-data assumptions.
+### Step 5: Look up library documentation with Context7
 
-**Step 6 - Research tool behavior (Parallel Search)**
-For anything involving yt-dlp, FFmpeg, whisper.cpp, or instaloader release assets, flags, or platform-specific packaging - these change over time and this project pins specific versions.
+Check the current API of Express 5, React 19, Vite, Vitest, Electron (`utilityProcess`, `ipcMain`, `contextBridge`), `electron-updater`, `electron-builder` and `multer` before you write code against them.
 
-**Step 7 - Plan with Sequential Thinking**
-Required for anything touching more than one layer (manager + route + frontend), or any change to how a tool is downloaded/located across platforms.
+### Step 6: Research tool behavior with Parallel Search
+
+yt-dlp, FFmpeg, whisper.cpp and instaloader change their flags and release assets over time. Check the current behavior for every platform you touch.
+
+### Step 7: Plan with Sequential Thinking
+
+Plan first when the change touches more than one layer (for example a manager, a service and a frontend feature), or when it changes how a tool is downloaded or located on any platform.
 
 ---
 
 ## Phase 3: Design
 
-**Step 8 - Identify what changes**
-- New/changed Express route(s)
-- New/changed manager function(s)
-- New/changed IPC channel
-- New/changed frontend component(s) and where they plug into `App.jsx`'s view switching
-- Any packaging/electron-builder config implications
+### Step 8: List what changes
 
-**Step 9 - Identify reuse opportunities**
-- Is there a manager function that already does most of what you need? Extend it rather than duplicating a download/spawn helper.
-- Is there a shadcn component that fits? Use it.
-- Does this operation need SSE? Reuse the `phase`/`progress`/`done`/`error` shape and `ProgressModal.jsx` rather than inventing new UI.
+- Shared types in `shared/types/` (request, response and stream-event shapes)
+- Backend: route table, validator, controller, service, store, manager
+- Electron: an IPC channel, if the page needs something only the main process can do
+- Frontend: methods in `src/services/api.ts`, a feature folder in `src/features/`, and where it plugs into `src/AppShell.tsx` or `src/pages/DownloadPage.tsx`
+- Packaging: anything `package.json` `build` must include or exclude
+
+### Step 9: Reuse what fits
+
+- Long work streams its progress. Return a `StreamJob` from the service and send it with `sendStream` in the controller. The last event is always `done`.
+- Errors are `AppError` subclasses from `backend/src/lib/errors.ts` (`ValidationError`, `NotFoundError`, `ConflictError`, `ToolNotInstalledError` and others). The error handler turns them into the one JSON error shape.
+- Use shadcn components from `frontend/src/components/ui/` and Lucide icons. Reuse `ProgressModal` for download progress instead of building a new progress view.
 
 ---
 
 ## Phase 4: Implement
 
-**Step 10 - Implement in this order:**
-1. Backend: manager function(s) in `backend/utils/`
-2. Backend: route handler(s) in `backend/routes/`
-3. Backend: mount in `backend/server.js` if a new router file
-4. Electron: new IPC channel in `preload.js` + `main.js`, if needed
-5. Frontend: new fetch/SSE call
-6. Frontend: new/updated component
-7. Frontend: wire into `App.jsx`'s view state
+### Step 10: Build the layers in this order
 
-**Step 11 - Eliminate duplication**
-Look for logic that duplicates something that already exists (a download-with-progress helper, a status-check pattern) and factor it out only if the duplication is genuinely costing maintainability - see `DECISIONS.md` for the existing tradeoff around the four managers' near-identical `downloadFileWithProgress()`.
+1. Shared types. Add or extend a file in `shared/types/` (`api`, `tools`, `youtube`, `instagram`, `downloads`, `transcriptions`, `folders`, `electron`). These files hold types only. The backend, frontend and Electron import them type-only through the `@shared/*` alias or a relative path.
+2. Manager, only if an external tool is involved. Each tool has a folder in `backend/src/managers/` (`ytdlp/`, `ffmpeg/`, `whisper/`, `instaloader/`) that downloads, installs, locates and spawns it. Only managers spawn tool binaries. See `docs/features/NEW_TOOL_MANAGER.md`.
+3. Platform parsing, only for new link shapes. URL parsers and yt-dlp JSON mappers live in `backend/src/platforms/` and stay pure, so they are easy to test.
+4. Store, only for state that must survive a restart. JSON-file stores live in `backend/src/stores/` and write through `jsonFile.ts`.
+5. Service in `backend/src/services/`. It holds the business rules and calls managers and stores. Register it in `createServices` in `backend/src/container.ts`.
+6. Validator in `backend/src/validators/`. It turns untrusted input (body, query, params) into a typed request and throws `ValidationError` or `NotFoundError`. Shared field helpers are in `validators/fields.ts`.
+7. Controller in `backend/src/controllers/`. It validates the input, calls one service method, and sends `dataResponse`, `listResponse` or `sendStream` from `controllers/http.ts`.
+8. Route table in `backend/src/routes/`. Add the route to the resource's table, or create a table and mount it in `routes/apiRouter.ts`. See `docs/features/NEW_API_ROUTE.md`.
+9. Electron IPC, only if needed. Add the handler in `electron/src/ipcHandlers.ts` (or `updater.ts` for update channels), expose it in `electron/src/preload.ts`, and type it in `shared/types/electron.ts`.
+10. API client. Add one method to the `api` object in `frontend/src/services/api.ts`. Use `request` for JSON and `openStream` for a stream. Only the files in `src/services/` talk to the backend.
+11. Feature folder in `frontend/src/features/<feature>/`. Keep pure state logic in its own module (for example `downloads/singleDownloadState.ts`), hooks in `useX.ts` files, and components in `.tsx` files. Wire the feature into `AppShell.tsx` or the download page.
+
+### Step 11: Remove duplication
+
+If the new code repeats something that already exists (a stream helper, a status check, a download helper), move the shared part into `lib/` or a service. Do it only when the repetition really costs maintenance.
 
 ---
 
 ## Phase 5: Verify
 
-**Step 12 - Automated tests**
+### Step 12: Add tests
+
+Tests mirror the source tree: `backend/tests/` for `backend/src/`, `frontend/tests/` for `frontend/src/`. Add tests in the same change for every new parser, mapper, validator, store, service rule and route. See `docs/workflows/TESTING.md` for the fixtures and examples.
+
+### Step 13: Type check and run the tests
+
+From the repository root:
+
 ```bash
-cd backend && npm test     # node:test - see docs/workflows/TESTING.md
-cd frontend && npm test    # vitest
+npm run typecheck
+npm test
 ```
 
-**Step 13 - Build verification**
+Then lint the frontend:
+
 ```bash
-cd frontend && npm run build   # must build without errors
-cd frontend && npm run lint    # must pass with no errors
+cd frontend && npm run lint
 ```
 
-**Step 14 - Manual testing - golden path**
-Run `npm run dev` from the repo root and exercise the change end-to-end in the actual Electron window, not just the Vite preview - IPC and packaged-vs-dev path resolution only surface in the real app.
+### Step 14: Test the golden path by hand
 
-**Step 15 - Manual testing - edge cases**
-- Tool not installed yet (delete the relevant file from `backend/downloads/` and retest)
-- Network failure mid-download
-- Invalid/unsupported URL input
-- Very large batch (Instagram profile bulk-download, large channel)
+Run `npm run dev` from the repository root and use the change in the Electron window, not only in a browser tab. IPC and the folder picker only work inside Electron.
 
-**Step 16 - Cross-platform sanity check**
-If the change touches a manager or anything that shells out to a binary, explicitly ask: does this hardcode `.exe`, a Windows asset URL, or a `win32`-only path? If yes, and platform support isn't in scope for this change, note it in `docs/philosophy/CROSS_PLATFORM.md`'s gap list rather than leaving it undocumented.
+### Step 15: Test the edge cases
 
-**Step 17 - Console error check**
-Open DevTools (F12) in the running app. No uncaught errors, no failed network requests, no React warnings.
+- A tool that is not installed yet (remove it from `backend/downloads/` and try again)
+- A network failure in the middle of a download or install
+- A link the app does not support
+- A large batch (a long Instagram profile, a large channel)
+- Closing the stream early (cancel the action in the UI) and checking that the work stops
+
+### Step 16: Check every platform
+
+If the change touches a manager or anything that runs a binary, check for a hardcoded `.exe`, a Windows-only asset URL, or a `win32`-only path. If macOS or Linux support is not part of this change, record the gap in `docs/philosophy/CROSS_PLATFORM.md`.
+
+### Step 17: Check the console
+
+Press F12 in the running app. Look for uncaught errors, failed requests and React warnings. The backend writes one JSON log line per request with its request id. Every JSON error carries the same `requestId`, so you can match a failed request to its log line.
 
 ---
 
-## Phase 6: Document and Commit
+## Phase 6: Document and commit
 
-**Step 18 - Update documentation**
-Use the table in `CLAUDE.md` - Documentation Maintenance Policy.
+### Step 18: Update the docs
 
-**Step 19 - Update `CHANGELOG.md`**
+Use the Documentation Maintenance Policy table in `CLAUDE.md`. For example, a new route goes into `docs/architecture/backend/ROUTES.md` and the manual checklist in `docs/workflows/TESTING.md`. A new frontend feature goes into `docs/architecture/frontend/REACT_ARCHITECTURE.md`.
+
+### Step 19: Update `CHANGELOG.md`
+
 Add an entry under `[Unreleased]`.
 
-**Step 20 - Update `ROADMAP.md`**
-If the feature was on the roadmap, move it to done. If it opened new follow-up work, add it.
+### Step 20: Update `ROADMAP.md`
 
-**Step 21 - Commit**
-Follow `docs/workflows/GIT.md`.
+If the feature was on the roadmap, move it to done. If it opened follow-up work, add that.
 
-**Step 22 - Release (if ready)**
+### Step 21: Commit
+
+Follow `docs/workflows/GIT.md`. Commit each self-contained change on its own.
+
+### Step 22: Release, when ready
+
 Follow `docs/workflows/RELEASE.md`.

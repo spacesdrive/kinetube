@@ -495,3 +495,138 @@ Records every significant architectural decision, the alternatives considered, a
 - Scoped to yt-dlp only, matching what was actually requested - ffmpeg's three download sources (gyan.dev, evermeet.cx, johnvansickle.com) aren't GitHub releases and have no equivalent "latest tag" API, so the same mechanism doesn't directly extend to it.
 - No automated route test for `/api/ytdlp-update-check` or `/api/ytdlp-update` themselves, since both require real network access (GitHub, then a real binary download) - consistent with this project's existing policy of not automating real tool execution (`docs/workflows/TESTING.md`). Verified manually end-to-end during implementation (check found a real pending update, update downloaded it, binary's own `--version` reflected the new release afterward).
 - `YTDLP_VERSION` (the pinned constant used elsewhere - the initial-install URL, and now also the "outdated" comparison target) was deliberately left unbumped, consistent with `ROADMAP.md`'s existing note that this is routine maintenance handled separately from feature work; this ADR is what gives a user a way to get current without waiting on that.
+
+---
+
+## ADR-023: TypeScript everywhere, replacing ADR-007
+
+**Date:** 2026-10-17
+**Status:** Accepted. Replaces ADR-007.
+
+**Decision:** The backend, frontend, Electron main process, scripts and shared API types are strict TypeScript (TypeScript 6.0). Settings: `strict`, `noUncheckedIndexedAccess`, `erasableSyntaxOnly`, and `verbatimModuleSyntax` in the backend and frontend. No `any`, `enum`, `@ts-ignore`, or non-null assertions where a check works instead.
+
+**Why ADR-007 no longer holds:** ADR-007 kept JavaScript to avoid a build step and because the code was small. By 1.6 the backend had a route file of 1,000 lines that built yt-dlp arguments from untrusted query strings, and the frontend and backend agreed on response shapes only by convention. Several of the security bugs fixed in ADR-026 came from values nobody had typed or validated.
+
+**Alternatives considered:**
+- JSDoc types on JavaScript: it checks less, and the owner's style rules out JSDoc blocks.
+- TypeScript 7 (the native compiler): typescript-eslint does not support it yet, so 6.0 is the newest version the frontend lint can use.
+
+**Trade-offs:**
+- The packaged app needs a build step (ADR-029).
+- Development needs Node 22.18 or newer, which runs `.ts` files directly.
+
+---
+
+## ADR-024: A versioned REST API under /api/v1
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** Every route moves to `/api/v1` and is named after a resource: `tools`, `downloads`, `download-batches`, `whisper-models`, `transcriptions`, `instagram/accounts`, `youtube/media`, `instagram/media`, `folders` and `images`. Reads use GET. Every action uses POST (`/tools/:toolId/install`, `/downloads/:downloadId/pause`, `/downloads/:downloadId/resume`). Deletes use DELETE and answer 204. A single item comes back as `{ data }`, a list as `{ data, total }`, and every error as `{ success: false, code, message, requestId }`. `/health` stays at the root because Electron and the dev script wait on it.
+
+**Alternatives considered:**
+- Keep the 1.x routes and only add types. The old routes mixed verbs into paths (`/ytdlp-update-check`, `/validate-path`), started downloads with GET, and used a different error shape in each file.
+- Pagination on every list. No list here can grow large: tools, models, accounts and pending downloads are a handful of items, and a channel or profile listing is one yt-dlp or instaloader call that the page shows whole.
+
+**Reasoning:** a consumer can guess the route for a resource from the others. Status codes say what happened: 201 when a login saved an account, 202 when Instagram wants a code first, 409 when the same download is already running. `/v1` leaves room to change the contract later without breaking an older build.
+
+**Trade-offs:** every 1.x route changed in one release. The frontend and backend ship together in one installer, so no outside consumer breaks. `docs/architecture/backend/ROUTES.md` keeps an old-to-new table.
+
+---
+
+## ADR-025: Fetch-based streams replace EventSource
+
+**Date:** 2026-10-17
+**Status:** Accepted. ADR-005 (server-sent events for long work) still holds.
+
+**Decision:** The frontend reads server-sent events with `fetch` and a stream reader (`frontend/src/services/eventStream.ts`) instead of `EventSource`. Every stream ends with a `done` event that carries either the result or the same `code` and `message` as a JSON error. A paused download is the one exception: it ends with `paused`, and the reader is told so. Closing the stream aborts the request, and the backend cancels downloads and batches when that happens.
+
+**Reasoning:**
+- `EventSource` can only send GET, so 1.x started downloads with GET and long query strings. With `fetch`, actions are POST requests with JSON bodies, which also makes the browser send a preflight for cross-site requests (ADR-026).
+- `EventSource` reconnects on its own after a stream ends. 1.x worked around that with a `retry: 3600000` line and a "closed" flag in every consumer.
+- An error found before the stream opens (a bad link, a missing tool, a 409) arrives as a normal JSON error, so the page shows the backend's message instead of "connection lost".
+
+**Trade-offs:** about 120 lines of client code that the browser used to provide, covered by `frontend/tests/services/eventStream.test.ts`.
+
+---
+
+## ADR-026: Loopback listener and a Host and Origin guard
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** The backend listens on `127.0.0.1` only. `backend/src/middleware/originGuard.ts` answers 403 to any request whose Host is not `localhost:<port>` or `127.0.0.1:<port>`, and to any request with an Origin other than the app itself or the Vite dev server. The `cors` package is removed, because the app never needs cross-origin access.
+
+**Problems this fixes (all found during the rewrite):**
+- 1.x listened on every network interface, so other machines on the network could call the API.
+- Its CORS rule allowed every origin whenever `ELECTRON_APP` was set, which is always true in the installed app. Any web page open in the person's browser could start downloads, read the account list, or start a pip install.
+- `/api/instagram/bulk-download` passed each item's `url` to yt-dlp without parsing it, so a value such as `--exec=<command>` ran a command. Every link is now parsed by the platform URL parsers and placed after `--` in yt-dlp's arguments.
+- `DELETE /api/instagram/accounts/:username` built a file path from the username, so `../` reached files outside the sessions folder. Usernames are now validated.
+- The image proxy matched allowed hosts with `endsWith`, so `evilinstagram.com` passed. Hosts now match exactly or as a real subdomain, over https only, and every redirect is checked again.
+
+**Reasoning:** the Host check also stops DNS rebinding, where a web page points its own domain at 127.0.0.1 to get around the browser's same-origin rule.
+
+**Trade-offs:** the Electron window keeps loading `http://localhost:3001` rather than `127.0.0.1`, because localStorage is kept per origin and saved settings would otherwise be lost.
+
+---
+
+## ADR-027: One API client module, replacing ADR-006 and ADR-016
+
+**Date:** 2026-10-17
+**Status:** Accepted. Replaces ADR-006 and ADR-016.
+
+**Decision:** Every request, streaming or not, goes through `frontend/src/services/api.ts`, typed by the shared types. Components never call `fetch`.
+
+**Reasoning:** ADR-006 kept stream handling inside each component because each `EventSource` needed its own listeners and close logic. With the stream reader from ADR-025, a stream is one function call with a typed handler, so nothing is left to keep beside the component. Pure reducers (`singleDownloadState.ts`, `bulkDownloadState.ts`, `transcribeQueueState.ts`) turn events into state and are unit tested without rendering.
+
+---
+
+## ADR-028: Shared API types through TypeScript project references
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** `shared/types/` holds the request, response and stream-event types and nothing else. It is a composite TypeScript project that emits declarations only. The backend, frontend and Electron projects reference it and import it with `import type`, so none of it exists at runtime.
+
+**Alternatives considered:**
+- npm workspaces with a shared package. Workspaces move dependencies into the root `node_modules`, but electron-builder copies `backend/` with its own `node_modules`, so the packaged backend would lose its dependencies.
+- Importing the shared files directly. The backend build would then reject them for sitting outside its `rootDir`, or nest its output under `dist/backend/src/`.
+
+---
+
+## ADR-029: Compiled JavaScript for the packaged app
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** In development the backend runs its `.ts` files directly on Node 22.18 or newer. For the installer, `tsc` compiles the backend to `backend/dist/` and the Electron main process to CommonJS in `electron/dist/`. The helper scripts are `.mts` files that Node 22 runs directly.
+
+**Reasoning:** Electron 33 runs the backend on its own Node 20, which cannot strip TypeScript types. Upgrading Electron only to get type stripping would change the runtime of a shipping app for a build convenience.
+
+**Trade-offs:** `npm run build:backend` compiles and then prunes dev dependencies, so the release workflow installs the backend with dev dependencies first, and it now runs on Node 22.
+
+---
+
+## ADR-030: Instagram sessions are not passed to yt-dlp
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** The backend no longer passes instaloader's session file to yt-dlp as `--cookies`. Instagram post lookups and downloads run logged out. Profiles still use the saved session, through instaloader.
+
+**Root cause:** instaloader saves a session as a Python pickle, not as the Netscape cookie file yt-dlp expects. yt-dlp failed to read it (`'utf-8' codec can't decode byte 0x80`). In 1.x, every Instagram lookup or download with an account selected failed. Confirmed against the real backend during the rewrite.
+
+**Follow-up:** a helper that exports the session's cookies to a Netscape file would let yt-dlp download private posts again (`ROADMAP.md`).
+
+---
+
+## ADR-031: One download runner for YouTube and Instagram
+
+**Date:** 2026-10-17
+**Status:** Accepted
+
+**Decision:** `POST /api/v1/downloads` takes a YouTube video or Shorts link, or an Instagram post, reel or story link, and both go through the same runner in `backend/src/services/downloads/`. Instagram downloads are now recorded as pending, so they can be paused, resumed, and offered again after the app closes. `POST /api/v1/download-batches` takes a list from either site and spaces out the Instagram items. The single download route refuses channel and profile links, so one request can never download a whole page by accident.
+
+**Reasoning:** 1.x had two download routes that shared most of their code and had drifted apart: different file-name cleaning, different format selectors, and no pause for Instagram.
+
+**Trade-offs:** an Instagram download now uses the YouTube format selectors. They also fit Instagram, which serves one combined stream per height.

@@ -1,0 +1,1743 @@
+openapi: 3.1.0
+info:
+  title: KineTube local API
+  version: v1
+  summary: The HTTP API the KineTube desktop app's backend serves to its own window.
+  description: |
+    The backend listens on 127.0.0.1 only. Every request must carry a Host header of
+    localhost:3001 or 127.0.0.1:3001, and an Origin header, when present, must be the app
+    itself (http://localhost:3001, http://127.0.0.1:3001) or the Vite dev server
+    (http://localhost:5173, http://127.0.0.1:5173). Any other request gets 403 FORBIDDEN.
+    No CORS headers are sent.
+
+    JSON success responses are `{ data }` for one item and `{ data, total }` for a list.
+    Every error is an ErrorResponse.
+
+    Streaming routes answer with `text/event-stream`. Each event is an `event: <name>` line
+    and a `data: <JSON>` line, then a blank line. The last event is `done`, carrying either
+    the result with `success: true`, or `success: false` with a code and message. A paused
+    download is the one exception: it ends with a `paused` event. A `: keepalive` comment
+    is written every 15 seconds. Errors found before the stream opens are normal JSON errors.
+    Closing a download or batch stream cancels it, and closing a transcription stream stops
+    it. Tool installs and model downloads keep running when their stream is closed.
+
+    The schemas mirror the TypeScript types in shared/types/. Those types are the source of
+    truth; update this file when they change.
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:3001
+    description: The packaged app, and the backend in development
+tags:
+  - name: health
+  - name: tools
+  - name: media
+  - name: downloads
+  - name: whisper
+  - name: instagram-accounts
+  - name: files
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      operationId: getHealth
+      summary: Liveness check
+      description: Answered before the JSON parser and before any tool check. Electron waits for it before it opens the window.
+      responses:
+        '200':
+          description: The server is up.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok:
+                    const: true
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/tools:
+    get:
+      tags: [tools]
+      operationId: listTools
+      summary: Status of every tool
+      parameters:
+        - name: ids
+          in: query
+          required: false
+          description: Comma-separated tool ids to check, such as `ytdlp,ffmpeg`. Without it every tool is checked.
+          schema:
+            type: string
+            example: ytdlp,ffmpeg
+      responses:
+        '200':
+          description: The tools, in the order asked for.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ToolList'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/tools/ytdlp/releases/latest:
+    get:
+      tags: [tools]
+      operationId: getLatestYtdlpRelease
+      summary: Compare the installed yt-dlp with its latest GitHub release
+      responses:
+        '200':
+          description: The installed and latest versions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/YtdlpRelease'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          $ref: '#/components/responses/UpstreamFailed'
+        '503':
+          $ref: '#/components/responses/ToolNotInstalled'
+
+  /api/v1/tools/{toolId}:
+    parameters:
+      - $ref: '#/components/parameters/ToolId'
+    get:
+      tags: [tools]
+      operationId: getTool
+      summary: Status of one tool
+      responses:
+        '200':
+          description: The tool.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Tool'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/tools/{toolId}/install:
+    parameters:
+      - $ref: '#/components/parameters/ToolId'
+    post:
+      tags: [tools]
+      operationId: installTool
+      summary: Install a tool if it is missing
+      description: |
+        Streams ToolInstallEvents:
+        - `phase` (ToolPhaseEvent): a step started; `isSkipped: true` when the tool was already installed.
+        - `progress` (ToolProgressEvent): download progress.
+        - `log` (LogEvent): output from pip or the whisper.cpp build.
+        - `done` (ToolInstallDone): last. A failure has code UPSTREAM_FAILED and follows a `phase` event with `phase: error`.
+
+        Closing the stream does not stop the install.
+      responses:
+        '200':
+          $ref: '#/components/responses/EventStream'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/tools/{toolId}/update:
+    parameters:
+      - $ref: '#/components/parameters/ToolId'
+    post:
+      tags: [tools]
+      operationId: updateTool
+      summary: Download the latest yt-dlp release over the installed one
+      description: |
+        Only `ytdlp` can be updated; any other tool id is 400. Streams the same ToolInstallEvents
+        as the install route: `phase`, `progress`, `log`, then `done` (ToolInstallDone).
+      responses:
+        '200':
+          $ref: '#/components/responses/EventStream'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ToolNotInstalled'
+
+  /api/v1/youtube/media:
+    get:
+      tags: [media]
+      operationId: getYouTubeMedia
+      summary: Metadata for a YouTube video, Shorts or channel
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 2048
+      responses:
+        '200':
+          description: The video or channel.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/YouTubeMedia'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          $ref: '#/components/responses/UpstreamFailed'
+        '503':
+          $ref: '#/components/responses/ToolNotInstalled'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+
+  /api/v1/instagram/media:
+    get:
+      tags: [media]
+      operationId: getInstagramMedia
+      summary: Metadata for an Instagram post, reel, story or profile
+      description: |
+        Returns JSON by default. With `Accept: text/event-stream` it streams InstagramMediaEvents instead:
+        - `profile` (InstagramProfileEvent): the profile header, sent once for a profile link.
+        - `progress` (InstagramProgressEvent): one per post read.
+        - `done` (InstagramMediaDone): last, with `media`.
+
+        Closing the stream stops the profile helper.
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+            maxLength: 2048
+        - name: account
+          in: query
+          required: false
+          description: A saved account whose session the profile helper should use.
+          schema:
+            $ref: '#/components/schemas/InstagramUsername'
+      responses:
+        '200':
+          description: The post or profile, or an event stream when asked for one.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/InstagramMedia'
+            text/event-stream:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          $ref: '#/components/responses/UpstreamFailed'
+        '503':
+          $ref: '#/components/responses/ToolNotInstalled'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+
+  /api/v1/downloads:
+    get:
+      tags: [downloads]
+      operationId: listDownloads
+      summary: Downloads with a pending record, newest first
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/DownloadStatus'
+      responses:
+        '200':
+          description: The downloads.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadList'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [downloads]
+      operationId: createDownload
+      summary: Start a download
+      description: |
+        Takes one YouTube video or Shorts link, or one Instagram post, reel or story link.
+        Channel and profile links are 400. Streams DownloadEvents:
+        - `start` (DownloadStartEvent): first, with the download and its id.
+        - `title` (DownloadTitleEvent): the title read from the file name.
+        - `progress` (DownloadProgressEvent).
+        - `phase` (DownloadPhaseEvent): video, audio or merging.
+        - `log` (LogEvent): yt-dlp output.
+        - `warning` (WarningEvent): a missing download folder, a missing FFmpeg, or Instagram content that may need a login.
+        - `paused` (DownloadPausedEvent): last when the download was paused; no `done` follows.
+        - `done` (DownloadDone): last otherwise. Failures use UPSTREAM_FAILED or CANCELLED.
+
+        Closing the stream cancels the download.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDownloadRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/EventStream'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ToolNotInstalled'
+
+  /api/v1/downloads/{downloadId}:
+    parameters:
+      - $ref: '#/components/parameters/DownloadId'
+    get:
+      tags: [downloads]
+      operationId: getDownload
+      summary: One download
+      responses:
+        '200':
+          description: The download.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Download'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [downloads]
+      operationId: removeDownload
+      summary: Cancel a running download, or dismiss a paused or interrupted one
+      description: The partial file stays on disk.
+      responses:
+        '204':
+          description: Cancelled or dismissed.
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/downloads/{downloadId}/pause:
+    parameters:
+      - $ref: '#/components/parameters/DownloadId'
+    post:
+      tags: [downloads]
+      operationId: pauseDownload
+      summary: Stop a running download and keep its record so it can resume
+      responses:
+        '200':
+          description: The download, now paused.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Download'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/downloads/{downloadId}/resume:
+    parameters:
+      - $ref: '#/components/parameters/DownloadId'
+    post:
+      tags: [downloads]
+      operationId: resumeDownload
+      summary: Run a paused or interrupted download again with its saved options
+      description: |
+        Streams the same DownloadEvents as POST /api/v1/downloads: `start`, `title`, `progress`,
+        `phase`, `log`, `warning`, then `paused` or `done`. Closing the stream cancels the download.
+      responses:
+        '200':
+          $ref: '#/components/responses/EventStream'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ToolNotInstalled'
+
+  /api/v1/download-batches:
+    post:
+      tags: [downloads]
+      operationId: createDownloadBatch
+      summary: Download a list of YouTube and Instagram links one after another
+      description: |
+        Instagram items are paced. Streams DownloadBatchEvents:
+        - `start` (BatchStartEvent): first, with the item count.
+        - `itemStart` (BatchItemStartEvent).
+        - `itemProgress` (BatchItemProgressEvent).
+        - `itemDone` (BatchItemDoneEvent): one per item, successful or not.
+        - `warning` (WarningEvent): sent once per distinct warning.
+        - `done` (DownloadBatchDone): last. A cancelled batch has code CANCELLED.
+
+        Closing the stream stops the current item and skips the rest.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDownloadBatchRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/EventStream'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ToolNotInstalled'
+
+  /api/v1/whisper-models:
+    get:
+      tags: [whisper]
+      operationId: listWhisperModels
+      summary: All whisper models and whether each is downloaded
+      responses:
+        '200':
+          description: The five models.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WhisperModelList'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/v1/whisper-models/{modelId}:
+    parameters:
+      - $ref: '#/components/parameters/ModelId'
+    get:
+      tags: [whisper]
+      operationId: getWhisperModel
+      summary: One whisper model
+      responses:
+        '200':
+          description: The model.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/WhisperModel'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/whisper-models/{modelId}/download:
+    parameters:
+      - $ref: '#/components/parameters/ModelId'
+    post:
+      tags: [whisper]
+      operationId: downloadWhisperModel
+      summary: Download a whisper model if it is missing
+      description: |
+        Streams ModelDownloadEvents:
+        - `phase` (ModelPhaseEvent): `isSkipped: true` when the model was already downloaded.
+        - `progress` (ModelProgressEvent).
+        - `done` (ModelDownloadDone): last. A failure has code UPSTREAM_FAILED.
+
+        Closing the stream does not stop the download.
+      responses:
+        '200':
+          $ref: '#/components/responses/EventStream'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/v1/transcriptions:
+    post:
+      tags: [whisper]
+      operationId: createTranscription
+      summary: Transcribe an audio or video file with whisper.cpp
+      description: |
+        Send JSON naming a file already on disk, or multipart form data with the file in a `file`
+        field. Streams TranscriptionEvents:
+        - `phase` (TranscriptionPhaseEvent): `extracting` (FFmpeg converts to WAV), then `transcribing`.
+        - `progress` (TranscriptionProgressEvent).
+        - `chunk` (TranscriptionChunkEvent): text as whisper.cpp prints it.
+        - `done` (TranscriptionDone): last, with the cleaned text and the path of the `.txt` file written beside the input.
+
+        Closing the stream stops FFmpeg and whisper.cpp.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTranscriptionRequest'
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  contentMediaType: application/octet-stream
+                  description: One audio or video file up to 2 GB, with an extension of mp3, mp4, wav, m4a, ogg, flac, aac, webm, mkv, mov, avi or wma.
+                modelId:
+                  $ref: '#/components/schemas/WhisperModelId'
+                language:
+                  $ref: '#/components/schemas/TranscriptionLanguage'
+      responses:
+        '200':
+          $ref: '#/components/responses/EventStream'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ToolNotInstalled'
+
+  /api/v1/instagram/accounts:
+    get:
+      tags: [instagram-accounts]
+      operationId: listInstagramAccounts
+      summary: Saved Instagram accounts
+      description: Never returns session content.
+      responses:
+        '200':
+          description: The accounts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstagramAccountList'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [instagram-accounts]
+      operationId: createInstagramAccount
+      summary: Log in to Instagram and save the session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInstagramAccountRequest'
+      responses:
+        '201':
+          description: Logged in; the account was saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/InstagramLoggedIn'
+        '202':
+          description: Instagram asked for a two-factor code. Send it to the two-factor route within 5 minutes.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/InstagramTwoFactorRequired'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          $ref: '#/components/responses/UpstreamFailed'
+        '503':
+          $ref: '#/components/responses/ToolNotInstalled'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+
+  /api/v1/instagram/accounts/{username}/two-factor:
+    parameters:
+      - $ref: '#/components/parameters/Username'
+    post:
+      tags: [instagram-accounts]
+      operationId: verifyInstagramLogin
+      summary: Send the two-factor code to the login that is waiting for it
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyInstagramLoginRequest'
+      responses:
+        '201':
+          description: Logged in; the account was saved.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/InstagramAccount'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '502':
+          $ref: '#/components/responses/UpstreamFailed'
+        '504':
+          $ref: '#/components/responses/UpstreamTimeout'
+
+  /api/v1/instagram/accounts/{username}:
+    parameters:
+      - $ref: '#/components/parameters/Username'
+    delete:
+      tags: [instagram-accounts]
+      operationId: removeInstagramAccount
+      summary: Remove a saved account and delete its session file
+      responses:
+        '204':
+          description: Removed.
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/folders/pick:
+    post:
+      tags: [files]
+      operationId: pickFolder
+      summary: Show the Windows folder dialog
+      description: Windows only, through PowerShell. The desktop app uses Electron's own dialog instead; this route serves the frontend in a plain browser.
+      responses:
+        '200':
+          description: The chosen folder, or a null path when the dialog was closed.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PickedFolder'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '501':
+          $ref: '#/components/responses/NotSupported'
+
+  /api/v1/folders/{folderPath}:
+    parameters:
+      - name: folderPath
+        in: path
+        required: true
+        description: An absolute folder path, URL-encoded as one path segment, such as `C%3A%5CUsers%5CVideos`.
+        schema:
+          type: string
+    get:
+      tags: [files]
+      operationId: getFolder
+      summary: Check that a folder exists
+      responses:
+        '200':
+          description: The folder exists.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Folder'
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/images:
+    get:
+      tags: [files]
+      operationId: getImage
+      summary: Load a YouTube or Instagram image through the backend
+      description: |
+        Only https URLs whose host equals, or is a subdomain of, cdninstagram.com, fbcdn.net,
+        instagram.com, pinimg.com, yt3.ggpht.com, yt3.googleusercontent.com, ytimg.com or
+        i.ytimg.com. Up to 3 redirects are followed, each checked again.
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+            maxLength: 2048
+      responses:
+        '200':
+          description: The image, cached privately for an hour.
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: private, max-age=3600
+          content:
+            image/*:
+              schema:
+                type: string
+                contentMediaType: image/*
+        '400':
+          $ref: '#/components/responses/ValidationFailed'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '502':
+          $ref: '#/components/responses/UpstreamFailed'
+
+components:
+  parameters:
+    ToolId:
+      name: toolId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ToolId'
+    DownloadId:
+      name: downloadId
+      in: path
+      required: true
+      description: 16 lowercase hex characters. An id in any other shape is 404.
+      schema:
+        type: string
+        pattern: '^[a-f0-9]{16}$'
+    ModelId:
+      name: modelId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/WhisperModelId'
+    Username:
+      name: username
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/InstagramUsername'
+
+  responses:
+    EventStream:
+      description: A stream of server-sent events. See the operation description for its events.
+      content:
+        text/event-stream:
+          schema:
+            type: string
+    ValidationFailed:
+      description: VALIDATION_FAILED. The input is missing, malformed or not allowed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: FORBIDDEN. The origin guard refused the request, or the image host is not allowed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: NOT_FOUND. The resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: CONFLICT. The same work is already running, or a precondition is not met.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotSupported:
+      description: NOT_SUPPORTED. The feature does not work on this platform.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UpstreamFailed:
+      description: UPSTREAM_FAILED. YouTube, Instagram, GitHub or a tool answered with a failure.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ToolNotInstalled:
+      description: TOOL_NOT_INSTALLED. A tool this route needs is not installed yet.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UpstreamTimeout:
+      description: UPSTREAM_TIMEOUT. YouTube or Instagram took too long to answer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+    # shared/types/api.ts
+    ErrorCode:
+      type: string
+      enum:
+        - VALIDATION_FAILED
+        - NOT_FOUND
+        - CONFLICT
+        - FORBIDDEN
+        - NOT_SUPPORTED
+        - TOOL_NOT_INSTALLED
+        - UPSTREAM_FAILED
+        - UPSTREAM_TIMEOUT
+        - CANCELLED
+        - INTERNAL
+      description: CANCELLED only appears in a stream's done event.
+    ErrorResponse:
+      type: object
+      required: [success, code, message, requestId]
+      properties:
+        success:
+          const: false
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+          description: What failed, then what to do. Safe to show to the person.
+        requestId:
+          type: string
+          format: uuid
+          description: Matches the requestId in the backend's log line for this request.
+    StreamDoneFailure:
+      type: object
+      required: [success, code, message]
+      properties:
+        success:
+          const: false
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+        message:
+          type: string
+    LogEvent:
+      type: object
+      required: [message, level]
+      properties:
+        message:
+          type: string
+        level:
+          type: string
+          enum: [info, error]
+    WarningEvent:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+    TransferProgress:
+      type: object
+      required: [downloadedBytes, totalBytes, percent, bytesPerSecond]
+      properties:
+        downloadedBytes:
+          type: number
+        totalBytes:
+          type: number
+          description: 0 when the server sent no Content-Length.
+        percent:
+          type: number
+        bytesPerSecond:
+          type: number
+
+    # shared/types/tools.ts
+    ToolId:
+      type: string
+      enum: [ytdlp, ffmpeg, whisper, instaloader]
+    Tool:
+      type: object
+      required: [id, name, isInstalled, version, requiredVersion, needsUpdate, missingRequirement]
+      properties:
+        id:
+          $ref: '#/components/schemas/ToolId'
+        name:
+          type: string
+        isInstalled:
+          type: boolean
+        version:
+          type: [string, 'null']
+        requiredVersion:
+          type: [string, 'null']
+          description: The version this copy of KineTube was tested with; only yt-dlp has one.
+        needsUpdate:
+          type: boolean
+        missingRequirement:
+          type: [string, 'null']
+          enum: [python, null]
+          description: instaloader is a pip package, so it cannot be installed until Python itself is.
+    ToolList:
+      type: object
+      required: [data, total]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tool'
+        total:
+          type: integer
+    YtdlpRelease:
+      type: object
+      required: [currentVersion, latestVersion, isUpdateAvailable, releaseUrl]
+      properties:
+        currentVersion:
+          type: string
+        latestVersion:
+          type: string
+        isUpdateAvailable:
+          type: boolean
+        releaseUrl:
+          type: string
+          format: uri
+    ToolPhase:
+      type: string
+      enum: [downloading, extracting, cloning, configuring, building, installing, done, error]
+    ToolPhaseEvent:
+      type: object
+      required: [toolId, phase, message, isSkipped]
+      properties:
+        toolId:
+          $ref: '#/components/schemas/ToolId'
+        phase:
+          $ref: '#/components/schemas/ToolPhase'
+        message:
+          type: string
+        isSkipped:
+          type: boolean
+    ToolProgressEvent:
+      allOf:
+        - $ref: '#/components/schemas/TransferProgress'
+        - type: object
+          required: [toolId]
+          properties:
+            toolId:
+              $ref: '#/components/schemas/ToolId'
+    ToolInstallDone:
+      oneOf:
+        - type: object
+          required: [success, message, tool]
+          properties:
+            success:
+              const: true
+            message:
+              type: string
+            tool:
+              $ref: '#/components/schemas/Tool'
+        - $ref: '#/components/schemas/StreamDoneFailure'
+
+    # shared/types/youtube.ts
+    VideoFormat:
+      type: object
+      required: [formatId, height, fps, ext, fileSize, videoCodec, label, needsMerge]
+      properties:
+        formatId:
+          type: string
+        height:
+          type: number
+        fps:
+          type: number
+        ext:
+          type: string
+        fileSize:
+          type: [number, 'null']
+        videoCodec:
+          type: string
+        label:
+          type: string
+        needsMerge:
+          type: boolean
+    AudioFormat:
+      type: object
+      required: [formatId, bitrate, ext, fileSize, audioCodec, label]
+      properties:
+        formatId:
+          type: string
+        bitrate:
+          type: number
+        ext:
+          type: string
+        fileSize:
+          type: [number, 'null']
+        audioCodec:
+          type: string
+        label:
+          type: string
+    YouTubeVideo:
+      type: object
+      required:
+        - kind
+        - urlType
+        - id
+        - url
+        - title
+        - description
+        - thumbnailUrl
+        - duration
+        - durationText
+        - viewCount
+        - likeCount
+        - uploader
+        - uploadDate
+        - videoFormats
+        - audioFormats
+      properties:
+        kind:
+          const: video
+        urlType:
+          type: string
+          enum: [video, shorts]
+        id:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        thumbnailUrl:
+          type: [string, 'null']
+        duration:
+          type: [number, 'null']
+        durationText:
+          type: [string, 'null']
+        viewCount:
+          type: [number, 'null']
+        likeCount:
+          type: [number, 'null']
+        uploader:
+          type: [string, 'null']
+        uploadDate:
+          type: [string, 'null']
+        videoFormats:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoFormat'
+        audioFormats:
+          type: array
+          items:
+            $ref: '#/components/schemas/AudioFormat'
+    ChannelEntry:
+      type: object
+      required: [id, title, url, thumbnailUrl, duration, durationText, viewCount, uploadDate]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+        thumbnailUrl:
+          type: string
+        duration:
+          type: [number, 'null']
+        durationText:
+          type: [string, 'null']
+        viewCount:
+          type: [number, 'null']
+        uploadDate:
+          type: [string, 'null']
+    YouTubeChannel:
+      type: object
+      required: [kind, urlType, url, channelPath, channelId, name, channelUrl, avatarUrl, videoCount, entries]
+      properties:
+        kind:
+          const: channel
+        urlType:
+          type: string
+          enum: [channel, channel-videos, channel-shorts]
+        url:
+          type: string
+        channelPath:
+          type: string
+        channelId:
+          type: string
+        name:
+          type: string
+        channelUrl:
+          type: string
+        avatarUrl:
+          type: [string, 'null']
+        videoCount:
+          type: number
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelEntry'
+    YouTubeMedia:
+      oneOf:
+        - $ref: '#/components/schemas/YouTubeVideo'
+        - $ref: '#/components/schemas/YouTubeChannel'
+      discriminator:
+        propertyName: kind
+        mapping:
+          video: '#/components/schemas/YouTubeVideo'
+          channel: '#/components/schemas/YouTubeChannel'
+
+    # shared/types/instagram.ts
+    InstagramUsername:
+      type: string
+      pattern: '^[A-Za-z0-9._]{1,30}$'
+      description: 1 to 30 letters, digits, periods and underscores. A leading @ is removed first.
+    InstagramFormat:
+      type: object
+      required: [height, label, ext, fileSize]
+      properties:
+        height:
+          type: number
+        label:
+          type: string
+        ext:
+          type: string
+        fileSize:
+          type: [number, 'null']
+    InstagramPost:
+      type: object
+      required:
+        - kind
+        - urlType
+        - id
+        - url
+        - shortcode
+        - title
+        - description
+        - thumbnailUrl
+        - width
+        - height
+        - duration
+        - durationText
+        - viewCount
+        - likeCount
+        - commentCount
+        - uploader
+        - uploadDate
+        - formats
+      properties:
+        kind:
+          const: post
+        urlType:
+          type: string
+          enum: [post, reel, story]
+        id:
+          type: string
+        url:
+          type: string
+        shortcode:
+          type: [string, 'null']
+        title:
+          type: string
+        description:
+          type: string
+        thumbnailUrl:
+          type: [string, 'null']
+        width:
+          type: [number, 'null']
+        height:
+          type: [number, 'null']
+        duration:
+          type: [number, 'null']
+        durationText:
+          type: [string, 'null']
+        viewCount:
+          type: [number, 'null']
+        likeCount:
+          type: [number, 'null']
+        commentCount:
+          type: [number, 'null']
+        uploader:
+          type: [string, 'null']
+        uploadDate:
+          type: [string, 'null']
+        formats:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstagramFormat'
+    ProfileEntry:
+      type: object
+      required: [id, shortcode, title, url, thumbnailUrl, duration, viewCount]
+      properties:
+        id:
+          type: string
+        shortcode:
+          type: string
+        title:
+          type: string
+        url:
+          type: string
+        thumbnailUrl:
+          type: [string, 'null']
+        duration:
+          type: [number, 'null']
+        viewCount:
+          type: [number, 'null']
+    InstagramProfile:
+      type: object
+      required: [kind, urlType, url, username, name, avatarUrl, postCount, isTruncated, entries]
+      properties:
+        kind:
+          const: profile
+        urlType:
+          type: string
+          enum: [profile, profile-reels, profile-tagged]
+        url:
+          type: string
+        username:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: [string, 'null']
+        postCount:
+          type: number
+        isTruncated:
+          type: boolean
+          description: The helper stops after a fixed number of posts (500), so a large profile comes back cut short.
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfileEntry'
+    InstagramMedia:
+      oneOf:
+        - $ref: '#/components/schemas/InstagramPost'
+        - $ref: '#/components/schemas/InstagramProfile'
+      discriminator:
+        propertyName: kind
+        mapping:
+          post: '#/components/schemas/InstagramPost'
+          profile: '#/components/schemas/InstagramProfile'
+    InstagramProfileEvent:
+      type: object
+      required: [username, name, postCount, avatarUrl]
+      properties:
+        username:
+          type: string
+        name:
+          type: string
+        postCount:
+          type: number
+        avatarUrl:
+          type: [string, 'null']
+    InstagramProgressEvent:
+      type: object
+      required: [fetchedCount, totalCount]
+      properties:
+        fetchedCount:
+          type: number
+        totalCount:
+          type: number
+    InstagramMediaDone:
+      oneOf:
+        - type: object
+          required: [success, message, media]
+          properties:
+            success:
+              const: true
+            message:
+              type: string
+            media:
+              $ref: '#/components/schemas/InstagramMedia'
+        - $ref: '#/components/schemas/StreamDoneFailure'
+    InstagramAccount:
+      type: object
+      required: [username, addedAt, hasSession]
+      properties:
+        username:
+          type: string
+        addedAt:
+          type: string
+        hasSession:
+          type: boolean
+    InstagramAccountList:
+      type: object
+      required: [data, total]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstagramAccount'
+        total:
+          type: integer
+    CreateInstagramAccountRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          $ref: '#/components/schemas/InstagramUsername'
+        password:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Sent to the login helper as typed; never logged or stored.
+    VerifyInstagramLoginRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          maxLength: 16
+          description: 6 to 8 digits once spaces are removed.
+    InstagramLoggedIn:
+      type: object
+      required: [status, account]
+      properties:
+        status:
+          const: loggedIn
+        account:
+          $ref: '#/components/schemas/InstagramAccount'
+    InstagramTwoFactorRequired:
+      type: object
+      required: [status, username]
+      properties:
+        status:
+          const: twoFactorRequired
+        username:
+          type: string
+    InstagramLoginResult:
+      oneOf:
+        - $ref: '#/components/schemas/InstagramLoggedIn'
+        - $ref: '#/components/schemas/InstagramTwoFactorRequired'
+      discriminator:
+        propertyName: status
+        mapping:
+          loggedIn: '#/components/schemas/InstagramLoggedIn'
+          twoFactorRequired: '#/components/schemas/InstagramTwoFactorRequired'
+
+    # shared/types/downloads.ts
+    Platform:
+      type: string
+      enum: [youtube, instagram]
+    VideoQuality:
+      type: string
+      enum: [best, 2160p, 1440p, 1080p, 720p, 480p, 360p]
+    DownloadStatus:
+      type: string
+      enum: [active, paused, interrupted]
+    FileNameOptions:
+      type: object
+      required: [prefix, suffix, template, sequenceNumber]
+      properties:
+        prefix:
+          type: string
+        suffix:
+          type: string
+        template:
+          type: string
+          description: A yt-dlp output template such as `%(uploader)s - %(title)s`; empty means the video title plus its id.
+        sequenceNumber:
+          type: [integer, 'null']
+          description: null turns numbering off.
+    FileNameOptionsInput:
+      type: object
+      description: Partial FileNameOptions as sent in a request; every field is optional.
+      properties:
+        prefix:
+          type: string
+          maxLength: 100
+        suffix:
+          type: string
+          maxLength: 100
+        template:
+          type: string
+          maxLength: 200
+        sequenceNumber:
+          type: [integer, 'null']
+          minimum: 1
+          maximum: 99999
+    DownloadOptions:
+      type: object
+      required: [quality, isAudioOnly, outputDir, fileName, account]
+      properties:
+        quality:
+          $ref: '#/components/schemas/VideoQuality'
+        isAudioOnly:
+          type: boolean
+        outputDir:
+          type: [string, 'null']
+        fileName:
+          $ref: '#/components/schemas/FileNameOptions'
+        account:
+          type: [string, 'null']
+    Download:
+      type: object
+      required: [id, platform, url, title, status, options, startedAt, pausedAt]
+      properties:
+        id:
+          type: string
+          pattern: '^[a-f0-9]{16}$'
+        platform:
+          $ref: '#/components/schemas/Platform'
+        url:
+          type: string
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/DownloadStatus'
+        options:
+          $ref: '#/components/schemas/DownloadOptions'
+        startedAt:
+          type: string
+          format: date-time
+        pausedAt:
+          type: [string, 'null']
+          format: date-time
+    DownloadList:
+      type: object
+      required: [data, total]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Download'
+        total:
+          type: integer
+    CreateDownloadRequest:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          maxLength: 2048
+          description: One YouTube video or Shorts link, or one Instagram post, reel or story link.
+        quality:
+          $ref: '#/components/schemas/VideoQuality'
+        isAudioOnly:
+          type: boolean
+          default: false
+        outputDir:
+          type: [string, 'null']
+          description: The download folder. A folder that does not exist falls back to the default one, with a warning.
+        fileName:
+          $ref: '#/components/schemas/FileNameOptionsInput'
+        account:
+          oneOf:
+            - $ref: '#/components/schemas/InstagramUsername'
+            - type: 'null'
+    DownloadPhase:
+      type: string
+      enum: [video, audio, merging]
+    DownloadProgressEvent:
+      type: object
+      required: [percent, speed, eta, title, phase, isMultiFile]
+      properties:
+        percent:
+          type: number
+        speed:
+          type: string
+        eta:
+          type: string
+        title:
+          type: string
+        phase:
+          $ref: '#/components/schemas/DownloadPhase'
+        isMultiFile:
+          type: boolean
+    DownloadPhaseEvent:
+      type: object
+      required: [phase, label, isMultiFile]
+      properties:
+        phase:
+          $ref: '#/components/schemas/DownloadPhase'
+        label:
+          type: string
+        isMultiFile:
+          type: boolean
+    DownloadStartEvent:
+      type: object
+      required: [download, willMerge]
+      properties:
+        download:
+          $ref: '#/components/schemas/Download'
+        willMerge:
+          type: boolean
+    DownloadTitleEvent:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+    DownloadPausedEvent:
+      type: object
+      required: [download]
+      properties:
+        download:
+          $ref: '#/components/schemas/Download'
+    DownloadDone:
+      oneOf:
+        - type: object
+          required: [success, message, title, filePath]
+          properties:
+            success:
+              const: true
+            message:
+              type: string
+            title:
+              type: string
+            filePath:
+              type: string
+        - $ref: '#/components/schemas/StreamDoneFailure'
+    BatchItem:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          maxLength: 2048
+        title:
+          type: string
+          maxLength: 200
+    CreateDownloadBatchRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          items:
+            $ref: '#/components/schemas/BatchItem'
+        quality:
+          $ref: '#/components/schemas/VideoQuality'
+        isAudioOnly:
+          type: boolean
+          default: false
+        outputDir:
+          type: [string, 'null']
+        fileName:
+          $ref: '#/components/schemas/FileNameOptionsInput'
+        account:
+          oneOf:
+            - $ref: '#/components/schemas/InstagramUsername'
+            - type: 'null'
+    BatchStartEvent:
+      type: object
+      required: [total]
+      properties:
+        total:
+          type: integer
+    BatchItemStartEvent:
+      type: object
+      required: [index, url, title]
+      properties:
+        index:
+          type: integer
+        url:
+          type: string
+        title:
+          type: string
+    BatchItemProgressEvent:
+      type: object
+      required: [index, percent]
+      properties:
+        index:
+          type: integer
+        percent:
+          type: number
+    BatchItemDoneEvent:
+      type: object
+      required: [index, isSuccess, filePath, message]
+      properties:
+        index:
+          type: integer
+        isSuccess:
+          type: boolean
+        filePath:
+          type: [string, 'null']
+        message:
+          type: [string, 'null']
+    DownloadBatchDone:
+      oneOf:
+        - type: object
+          required: [success, message, succeededCount, failedCount]
+          properties:
+            success:
+              const: true
+            message:
+              type: string
+            succeededCount:
+              type: integer
+            failedCount:
+              type: integer
+        - $ref: '#/components/schemas/StreamDoneFailure'
+
+    # shared/types/transcriptions.ts
+    WhisperModelId:
+      type: string
+      enum: [tiny, base, small, medium, large]
+    WhisperModel:
+      type: object
+      required: [id, label, sizeMb, isDownloaded]
+      properties:
+        id:
+          $ref: '#/components/schemas/WhisperModelId'
+        label:
+          type: string
+        sizeMb:
+          type: number
+        isDownloaded:
+          type: boolean
+    WhisperModelList:
+      type: object
+      required: [data, total]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/WhisperModel'
+        total:
+          type: integer
+    ModelPhaseEvent:
+      type: object
+      required: [modelId, phase, message, isSkipped]
+      properties:
+        modelId:
+          $ref: '#/components/schemas/WhisperModelId'
+        phase:
+          type: string
+          enum: [downloading, done, error]
+        message:
+          type: string
+        isSkipped:
+          type: boolean
+    ModelProgressEvent:
+      allOf:
+        - $ref: '#/components/schemas/TransferProgress'
+        - type: object
+          required: [modelId]
+          properties:
+            modelId:
+              $ref: '#/components/schemas/WhisperModelId'
+    ModelDownloadDone:
+      oneOf:
+        - type: object
+          required: [success, message, model]
+          properties:
+            success:
+              const: true
+            message:
+              type: string
+            model:
+              $ref: '#/components/schemas/WhisperModel'
+        - $ref: '#/components/schemas/StreamDoneFailure'
+    TranscriptionLanguage:
+      type: string
+      pattern: '^(auto|[a-z]{2,3})$'
+      default: auto
+      description: '"auto" lets whisper detect the language; otherwise a two or three letter code such as "en".'
+    CreateTranscriptionRequest:
+      type: object
+      required: [filePath]
+      properties:
+        filePath:
+          type: string
+          maxLength: 2048
+          description: An absolute path to a file on disk.
+        modelId:
+          allOf:
+            - $ref: '#/components/schemas/WhisperModelId'
+          default: base
+        language:
+          $ref: '#/components/schemas/TranscriptionLanguage'
+    TranscriptionPhaseEvent:
+      type: object
+      required: [phase, message]
+      properties:
+        phase:
+          type: string
+          enum: [extracting, transcribing]
+        message:
+          type: string
+    TranscriptionProgressEvent:
+      type: object
+      required: [percent]
+      properties:
+        percent:
+          type: number
+    TranscriptionChunkEvent:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+    TranscriptionDone:
+      oneOf:
+        - type: object
+          required: [success, message, text, outputPath]
+          properties:
+            success:
+              const: true
+            message:
+              type: string
+            text:
+              type: string
+            outputPath:
+              type: string
+        - $ref: '#/components/schemas/StreamDoneFailure'
+
+    # shared/types/folders.ts
+    Folder:
+      type: object
+      required: [path, exists]
+      properties:
+        path:
+          type: string
+        exists:
+          type: boolean
+    PickedFolder:
+      type: object
+      required: [path]
+      properties:
+        path:
+          type: [string, 'null']
+          description: null when the person closed the picker without choosing.

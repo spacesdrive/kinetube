@@ -1,77 +1,158 @@
-# Release Workflow
+# Release workflow
 
 ## Overview
 
-Releases are built by `.github/workflows/release.yml` on every push of a `v*` tag, across three runners in parallel (`windows-latest`, `macos-latest`, `ubuntu-latest`), and published to the same GitHub Release via `softprops/action-gh-release`.
+Pushing a tag that starts with `v` runs `.github/workflows/release.yml`. It builds on three runners in parallel (`windows-latest`, `macos-latest`, `ubuntu-latest`) and uploads every installer to the same GitHub Release with `softprops/action-gh-release`.
 
-**Read `docs/philosophy/CROSS_PLATFORM.md` before promoting the macOS or Linux artifact as a real release.** The workflow successfully produces a `.dmg` and an `.AppImage`, but as of this writing the app's core features (download, transcription, Instagram scraping) do not work on those platforms because the tool managers only fetch Windows binaries. Do not announce macOS/Linux support as complete until that gap is closed.
+**Read `docs/philosophy/CROSS_PLATFORM.md` before you announce macOS or Linux support.** The tool managers resolve the right yt-dlp, FFmpeg and whisper.cpp build for each platform, but the macOS and Linux paths have not been verified on real hardware. The workflow builds a `.dmg` and an `.AppImage`; treat them as untested until someone runs the setup flow and a download on a real Mac and Linux machine.
 
-## electron-builder Configuration (`package.json` -> `build`)
+## Targets
 
-| Platform | Target | Arch |
-|---|---|---|
-| Windows | `nsis` | x64 |
-| macOS | `dmg` | x64, arm64 |
-| Linux | `AppImage` | x64 |
+electron-builder reads the `build` section of the root `package.json`.
 
-```json
-"extraResources": [
-    { "from": "backend", "to": "backend", "filter": ["**/*", "!.env", "!downloads/*.exe", "!downloads/*.dll", "!downloads/*.zip", "!downloads/*.bin", "!downloads/*.mp4", "!downloads/*.webm", "!downloads/*.mkv", "!downloads/*.mp3", "!downloads/*.m4a", "!models/**"] },
-    { "from": "frontend/dist", "to": "frontend/dist" }
-]
-```
-
-Managed binaries, downloaded media, and models are excluded from the packaged app on every platform - they are fetched on first run into `app.getPath('userData')` instead (see `backend/utils/paths.js`). This keeps the installer small and lets tool versions update independently of app releases, but it also means **every platform's first launch requires a working internet connection** to become useful.
-
-`asar: false` - the app is shipped unpacked so the Express backend's `require()` graph resolves normally under `utilityProcess.fork` without asar-path translation concerns.
-
-## Local Build Commands
-
-```bash
-npm run build:frontend    # vite build -> frontend/dist
-npm run build:backend     # npm install --omit=dev inside backend/
-npm run dist:win          # build:frontend + build:backend + electron-builder --win
-npm run dist:mac          # ... --mac
-npm run dist:linux        # ... --linux
-npm run dist              # all configured targets for the current host platform
-```
-
-Cross-compiling is not attempted locally - `dist:mac` must run on macOS (or CI's `macos-latest` runner) to produce a signed-enough `.dmg`; `dist:win`/`dist:linux` have the same constraint per electron-builder's own platform requirements.
-
-## GitHub Actions Release Flow (`.github/workflows/release.yml`)
-
-Trigger: push of a tag matching `v*`.
-
-| Matrix entry | Runner | Script | Published artifact |
+| Platform | Target | Arch | Output |
 |---|---|---|---|
-| Windows | `windows-latest` | `dist:win` | `dist/*.exe` |
-| macOS | `macos-latest` | `dist:mac` | `dist/*.dmg` |
-| Linux | `ubuntu-latest` | `dist:linux` | `dist/*.AppImage` |
+| Windows | `nsis` | x64 | `dist/KineTube-Setup-<version>.exe` |
+| macOS | `dmg` | x64, arm64 | `dist/*.dmg` |
+| Linux | `AppImage` | x64 | `dist/*.AppImage` |
 
-Each job: checkout, Node 20 setup, `npm install` at root, `npm install` in `frontend/`, `npm install --omit=dev` in `backend/`, run the platform's `dist:*` script, upload the artifact plus `dist/latest*.yml` (used by `electron-updater` for auto-update version checks) to the GitHub Release.
+All three use `build/icon.png`. `asar` is `false`, so the app files are shipped as plain files.
 
-`fail-fast: false` is set deliberately - a build failure on one platform should not cancel the other two in-flight builds.
+## What goes into the package
 
-## Auto-Update
+`files` holds the Electron part of the app:
 
-`electron-updater` reads `dist/latest*.yml` (per-platform: `latest.yml`, `latest-mac.yml`, `latest-linux.yml`) from the GitHub Release to determine whether an update is available. See `docs/architecture/electron/MAIN_PROCESS.md` - Auto-Updater for the in-app flow. No additional server or config is required beyond the GitHub Release itself; `electron-builder`'s `publish.provider: "github"` block in `package.json` wires this up.
+- `electron/dist/**/*`: the compiled main process and preload script
+- `electron/loading.html`: the page shown until the backend answers `/health`
 
-**The NSIS artifact filename must never contain a space.** Because this workflow builds with `--publish never` and uploads the raw `dist/*.exe` file itself (rather than letting `electron-builder` publish and rename it), the filename that ends up in `dist/latest.yml` and the filename of the actual uploaded asset must be byte-for-byte identical, or `electron-updater` 404s trying to download the update (see `DECISIONS.md` ADR-014). electron-builder's default NSIS `artifactName` template is `${productName} Setup ${version}.${ext}` (with literal spaces), but it always writes a space-free, GitHub-safe name into `latest.yml`. GitHub's asset upload API also silently rewrites spaces in a filename to dots on upload - so the two space-free names it produces (`latest.yml`'s dash-separated name vs. GitHub's dot-separated rename) never matched. `build.nsis.artifactName` in `package.json` is pinned to `${productName}-Setup-${version}.${ext}` (no spaces) specifically so the built file, the GitHub asset, and `latest.yml` all agree on the same name.
+`extraResources` copies two folders next to the app, into `resources/`:
 
-## Cutting a Release
+| From | To | Notes |
+|---|---|---|
+| `backend` | `resources/backend` | The compiled backend in `dist/`, `package.json`, the production `node_modules`, and the Python helpers in `python/` |
+| `frontend/dist` | `resources/frontend/dist` | The built React app, served by the backend |
 
-1. Ensure `CHANGELOG.md`'s `[Unreleased]` section reflects everything shipped since the last tag
-2. Bump `version` in `package.json` (root) - this becomes the app version and the tag name
-3. Move `[Unreleased]` to a new version heading with today's date in `CHANGELOG.md`
-4. Commit: `release: vX.Y.Z - short description`
-5. Tag: `git tag -a vX.Y.Z -m "vX.Y.Z - short description"`
-6. Push: `git push origin main --tags`
-7. Watch `.github/workflows/release.yml` run for all three platforms at https://github.com/spacesdrive/kinetube/actions
-8. Verify the GitHub Release has all three artifacts plus the `latest*.yml` files before announcing
-9. Verify the `url`/`path` filename inside each `latest*.yml` exactly matches the corresponding uploaded asset's filename (`gh release view vX.Y.Z --json assets` vs. `gh release download vX.Y.Z --pattern "latest*.yml" --output -`) - a mismatch means the in-app updater will 404 even though the release page looks correct
+The `backend` copy leaves out:
 
-## Verifying a Release
+| Pattern | Why |
+|---|---|
+| `.env` | Local secrets, if one ever exists |
+| `src/**`, `tests/**`, `tsconfig*.json`, `*.tsbuildinfo` | TypeScript sources and build files; the package runs `dist/` |
+| `python/__pycache__/**` | Python byte-code caches |
+| `pending-downloads.json` | The developer's own download records |
+| `sessions/**` | Instagram session files and `accounts.json` |
+| `downloads/*.exe`, `*.dll`, `*.zip`, `*.bin` | Windows tool binaries and archives |
+| `downloads/yt-dlp`, `ffmpeg`, `whisper-cli`, `main`, `*.so`, `*.so.*`, `*.dylib`, `*.tar.xz`, `*.download` | macOS and Linux tool binaries, their libraries and archives, and an unfinished yt-dlp update |
+| `downloads/*.mp4`, `*.webm`, `*.mkv`, `*.mp3`, `*.m4a` | Downloaded media |
+| `models/**` | Whisper models |
 
-- **Windows:** download and run the `.exe`, confirm first-run tool setup completes and a YouTube download succeeds
-- **macOS / Linux:** download and run the artifact, confirm the app launches and reaches the setup screen - do not yet expect downloads/transcription/Instagram to work; see `docs/philosophy/CROSS_PLATFORM.md`
-- Confirm the in-app updater detects the new version from a previous install (bump a test build's version down temporarily if needed to verify the update prompt appears)
+Tools, models and sessions are fetched or created on first run under Electron's `userData` folder instead. This keeps the installer small and lets tool versions change without an app release. It also means **the first start on every platform needs an internet connection**.
+
+When a manager starts writing a new file name into `backend/downloads/`, add it to this filter and to `.gitignore` in the same commit.
+
+## Build steps
+
+All scripts are in the root `package.json`.
+
+| Script | What it does |
+|---|---|
+| `npm run build:electron` | `tsc -b electron`: compiles `electron/src/*.ts` to CommonJS in `electron/dist/`. Electron 33 runs Node 20, which cannot run `.ts` files. |
+| `npm run build:frontend` | `cd frontend && npm run build`: `tsc -b`, then `vite build` into `frontend/dist/` |
+| `npm run build:backend` | `cd backend && npm run build && npm prune --omit=dev`: `tsc -b tsconfig.build.json` into `backend/dist/`, then removes the backend's dev dependencies |
+| `npm run build` | All three, in that order |
+| `npm run dist` | `build`, then `electron-builder --publish never` for the current platform's targets |
+| `npm run dist:win` | `build`, then `electron-builder --win --publish never` |
+| `npm run dist:mac` | `build`, then `electron-builder --mac --publish never` |
+| `npm run dist:linux` | `build`, then `electron-builder --linux --publish never` |
+
+**`build:backend` prunes the backend's dev dependencies** (TypeScript, `supertest`, the `@types` packages). After any `build` or `dist` script, run `cd backend && npm install` before you type check, test or run `npm run dev` again.
+
+Run each `dist:*` script on its own platform. `dist:mac` needs macOS. The project builds each platform on its own CI runner and does not try cross-building.
+
+## Environment variables Electron passes to the backend
+
+In a packaged build, `electron/src/backendProcess.ts` starts `resources/backend/dist/server.js` with `utilityProcess.fork`. The child gets Electron's own environment plus:
+
+| Variable | Value | Read by |
+|---|---|---|
+| `PORT` | `3001` | `readConfig` in `backend/src/config.ts`; the default is also 3001 |
+| `ELECTRON_APP` | `1` | `readConfig`: turns on serving the built frontend |
+| `ELECTRON_USER_DATA` | `app.getPath('userData')` | `readConfig`: the data folder for tools, models, sessions and `pending-downloads.json` |
+| `ELECTRON_FRONTEND_DIST` | `resources/frontend/dist` | `readConfig`: the folder the backend serves the page from |
+
+Without `ELECTRON_USER_DATA` (in development) the data folder is `backend/` itself. The backend listens on `127.0.0.1` only. Electron waits for `/health` (40 tries, half a second apart), then loads `http://localhost:3001`. The backend's output goes to `backend.log` in the `userData` folder.
+
+## The 7-Zip patch (`scripts/patch-7zip.mts`)
+
+electron-builder unpacks its `winCodeSign` tools with the bundled `7za.exe` from `7zip-bin`. That archive holds a `darwin/` folder with symbolic links. On Windows, creating symbolic links needs administrator rights or Developer Mode, so the unpack fails on a normal account and the Windows build stops.
+
+The root `postinstall` script runs `node scripts/patch-7zip.mts` after every `npm install` in the root:
+
+1. On macOS and Linux it does nothing.
+2. On Windows it compiles a small C# wrapper with `csc.exe` from the .NET Framework 4.
+3. It renames `node_modules/7zip-bin/win/x64/7za.exe` to `7za-real.exe` and puts the wrapper in its place.
+4. The wrapper passes every argument through unchanged and adds `-xr!darwin` to extract and list commands, so the `darwin/` folder is skipped.
+
+The script stops early if `7za-real.exe` already exists, so running it twice is safe. If `csc.exe` cannot be found, it exits with an error and the root `npm install` fails. Install the .NET Framework 4 in that case. The Windows runner in CI runs the same patch.
+
+## GitHub Actions release flow (`.github/workflows/release.yml`)
+
+Trigger: a pushed tag matching `v*`. The workflow has `contents: write` permission so it can create the release.
+
+| Matrix entry | Runner | Script | Uploaded files |
+|---|---|---|---|
+| Windows | `windows-latest` | `dist:win` | `dist/*.exe`, `dist/latest*.yml` |
+| macOS | `macos-latest` | `dist:mac` | `dist/*.dmg`, `dist/latest*.yml` |
+| Linux | `ubuntu-latest` | `dist:linux` | `dist/*.AppImage`, `dist/latest*.yml` |
+
+Each job runs these steps:
+
+1. Check out the repository.
+2. Set up Node 22 with the npm cache. Node 22 runs the `.mts` scripts directly.
+3. `npm install` in the root. This also runs the 7-Zip patch.
+4. `npm install` in `frontend/`.
+5. `npm install` in `backend/`, with dev dependencies, because the build compiles the backend before it prunes them.
+6. `npm run typecheck && npm test`. A type error or a failing test stops the job before anything is packaged.
+7. `npm run <platform script>` with `GH_TOKEN` set.
+8. Upload the installer and `dist/latest*.yml` to the GitHub Release, with generated release notes.
+
+`fail-fast` is `false`, so a failure on one platform does not cancel the other two builds.
+
+## Auto-update
+
+`electron-updater` reads `latest.yml`, `latest-mac.yml` and `latest-linux.yml` from the GitHub Release to find out whether a newer version exists. The `publish` block in `package.json` (`provider: github`, `owner: spacesdrive`, `repo: kinetube`) tells it where to look. No other server is needed. See `docs/architecture/electron/MAIN_PROCESS.md` for the in-app flow: the app checks five seconds after start, and the person chooses when to download and install.
+
+**The NSIS file name must never contain a space.** The workflow builds with `--publish never` and uploads `dist/*.exe` itself. The file name written into `latest.yml` and the name of the uploaded asset must match exactly, or the updater gets a 404 when it downloads the update (ADR-014). By default, electron-builder puts spaces in the NSIS file name, and GitHub replaces spaces with dots on upload, so the two names never matched. To fix this, `build.nsis.artifactName` is set to `${productName}-Setup-${version}.${ext}`, so the built file, the GitHub asset and `latest.yml` all use the same name.
+
+## Versioning and tagging
+
+The version in the root `package.json` is the app version and the tag name. Follow semantic versioning:
+
+| Change | Bump | Example |
+|---|---|---|
+| Bug fixes only | Patch | v1.6.0 to v1.6.1 |
+| New features | Minor | v1.6.1 to v1.7.0 |
+| Breaking changes | Major | v1.7.0 to v2.0.0 |
+
+## Cutting a release
+
+1. Check that the `[Unreleased]` section of `CHANGELOG.md` lists everything since the last tag.
+2. Bump `version` in the root `package.json`.
+3. In `CHANGELOG.md`, move `[Unreleased]` under a new version heading with today's date.
+4. Commit, then tag and push:
+
+   ```bash
+   git commit -m "release: vX.Y.Z - short description"
+   git tag -a vX.Y.Z -m "vX.Y.Z - Short description"
+   git push origin main --tags
+   ```
+
+5. Watch the workflow for all three platforms at https://github.com/spacesdrive/kinetube/actions.
+6. Check that the GitHub Release has all three installers and the `latest*.yml` files.
+7. Check that the `url` and `path` in each `latest*.yml` match the uploaded file names exactly. Compare `gh release view vX.Y.Z --json assets` with `gh release download vX.Y.Z --pattern "latest*.yml" --output -`. A mismatch means the in-app updater will fail even though the release page looks fine.
+
+## Verifying a release
+
+- Windows: install the `.exe`, let the setup screen install yt-dlp and FFmpeg, and download a YouTube video.
+- macOS and Linux: install the artifact and check that the app starts and reaches the setup screen. Record what works and what fails in `docs/philosophy/CROSS_PLATFORM.md`.
+- Updater: from an older installed version, check that the update dialog finds the new release. If needed, build a test version with a lower version number to see the prompt.

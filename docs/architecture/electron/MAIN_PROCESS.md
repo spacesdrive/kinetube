@@ -1,69 +1,130 @@
-# Electron Main Process
+# Electron main process
 
 ## Files
 
-| File | Responsibility |
+The main process is written in TypeScript in `electron/src/` and compiled to `electron/dist/`.
+
+| File | What it does |
 |---|---|
-| `electron/main.js` | Window lifecycle, backend process management, auto-updater, IPC handlers, single-instance lock |
-| `electron/preload.js` | Context-isolated bridge exposing `window.electronAPI` to the renderer |
-| `electron/loading.html` | Static splash screen shown while the packaged backend boots |
+| `main.ts` | The entry point. Removes the native menu, registers the IPC handlers, takes the single-instance lock, creates the window, sets up the updater, starts the backend in a packaged build, and stops it on quit. |
+| `appPaths.ts` | `isDev` (`!app.isPackaged`), `BACKEND_PORT` (3001), `APP_URL` (`http://localhost:3001`), `DEV_SERVER_URL` (`http://localhost:5173`), and the paths to the preload script, loading page, icon, backend entry, frontend build and `backend.log`. |
+| `backendProcess.ts` | `startBackend` forks the backend in a utility process. `waitForBackend` polls `/health`. |
+| `backendLog.ts` | Opens, writes and reads `backend.log`. |
+| `mainWindow.ts` | `createMainWindow` builds the `BrowserWindow`. |
+| `ipcHandlers.ts` | The `open-folder-dialog` and `get-app-version` handlers. |
+| `updater.ts` | `setUpAutoUpdater`: the three update handlers and the `update-status` events. |
+| `errorPages.ts` | The two error pages, built as `data:` URLs with the text HTML-escaped. |
+| `preload.ts` | Exposes `window.electronAPI` to the page through `contextBridge`. |
 
-## Window Creation
+`electron/loading.html` is a static page. It is not compiled, and the window shows it while the packaged backend starts.
 
-`createWindow()` builds a single `BrowserWindow` with `contextIsolation: true` and `nodeIntegration: false`. The renderer gets no Node.js access except what `preload.js` explicitly exposes on `window.electronAPI`. Do not weaken this without a specific, reviewed reason - it is the app's only real security boundary given how much of the app talks to the open internet (YouTube, Instagram, GitHub releases, Hugging Face).
+## Why it compiles to CommonJS
 
-- `ready-to-show` is used to avoid a blank white flash before first paint.
-- `setWindowOpenHandler` redirects any `target="_blank"` link to the system browser via `shell.openExternal` instead of opening a second Electron window.
-- F12 toggles DevTools in every build (dev and packaged) - this is intentional, to make support/debugging possible without a dev environment.
+Electron 33 runs on its own Node 20, which cannot run `.ts` files (ADR-029). So `npm run build:electron` (`tsc -b electron`) compiles `electron/src/` to `electron/dist/`, and the root `package.json` points `main` at `electron/dist/main.js`.
 
-## Backend Process Management
+`electron/tsconfig.json` uses `"module": "nodenext"`. The root `package.json` has no `"type": "module"`, so `tsc` writes CommonJS. `appPaths.ts` relies on that: it uses `__dirname` to find `preload.js` next to it and the project root two folders up.
 
-| Mode | How the backend starts | How readiness is detected |
+`preload.ts` and `updater.ts` import `shared/types/electron.ts` by relative path with `import type`, so the compiled files have no import of it. `npm run dev` runs `build:electron` before it starts anything, so a change in `electron/src/` needs a restart of `npm run dev`.
+
+The packaged app includes `electron/dist/**/*` and `electron/loading.html` (`build.files` in `package.json`).
+
+## Window lifecycle
+
+`createMainWindow` builds one window: 1280 by 800, at least 960 by 640, titled KineTube, with `build/icon.png`.
+
+- `webPreferences` sets `contextIsolation: true`, `nodeIntegration: false` and the compiled preload script. The page has no Node access. Do not change this without a reviewed reason: the app loads data from YouTube, Instagram, GitHub and Hugging Face.
+- The window starts hidden and shows on `ready-to-show`, so there is no white flash.
+- `setWindowOpenHandler` opens any new-window link in the system browser with `shell.openExternal` and denies the Electron window.
+- F12 toggles the developer tools in every build. This is on purpose, so a problem can be looked at without a development setup.
+- `Menu.setApplicationMenu(null)` removes the native File, Edit and View menu, because the app has its own sidebar.
+
+What the window loads depends on the build:
+
+| Build | First page | Then |
 |---|---|---|
-| Dev (`npm run dev`) | `concurrently` runs `node --watch backend/server.js` directly; Electron does not spawn it | `wait-on` blocks the `electron` command until `:3001` and `:5173` both respond |
-| Packaged | `startBackend()` calls `utilityProcess.fork(getServerPath(), [], { env, stdio: 'pipe' })` after `app.whenReady()` | `waitForServer()` polls `GET http://localhost:3001/health` every 500ms, up to 40 attempts (~20s), before navigating the window |
+| Development | `http://localhost:5173` (Vite) | Nothing more. The `npm run dev` script runs the backend. |
+| Packaged | `electron/loading.html` | `loadPackagedApp` starts the backend if it is not running, waits for `/health`, and loads `http://localhost:3001`. |
 
-`utilityProcess.fork` (not `child_process.fork`) is used so the backend runs inside Electron's own bundled Node.js runtime - the packaged app does not need a separate Node.js installation on the user's machine.
+If the page at `http://localhost:3001` fails to load, a one-time `did-fail-load` handler writes the error to `backend.log` and shows `loadFailurePage` with the error code and description.
 
-**Dev Electron launch:** `npm run dev`'s Electron step runs `node scripts/run-electron.js` rather than invoking the `electron` binary directly. The wrapper resolves the real Electron binary via `require('electron')` and strips `ELECTRON_RUN_AS_NODE` from the child's environment before spawning it - that variable is commonly leaked into a dev shell by an Electron-based host terminal (VS Code, Cursor, etc.) and, if inherited, makes the spawned Electron process behave as plain Node.js instead of launching the actual runtime, crashing at the `electron-updater` require with `app` undefined before any window opens. See `DECISIONS.md` ADR-018. This only affects `npm run dev` - `dist:*` scripts invoke `electron-builder`, not `electron`, and the packaged, installed app is launched by the OS, not this wrapper.
+## Backend start and health check
 
-Environment variables injected into the backend process:
+In development, Electron does not start the backend. `npm run dev` runs `node --watch src/server.ts` in `backend/` and starts Electron only after `wait-on` sees `http://127.0.0.1:3001/health` and `http://localhost:5173`. It starts Electron through `scripts/run-electron.mts`, which removes `ELECTRON_RUN_AS_NODE` from the environment (ADR-018). Editor terminals often set that variable, and with it Electron runs as plain Node and crashes when it loads `electron-updater`.
 
-| Variable | Purpose |
+In a packaged build, `startBackend` calls `utilityProcess.fork` on `resources/backend/dist/server.js` with `stdio: 'pipe'`. A utility process runs on Electron's own Node, so the person needs no Node install (ADR-002). It sets these variables:
+
+| Variable | Value | Used for |
+|---|---|---|
+| `PORT` | `3001` | The port the backend listens on. |
+| `ELECTRON_APP` | `1` | Tells `readConfig` that it runs inside Electron. |
+| `ELECTRON_USER_DATA` | `app.getPath('userData')` | The writable data folder. |
+| `ELECTRON_FRONTEND_DIST` | `resources/frontend/dist` | The built frontend that the backend serves. |
+
+`waitForBackend` sends `GET http://127.0.0.1:3001/health` up to 40 times, 500 ms apart (about 20 seconds). The request names `127.0.0.1` because the backend listens there only. It sets `Host: localhost:3001`, which the origin guard accepts. Any status below 500 counts as healthy.
+
+If `/health` never answers, `main.ts` writes a line to the log and loads `backendFailurePage`. That page shows the path of `backend.log` and its contents, so the person can report the problem.
+
+## backend.log
+
+`backend.log` sits in `app.getPath('userData')`. `openBackendLog` opens it with the `w` flag when the packaged backend starts, so it always holds the latest run only. In development it is never opened, and lines only go to the terminal.
+
+`writeLog` writes each line to the file and to the main process's stdout. The lines have these prefixes:
+
+| Prefix | Source |
 |---|---|
-| `PORT` | Always `3001` |
-| `ELECTRON_APP` | Set to `'1'`; tells `backend/server.js` to relax CORS and serve the static frontend build |
-| `ELECTRON_USER_DATA` | `app.getPath('userData')`; the writable data root - see `backend/utils/paths.js` |
-| `ELECTRON_FRONTEND_DIST` | Absolute path to the packaged `frontend/dist` folder |
+| `[main]` | The main process: the backend entry path, a failed health check, a failed page load. |
+| `[backend]` | Backend stdout. The backend logs one JSON object per line (`backend/src/lib/logger.ts`). |
+| `[backend:err]` | Backend stderr. |
+| `[updater]`, `[updater:warn]`, `[updater:err]` | `electron-updater`'s logger and update errors. |
 
-If the backend fails to become healthy within the timeout, `main.js` reads `backend.log` (written by `openLog()`/`writeLog()` in `app.getPath('userData')`) and renders it inline as a data URL error page rather than showing a blank window - this is the only diagnostic surface a non-technical user has if the app cannot start.
+## Single instance and shutdown
 
-## Auto-Updater
+- `app.requestSingleInstanceLock()` runs before the app is ready. A second launch quits at once. The first instance gets `second-instance`, restores its window if it is minimized, and focuses it.
+- `before-quit` kills the backend process, so it never outlives Electron.
+- On macOS, `window-all-closed` does not quit the app, which matches the platform, and the backend keeps running. On other platforms it quits.
+- `activate` (macOS) opens a new window through the same `openWindow()` as the first one. In a packaged build it finds the backend still running and loads the app; if the backend has exited, it starts a new one.
 
-`setupAutoUpdater()` wires `electron-updater`'s `autoUpdater` to the `update-status` IPC channel, consumed by `frontend/src/components/UpdateDialog.jsx` via `window.electronAPI.onUpdateStatus()`.
+## Updater
 
-- Skipped entirely in dev (`isDev` check) - `app-update.yml` only exists in a packaged build.
-- `autoDownload = false` and `autoInstallOnAppQuit = false` - the user must explicitly click "Update Now" in the dialog; downloads and installs never happen silently.
-- The first update check is delayed 5 seconds after app ready, so the main window has time to paint before any network activity starts.
-- IPC handlers `download-update` and `install-update` are invoked from the renderer through `window.electronAPI.downloadUpdate()` / `installUpdate()`.
-- `check-for-updates` lets the renderer trigger an additional check on demand (used by the "Check for Updates" button in Settings - see `DECISIONS.md` ADR-019). It short-circuits with `{ devMode: true }` in dev rather than calling `autoUpdater.checkForUpdates()`, since that throws without a packaged build's `app-update.yml`.
+`setUpAutoUpdater` in `updater.ts` uses `electron-updater`'s `autoUpdater` with the GitHub provider from `build.publish` in `package.json`.
 
-## IPC Surface
+- Nothing downloads or installs without the person's click: `autoDownload` and `autoInstallOnAppQuit` are both `false`.
+- A first check runs 5 seconds after the window is created, so it never slows the start.
+- `check-for-updates`, `download-update` and `install-update` are registered in every build. In development, `check-for-updates` answers `{ isDevMode: true }` without calling the updater, because `app-update.yml` exists only in a packaged build. The updater events and the first check are set up in packaged builds only.
+- `download-update` calls `autoUpdater.downloadUpdate()`. `install-update` calls `autoUpdater.quitAndInstall(false, true)`: on Windows the installer is not silent, and KineTube starts again when it finishes.
+- Every updater event is sent to the window on the `update-status` channel.
 
-The entire main-process-to-renderer API is defined in `preload.js`:
+In the renderer, `useUpdateNotice` (`frontend/src/hooks/`) opens `UpdateDialog` when an `available` status arrives. `UpdateDialog` follows the download progress and offers to install. `useAppUpdateCheck` (`frontend/src/features/settings/`) runs the manual check on the About card in Settings (ADR-019).
 
-| Channel | Direction | Purpose |
+## IPC channels
+
+The whole bridge is `ElectronApi` in `shared/types/electron.ts`. `preload.ts` implements it and exposes it as `window.electronAPI`.
+
+| Channel | Direction | Renderer method | Result or payload |
+|---|---|---|---|
+| `open-folder-dialog` | Renderer to main (`invoke`) | `openFolderDialog()` | `string \| null`: the picked folder, or `null` if cancelled. |
+| `get-app-version` | Renderer to main (`invoke`) | `getAppVersion()` | `string` from `app.getVersion()`. |
+| `check-for-updates` | Renderer to main (`invoke`) | `checkForUpdates()` | `UpdateCheckResult`: `{ isDevMode: boolean }`. |
+| `download-update` | Renderer to main (`invoke`) | `downloadUpdate()` | `void` |
+| `install-update` | Renderer to main (`invoke`) | `installUpdate()` | `void` |
+| `update-status` | Main to renderer (`send`) | `onUpdateStatus(callback)` | `UpdateStatus` (below). `onUpdateStatus` returns a function that removes the listener. |
+
+`UpdateStatus` is a union on `type`:
+
+| `type` | Extra fields | Sent when |
 |---|---|---|
-| `open-folder-dialog` | renderer -> main (invoke) | Opens `dialog.showOpenDialog` scoped to directories; used by the download-folder picker in Settings |
-| `get-app-version` | renderer -> main (invoke) | Returns `app.getVersion()`; shown in Settings' About card |
-| `update-status` | main -> renderer (event) | Pushes updater state (`checking`, `available`, `not-available`, `progress`, `downloaded`, `error`) |
-| `download-update` / `install-update` | renderer -> main (invoke) | Triggers `autoUpdater.downloadUpdate()` / `quitAndInstall()` |
-| `check-for-updates` | renderer -> main (invoke) | Triggers `autoUpdater.checkForUpdates()` on demand; resolves `{ devMode: true }` instead in dev |
+| `checking` | none | A check starts. |
+| `available` | `version` | A newer release exists. |
+| `not-available` | none | The installed version is the newest. |
+| `progress` | `percent`, `bytesPerSecond`, `transferredBytes`, `totalBytes` | The update is downloading. |
+| `downloaded` | none | The update is ready to install. |
+| `error` | `message` | The updater failed. The message starts with "The update couldn't be downloaded:". |
 
-Adding a new IPC channel: expose it in `preload.js` under `electronAPI`, register the handler in `main.js` with `ipcMain.handle` (request/response) or `mainWindow.webContents.send` (event push), and document it in this table.
+`window.electronAPI` does not exist when the frontend runs in a plain browser. Every caller checks it first, for example `window.electronAPI?.onUpdateStatus(...)`. `frontend/src/lib/folderPicker.ts` falls back to `POST /api/v1/folders/pick` when it is missing.
 
-## Shutdown and Single Instance
+### Adding a channel
 
-- `app.requestSingleInstanceLock()` ensures only one KineTube window can run; a second launch focuses the existing window instead of opening a new one.
-- `before-quit` and `window-all-closed` both call `serverProcess?.kill()` so the Express child process never survives the Electron process on any platform.
-- On macOS, `window-all-closed` does not call `app.quit()` (matches platform convention - closing the window does not quit the app on macOS). This is currently the only `process.platform` branch in the entire codebase; see `docs/philosophy/CROSS_PLATFORM.md` for why the tool managers have none.
+1. Add the method to `ElectronApi` in `shared/types/electron.ts`.
+2. Implement it in `electron/src/preload.ts` with `ipcRenderer.invoke` or `ipcRenderer.on`.
+3. Register the handler with `ipcMain.handle` in `ipcHandlers.ts`, or in `updater.ts` for update work.
+4. Add it to the table above.

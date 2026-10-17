@@ -1,49 +1,48 @@
-# Writing and Design Standards
+# Writing and design standards
 
-These rules apply to all generated code, documentation, UI copy, commit messages, comments, and any user-facing text in this project. Follow them without exception.
+These rules apply to all code, documentation, UI copy, commit messages, comments and any other text in this project. Follow them without exception.
 
 ---
 
 ## Typography
 
-- Never use emojis.
-- Never use Unicode emoji icons.
-- Never use emoticons.
-- Never use em dashes (--). Use a standard hyphen (-) or restructure the sentence.
-- Never use en dashes where a hyphen is appropriate.
-- Always use standard ASCII hyphens (-).
+- Never use emoji, Unicode emoji symbols or emoticons.
+- No em dash (`—`) and no en dash (`–`).
+- No hyphen used as a dash: neither a spaced hyphen (` - `) nor a double hyphen (` -- `) between two parts of a sentence.
+- Rewrite with a full stop, a comma, a colon or parentheses instead. For a range, write "5 to 6", not "5–6".
+- Normal hyphens inside words are fine: `cross-platform`, `two-factor`, `kebab-case`.
+- Code, paths, commands, flags and exact quotations stay as they are, even when they contain dashes.
 
-Existing `console.log` lines in `backend/server.js` predate this policy and use emoji as status markers. Do not extend that pattern to new code; when you touch a line that uses one, replace it in the same edit.
+These rules cover log lines too. The backend logs one JSON object per line (`backend/src/lib/logger.ts`), and no log line uses emoji. Keep it that way.
 
 ---
 
 ## Icons
 
-- Never use emoji as icons in UI.
+- Never use emoji as icons in the UI.
 - Use SVG icons only.
-- Use Lucide React icons (`lucide-react`) - this is the only icon library in the frontend dependency tree.
-- If Lucide does not have an appropriate icon, use another open-source SVG icon library rather than an emoji or a raster image.
-- All icons in the same UI context must have consistent size, stroke width, spacing, and visual weight.
+- Use Lucide React (`lucide-react`) for every icon. The YouTube and Instagram brand marks are the one exception: Lucide has none, so they are inline SVGs in `frontend/src/components/icons/BrandIcons.tsx`.
+- If Lucide has no fitting icon, use another open-source SVG icon set, never an emoji or a raster image.
+- Icons in the same part of the UI share one size, stroke width, spacing and visual weight.
 
 ---
 
-## Writing Style
+## Writing style
 
-Write in clear, professional English.
+Write clear, plain, professional English.
 
 Avoid:
 
-- Unnecessary buzzwords
-- Filler text or padding sentences
-- Exaggerated marketing language ("powerful", "blazing fast", "revolutionary")
-- Repetitive wording across adjacent sentences
+- buzzwords and marketing words ("powerful", "blazing fast", "seamless", "revolutionary")
+- filler sentences and padding ("It is important to note", "In conclusion", "Moreover")
+- repeating the same wording in sentences next to each other
 
 Prefer:
 
-- Concise, direct sentences
-- Descriptive headings that name the content, not the type of content
-- Readable formatting with appropriate whitespace
-- Consistent terminology throughout the project (pick one name for a concept and use it everywhere - "download folder", not "output directory" in one place and "save location" in another)
+- short, direct sentences
+- headings that name the content, not the type of content
+- readable formatting with enough white space
+- one name for each concept, used everywhere: "download folder", not "output directory" in one place and "save location" in another
 
 ---
 
@@ -53,72 +52,75 @@ Use clean Markdown in all documentation.
 
 Prefer:
 
-- Headings for structure
-- Bullet lists for non-sequential items
-- Numbered lists for steps or ordered items
-- Tables when comparing or listing structured data
+- headings for structure
+- bullet lists for items in no particular order
+- numbered lists for steps
+- tables for structured facts
+- code blocks for commands and code
 
 Avoid:
 
-- Excessive bold formatting (bold is for the single most critical item in a block, not decoration)
-- Nested bullet lists deeper than two levels
-- HTML tags inside Markdown except when necessary
+- too much bold (bold is for the single most important item in a block, not decoration)
+- bullet lists nested deeper than two levels
+- HTML tags inside Markdown, unless there is no other way
 
 ---
 
-## Code Comments
+## Code comments
 
-Add a comment only when the WHY is non-obvious: a hidden constraint, a subtle invariant, a workaround for a specific external bug (for example, whisper.cpp renaming `main.exe` to `whisper-cli.exe` starting at v1.7), or behavior that would surprise a future reader.
+Add a comment only when the reason behind the code is not clear from the code. That means a hidden constraint, a rule that is easy to break, or behavior that would surprise the next reader. It also covers a workaround for an outside tool. For example, whisper.cpp renamed its `main` binary to `whisper-cli` in v1.7, so both names are checked.
 
 Do not add comments that:
 
-- Describe what the code does (well-named identifiers already do that)
-- Reference the current task, ticket, or PR ("added for issue #123")
-- Explain callers or downstream effects ("used by X")
-- Restate what is visible in the code
+- describe what the code does (good names already do that)
+- mention the current task, ticket or pull request ("added for issue #123")
+- explain who calls the code or what happens downstream ("used by X")
+- repeat what the code already shows
 
-One short line per comment, maximum. No multi-paragraph comment blocks. No JSDoc unless documenting a public manager function whose parameters are genuinely non-obvious (see the existing `transcribeFile()` docblock in `whisperManager.js` as the outer bound of what is acceptable, not a template to copy by default).
-
----
-
-## UI Copy
-
-Write from the user's perspective, not the system's internals.
-
-- Name things by what the user recognizes, not how the code is structured: "Download folder", not "outputDir"
-- Action labels describe exactly what happens: "Download", "Transcribe", "Cancel" - not "Submit" or "Process"
-- Success feedback confirms what happened: "Download complete" not "Success"
-- Error messages explain what went wrong and what to do: "ffmpeg not found - open Settings to install it" not "Setup error"
-- No apologies in error messages
-- No vague messages like "Something went wrong"
+One short line per comment, at most one per block of logic. Start it in lowercase unless it starts with a name. No multi-line comment blocks and no JSDoc. See `docs/guidelines/TYPESCRIPT.md` for examples.
 
 ---
 
-## Commit Messages
+## UI copy
 
-Follow Conventional Commits format (see `docs/workflows/GIT.md` for full details).
+Write from the person's point of view, not from the code's.
+
+- Name things the way the person knows them: "Download folder", not "outputDir".
+- Action labels say exactly what happens: "Download", "Transcribe", "Cancel", not "Submit" or "Process".
+- Success messages confirm what happened: "Download complete", not "Success".
+- Error messages say what went wrong and what to do next: "FFmpeg isn't installed, so the MP3 conversion will fail. Install it from the setup screen." Not "Setup error".
+- No apologies in error messages.
+- No vague messages such as "Something went wrong".
+
+The backend writes most error messages, and the frontend shows them as they arrive. So these rules apply to the messages in `backend/src/` as much as to the labels in `frontend/src/`.
+
+---
+
+## Commit messages
+
+Follow Conventional Commits (see `docs/workflows/GIT.md` for the details).
 
 - Subject line: `type(scope): short imperative sentence`
-- No period at the end of the subject line
+- No full stop at the end of the subject line
 - Subject line under 72 characters
-- No emojis or decorative characters
-- Present tense: "add" not "added", "fix" not "fixed"
-- Body is optional; include it when the why is non-obvious
+- No emoji or decorative characters
+- Present tense: "add", not "added"; "fix", not "fixed"
+- A body is optional. Add one when the reason for the change is not obvious.
 
 ---
 
-## UI Consistency
+## UI consistency
 
-Every page must feel like it belongs to the same application.
+Every page must feel like part of the same app.
 
-Maintain:
+Keep these the same across pages:
 
-- Consistent page padding and spacing rhythm, matching the existing components in `frontend/src/components/`
-- Consistent shadcn `Card` structure for grouped content
-- Consistent loading states (shadcn `Skeleton` or the existing `Spinner` primitive)
-- Consistent toast notifications via `sonner` (`frontend/src/components/ui/sonner.jsx`) - never a custom alert/banner for transient feedback
-- Consistent icon usage (Lucide, same stroke width across a given context)
-- Consistent button variants (primary for the main action, outline/ghost for secondary actions)
-- Consistent progress UI for long-running operations - reuse `ProgressModal.jsx`'s pattern rather than inventing a new one per feature
+- page padding and spacing, matching the existing components in `frontend/src/features/` and `frontend/src/components/`
+- shadcn `Card` for grouped content
+- loading states, with the shadcn `Skeleton` or the `Spinner` primitive (`frontend/src/components/ui/spinner.tsx`)
+- toasts through Sonner (`frontend/src/components/ui/sonner.tsx`), never a custom alert or banner for short-lived feedback
+- icons (Lucide, with the same stroke width in one part of the UI)
+- button variants: primary for the main action, outline or ghost for the others
+- progress for long work: reuse the pattern of `frontend/src/features/downloads/ProgressModal.tsx` instead of building a new one per feature
 
-The entire project should feel like one polished desktop application, not independently built screens.
+The whole project should feel like one finished desktop app, not separate screens built on their own.

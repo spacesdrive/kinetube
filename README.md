@@ -5,8 +5,8 @@
 <h1 align="center">KineTube</h1>
 
 <p align="center">
-  A privacy-first desktop downloader for YouTube and Instagram.<br/>
-  No accounts. No cloud. No data leaves your machine.
+  A desktop app that downloads YouTube and Instagram media and transcribes it on your own computer.<br/>
+  No account, no subscription, no telemetry.
 </p>
 
 <p align="center">
@@ -19,224 +19,197 @@
 
 ---
 
-## What is KineTube
+## What KineTube does
 
-KineTube is a cross-platform desktop application that lets you download videos from YouTube and Instagram, transcribe them locally using Whisper AI, and manage your media -- entirely offline. It is built on Electron, React, and Express, and delegates all heavy lifting to battle-tested open-source tools (yt-dlp, FFmpeg, whisper.cpp, instaloader) that it downloads and manages automatically on first launch.
+KineTube saves videos and audio from YouTube and Instagram, and turns them into text with Whisper, a speech-to-text model that runs on your computer. It is an Electron app with a React interface and a small local Express server.
 
-There is no server to sign up for, no API key to buy, and no usage limit. Everything runs on your computer.
-
----
+The real work is done by open-source tools: yt-dlp downloads, FFmpeg merges and converts, whisper.cpp transcribes, and instaloader reads Instagram profiles. KineTube installs yt-dlp and FFmpeg on first start, and the other two when you first need them.
 
 ## Features
 
-| Category | Capability |
+| Area | What you can do |
 |---|---|
-| **YouTube** | Videos, Shorts, channels, playlists -- up to 4K with FFmpeg merging |
-| **Instagram** | Reels, posts, stories, full profile bulk-download (up to 500 posts) |
-| **Audio extraction** | Rip MP3 from any video with one click |
-| **Transcription** | Local Whisper AI transcription in 13 languages, five model sizes |
-| **Batch downloads** | Mix YouTube and Instagram URLs in one queue |
-| **Resume interrupted downloads** | If the app closes mid-download, the next launch offers to pick up where it left off |
-| **Dark mode** | System-aware theme with manual override |
-| **Private content** | Instagram login with 2FA support and multi-account management |
-| **Filename control** | Prefix, suffix, numbering, and custom yt-dlp templates |
-| **Progress streaming** | Real-time speed, ETA, and phase indicators via SSE |
-| **In-app updates** | Current version and a manual "Check for Updates" button live in Settings |
+| YouTube | Download videos and Shorts at up to 4K (2160p). FFmpeg merges the video and audio for 1080p and above. Open a channel's videos or Shorts and pick the ones to download. |
+| Instagram | Download posts, reels and stories. Open a profile, load up to 500 posts, and download the ones you pick. |
+| Audio | Save any video as an MP3. |
+| Transcription | Transcribe downloaded or local audio and video files with whisper.cpp. Five model sizes, from Tiny (about 75 MB) to Large (about 2.9 GB). Auto-detect the language or pick one of 12. The transcript is saved as a `.txt` file next to the source. |
+| Transcribe after download | Turn it on and every finished download is transcribed with your default model and language. |
+| Batch downloads | Paste many YouTube and Instagram links, one per line, and download them in one run. |
+| Pause and resume | Pause a single YouTube or Instagram download and resume it later from where it stopped. |
+| Resume after closing | If the app closes during a download, the next start offers to resume it. |
+| Instagram accounts | Log in with two-factor authentication and keep several accounts. Profiles load with the account you choose. |
+| File names | Add a prefix, a suffix or a sequence number, or use your own yt-dlp template such as `%(title)s`. |
+| Progress | Speed, time left and the current step for every download, install and transcription. |
+| Updates | The app tells you when a new version is out and installs it when you choose. Settings also checks for and installs a newer yt-dlp. |
+| Theme | Light, dark, or follow the system. |
 
----
+## Privacy
 
-## Architecture
+- KineTube has no server of its own, no account and no telemetry.
+- The app contacts only YouTube and Instagram (with their image servers for thumbnails), and the hosts it installs tools and models from: GitHub, the FFmpeg build hosts, Hugging Face, and PyPI through pip.
+- Downloads, transcripts, settings and Instagram sessions stay on your computer.
+- The local server listens on `127.0.0.1` only. It refuses requests from other web pages and from other host names, so a website you visit cannot use it.
 
-```mermaid
-graph TD
-    A[Electron Main Process] --> B[Vite + React Frontend]
-    A --> C[Express Backend :3001]
+## Requirements
 
-    B -->|SSE streams| C
-    B -->|REST JSON| C
+To use the app:
 
-    C --> D[yt-dlp]
-    C --> E[FFmpeg]
-    C --> F[whisper.cpp]
-    C --> G[instaloader Python]
+- Windows, macOS or Linux. Windows is the tested platform; see [Known limitations](#known-limitations).
+- An internet connection on first start, to install yt-dlp and FFmpeg.
+- Python 3 with pip, only for Instagram login and Instagram profiles. KineTube installs the `instaloader` package for you.
+- On macOS and Linux, transcription builds whisper.cpp from source, which needs `git`, `cmake` and a C/C++ compiler.
 
-    D -->|video/audio| H[(Downloads Folder)]
-    E -->|merged .mp4| H
-    F -->|.txt transcript| H
-    G -->|Instagram media| H
-```
+To build it from source:
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant F as Frontend
-    participant B as Backend
-    participant Y as yt-dlp
+- Node.js 22.18 or newer (`engines` in `package.json`). In development, Node runs the backend and the helper scripts as TypeScript directly, without a build step.
+- On Windows, the .NET Framework 4. The root `npm install` uses its `csc.exe` to patch electron-builder's 7-Zip (see [`docs/workflows/RELEASE.md`](docs/workflows/RELEASE.md)).
 
-    U->>F: Paste URL + click Fetch
-    F->>B: POST /api/info
-    B->>Y: yt-dlp -J <url>
-    Y-->>B: JSON metadata
-    B-->>F: formats, title, thumbnail
-    F->>U: Show quality picker
-
-    U->>F: Select quality + Download
-    F->>B: GET /api/download (SSE)
-    B->>Y: yt-dlp --newline --progress
-    loop Real-time progress
-        Y-->>B: progress line
-        B-->>F: SSE progress event
-        F-->>U: Speed / ETA / percent
-    end
-    B-->>F: SSE done event + filePath
-    F->>U: Show success + Transcribe option
-```
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- [Node.js](https://nodejs.org/) 18 or later
-- [Python](https://www.python.org/) 3.8 or later (required for Instagram login only)
-
-All other dependencies (yt-dlp, FFmpeg, whisper.cpp, instaloader) are downloaded automatically on first launch.
-
-### Run in development
+## Run in development
 
 ```bash
 git clone https://github.com/spacesdrive/kinetube.git
 cd kinetube
 npm install
 cd frontend && npm install && cd ..
+cd backend && npm install && cd ..
 npm run dev
 ```
 
-This starts the Express backend, the Vite dev server, and Electron simultaneously via `concurrently`.
+`npm run dev` does this:
 
-### Build a distributable
+1. Compiles the Electron code into `electron/dist/`.
+2. Starts the backend with `node --watch src/server.ts` on `127.0.0.1:3001`.
+3. Starts Vite on port 5173. Vite forwards `/api` to the backend.
+4. Waits until `/health` and Vite answer, then opens the Electron window.
+
+In development, tools, models, sessions and downloads are kept in `backend/`.
+
+## Test and type check
 
 ```bash
-# Build the React frontend first
-npm run build:frontend
+npm run typecheck   # shared types, Electron, backend and frontend
+npm test            # backend (node:test), then frontend (Vitest)
+cd frontend && npm run lint
+```
 
-# Then package for your platform
+See [`docs/workflows/TESTING.md`](docs/workflows/TESTING.md) for what the tests cover and the manual checklist.
+
+## Build installers
+
+```bash
 npm run dist:win    # Windows NSIS installer
-npm run dist:mac    # macOS DMG
+npm run dist:mac    # macOS DMG (x64 and arm64), run on macOS
 npm run dist:linux  # Linux AppImage
 ```
 
----
+Each `dist` script compiles Electron, the frontend and the backend, then runs electron-builder. Installers land in `dist/`. The backend build removes the backend's dev dependencies, so run `cd backend && npm install` before you test or develop again. Releases are built by GitHub Actions when a `v*` tag is pushed; see [`docs/workflows/RELEASE.md`](docs/workflows/RELEASE.md).
 
-## How It Works
+## How it fits together
 
-### YouTube downloads
+```mermaid
+graph TD
+    A[Electron main process] -->|starts, waits for /health| C[Express backend on 127.0.0.1:3001]
+    A -->|loads| B[React app]
+    B -->|JSON and event streams under /api/v1| C
 
-KineTube calls yt-dlp under the hood. When you paste a URL and click Fetch, the backend runs `yt-dlp -J` to pull metadata and return available format streams to the frontend. On download, it constructs a format selector string such as `bestvideo[height<=1080][ext=mp4]+bestaudio[ext=m4a]` and streams progress back line-by-line over SSE. If FFmpeg is available, video and audio tracks are merged automatically.
+    C --> D[yt-dlp]
+    C --> E[FFmpeg]
+    C --> F[whisper.cpp]
+    C --> G[instaloader, Python]
 
-If KineTube closes while a video is downloading, it remembers the request and offers to resume it on the next launch - yt-dlp resumes its own partial file rather than starting over.
+    D --> H[(Download folder)]
+    E --> H
+    F -->|.txt transcript| H
+```
 
-### Instagram
+- In the installed app, Electron starts the backend in a utility process, waits for `/health`, and loads the page from `http://localhost:3001`. The backend serves the built frontend.
+- Long work (downloads, installs, transcriptions) streams progress as server-sent events: a response that stays open and sends one event per update. Closing the stream cancels a download or a transcription.
+- The backend, frontend and Electron code are strict TypeScript. Request, response and event types live once in `shared/types/` and are shared by all three.
 
-Public content uses yt-dlp directly. Profile pages and private content route through `instaloader`, a Python library that handles Instagram's session-based authentication and pagination. KineTube wraps this in two helper scripts (`instaloader_login.py`, `instaloader_profile.py`) that communicate with the Express backend over stdin/stdout. Sessions are stored locally under `backend/sessions/` as binary cookie files.
-
-### Transcription
-
-After a download completes, or for any existing audio/video file, KineTube extracts a 16 kHz mono WAV via FFmpeg and passes it to `whisper-cli.exe` (whisper.cpp). The transcript is saved as a `.txt` file next to the source media. Five model sizes are available from Tiny (75 MB) to Large (2.9 GB) and are downloaded on demand from Hugging Face.
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Desktop shell | Electron 33 |
-| Frontend | React 19, Vite 8, Tailwind CSS 4, shadcn/ui |
-| Backend | Express 5, Node.js |
-| Downloader | yt-dlp (auto-managed) |
-| Merger | FFmpeg (auto-managed) |
-| Transcription | whisper.cpp v1.8.4 (auto-managed - prebuilt on Windows, built from source on macOS/Linux) |
-| Instagram scraping | instaloader (Python, `pip install instaloader`) |
-| Theme | next-themes |
-| Icons | Lucide React |
-
----
-
-## Project Structure
+## Project layout
 
 ```
 kinetube/
-  electron/           # Electron main process and preload
+  shared/types/        API request, response and stream-event types
   backend/
-    routes/           # Express route handlers (download, info, instagram, transcribe, setup)
-    utils/            # yt-dlp/ffmpeg/whisper.cpp managers, shared download helper, pending-download registry
-    sessions/         # Instagram session files (gitignored)
-    downloads/        # Default download output (gitignored)
-    models/           # Whisper model files (gitignored)
+    src/
+      routes/          one route table per resource, mounted under /api/v1
+      controllers/     check input, call a service, send JSON or a stream
+      validators/      turn untrusted input into typed requests
+      services/        business rules for tools, media, downloads, transcriptions
+      stores/          JSON-file stores (download records, Instagram accounts)
+      managers/        yt-dlp, FFmpeg, whisper.cpp, instaloader: install, locate, run
+      platforms/       YouTube and Instagram link parsers and metadata mappers
+      lib/, middleware/
+    python/            instaloader helper scripts
+    tests/             node:test
   frontend/
     src/
-      components/     # React components (shadcn-based UI)
-      components/ui/  # shadcn/ui primitives
-      lib/             # Shared frontend helpers (fetch client, URL cleaning, cn())
+      services/        api.ts: every backend call
+      features/        downloads, youtube, instagram, batch, transcribe, settings, setup
+      pages/, components/, hooks/, lib/
+    tests/             Vitest and Testing Library
+  electron/src/        main process, backend process, updater, IPC, preload
+  scripts/             patch-7zip.mts, run-electron.mts
+  docs/                architecture, guidelines and workflows
 ```
 
----
+## API
 
-## Configuration
+The backend's HTTP API is versioned under `/api/v1`; `/health` stays at the root. Every route, its status codes and its stream events are listed in [`docs/architecture/backend/ROUTES.md`](docs/architecture/backend/ROUTES.md). The OpenAPI description is in [`docs/api/openapi.yaml`](docs/api/openapi.yaml).
 
-All settings persist in `localStorage` and survive app restarts.
+The API is for the KineTube window only. It answers requests addressed to `localhost:3001` or `127.0.0.1:3001` from the app itself or the Vite dev server, and answers 403 to anything else.
 
-| Setting | Description |
+## Settings
+
+Settings are saved in the app's local storage and survive restarts and updates.
+
+| Setting | What it does |
 |---|---|
-| Output folder | Custom path or default to `backend/downloads/` |
-| Filename template | yt-dlp variables: `%(title)s`, `%(uploader)s`, `%(upload_date)s`, `%(id)s` |
-| Numbering | Prepend a zero-padded sequence number to filenames |
-| Prefix / suffix | Arbitrary text prepended or appended to every filename |
-| Default Whisper model | Tiny / Base / Small / Medium / Large |
-| Transcription language | Auto-detect or any of 13 preset languages |
+| Download folder | Where files are saved. When empty, KineTube uses its own `downloads` folder. |
+| Default quality | The quality each page starts with |
+| Numbering | Adds a sequence number to each file name |
+| Prefix and suffix | Text added before or after every file name |
+| Custom file name | A yt-dlp template, such as `%(title)s`, `%(uploader)s`, `%(upload_date)s` or `%(id)s` |
+| Default Whisper model | Tiny, Base, Small, Medium or Large |
+| Transcription language | Detect automatically, or one of 12 languages |
 
----
+## Instagram setup
 
-## Instagram Setup
-
-Instagram support requires Python to be installed and accessible on your PATH.
+Public posts and reels need no setup. Instagram login and profiles use instaloader, which needs Python 3 on your `PATH`. When Python is found, KineTube offers to run `pip install instaloader` for you. You can also install it yourself:
 
 ```bash
 pip install instaloader
 ```
 
-Once Python is detected, you can log in directly from the sidebar inside the app. Two-factor authentication is fully supported. Multiple accounts can be added and switched between without re-authenticating.
+Then log in from the sidebar. Two-factor authentication is supported, and you can add several accounts and switch between them.
 
-If you prefer to authenticate outside the app, copy the instaloader session file into `backend/sessions/session-<username>` and use the session import option in Settings.
-
----
-
-## Keyboard Shortcuts
+## Keyboard shortcuts
 
 | Action | Shortcut |
 |---|---|
-| Toggle DevTools | F12 |
-| New search | Click logo or "New search" button |
-| Submit URL | Enter |
+| Open or close the developer tools | F12 |
+| Look up the pasted link | Enter |
 
----
+## Known limitations
+
+- Instagram downloads run logged out. instaloader saves its session in a format yt-dlp can't read, so post lookups and downloads do not use your login. Content that Instagram only shows to logged-in users can't be downloaded yet. Profiles do use the saved session. Exporting the session as cookies for yt-dlp is on the roadmap.
+- macOS and Linux are not verified on real hardware. The tool setup for both is implemented and unit tested, but has not been run end to end on a real Mac or Linux machine. See [`docs/philosophy/CROSS_PLATFORM.md`](docs/philosophy/CROSS_PLATFORM.md).
+- FFmpeg on Apple Silicon runs under Rosetta 2. The FFmpeg build KineTube downloads for macOS is x64 only, so Apple Silicon Macs need Rosetta 2.
+- The backend's folder picker route works on Windows only. `POST /api/v1/folders/pick` opens a Windows dialog through PowerShell and answers 501 elsewhere. The desktop app uses Electron's own folder dialog on every platform, so this only affects the frontend running in a plain browser.
+- Only x64 Linux is supported. The Linux yt-dlp, FFmpeg and AppImage builds are x64.
 
 ## Contributing
 
-Contributions are welcome. To get started:
-
-1. Read [`CLAUDE.md`](CLAUDE.md) - project identity, architecture map, and engineering standards.
+1. Read [`CLAUDE.md`](CLAUDE.md) for the project rules and the map of the docs.
 2. Fork the repository and create a branch from `main`.
-3. Follow the Quick Start instructions above to run the project locally.
-4. Make your changes. Keep commits focused and the diff readable - see [`docs/workflows/GIT.md`](docs/workflows/GIT.md).
-5. Run `npm test` (backend + frontend) before opening a pull request - see [`docs/workflows/TESTING.md`](docs/workflows/TESTING.md).
-6. Open a pull request with a clear description of what changed and why.
+3. Set up the project as described in [Run in development](#run-in-development).
+4. Follow [`docs/workflows/FEATURE_DEVELOPMENT.md`](docs/workflows/FEATURE_DEVELOPMENT.md). Keep commits focused, as described in [`docs/workflows/GIT.md`](docs/workflows/GIT.md).
+5. Run `npm run typecheck` and `npm test` before you open a pull request.
+6. Open a pull request that says what changed and why.
 
-For larger changes, open an issue first to discuss the approach before investing time in the implementation. If your change touches yt-dlp, FFmpeg, whisper.cpp, or instaloader, read [`docs/philosophy/CROSS_PLATFORM.md`](docs/philosophy/CROSS_PLATFORM.md) first - these are currently Windows-only.
-
----
+For a larger change, open an issue first to agree on the approach. If your change touches yt-dlp, FFmpeg, whisper.cpp or instaloader, read [`docs/philosophy/CROSS_PLATFORM.md`](docs/philosophy/CROSS_PLATFORM.md) first.
 
 ## License
 
-[MIT](LICENSE) -- use it, modify it, ship it.
+[MIT](LICENSE)

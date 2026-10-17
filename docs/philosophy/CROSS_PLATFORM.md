@@ -1,84 +1,90 @@
-# Cross-Platform Support: Current State and Gaps
+# Cross-platform support: current state and gaps
 
-## Summary
+The release workflow (`.github/workflows/release.yml`) builds installers for three platforms:
 
-KineTube's electron-builder configuration and GitHub Actions release workflow (`.github/workflows/release.yml`) build and publish installers for Windows (`nsis`), macOS (`dmg`, x64 + arm64), and Linux (`AppImage`).
+| Platform | Target | Architectures |
+|---|---|---|
+| Windows | NSIS installer | x64 |
+| macOS | dmg | x64 and arm64 |
+| Linux | AppImage | x64 |
 
-As of 2026-07-26, all four managed tools have platform-aware download/build logic implemented for Windows, macOS, and Linux:
+Every tool manager in `backend/src/managers/` picks its download per platform. None of them is Windows-only. An older note in `CLAUDE.md` ("Known issues") still says the managers download a Windows `.exe` unconditionally. That stopped being true on 2026-07-26, when the macOS and Linux paths were added (ADR-011, ADR-012), and the TypeScript rewrite kept them.
+
+What is still open is mostly verification: the macOS and Linux paths have unit tests for their pure parts, but they have not been run end to end on real Mac or Linux hardware (see `ROADMAP.md`). The release workflow runs `npm run typecheck && npm test` on Windows, macOS and Ubuntu runners before it packages, so the unit tests run on all three. No test downloads or runs a real tool.
+
+## Per-platform state of each tool
 
 | Tool | Windows | macOS | Linux |
 |---|---|---|---|
-| yt-dlp | Working (verified) | Implemented, not yet run on real hardware | Implemented, not yet run on real hardware |
-| ffmpeg | Working (verified) | Implemented, not yet run on real hardware | Implemented, not yet run on real hardware |
-| whisper.cpp | Working (verified) | Implemented (build-from-source), not yet run on real hardware | Implemented (build-from-source), not yet run on real hardware |
-| instaloader | Working (verified) | Working (verified) | Working (verified) |
+| yt-dlp | `yt-dlp.exe` release asset. Verified. | `yt-dlp_macos` asset. Not yet run on real hardware. | `yt-dlp_linux` asset (x86_64). Not yet run on real hardware. |
+| FFmpeg | gyan.dev essentials zip. Verified. | evermeet.cx zip, x64 build under Rosetta 2 on Apple Silicon. Not yet run on real hardware. | johnvansickle.com amd64 static `tar.xz`, unpacked with the system `tar`. Not yet run on real hardware. |
+| whisper.cpp | `whisper-blas-bin-x64.zip` from the v1.8.4 release. Verified. | built from source with `git` and `cmake`. Not yet run on real hardware. | built from source with `git` and `cmake`. Not yet run on real hardware. |
+| instaloader | `pip install` into `python`, then `python3` | `pip install` into `python3`, then `python` | `pip install` into `python3`, then `python` |
 
-**Read this before treating "implemented" as "done."** This development environment is Windows-only. The yt-dlp, ffmpeg, and whisper.cpp macOS/Linux code paths were implemented from verified, current documentation of each tool's actual release assets and install conventions (see Sources below), and are covered by unit tests for the pure platform-resolution logic (asset URL selection, binary naming) - but the actual download-and-run behavior on real macOS/Linux hardware has not been exercised in this session. Treat them as "should work, needs a real-machine verification pass" until someone runs the setup flow on an actual Mac and Linux box and confirms it. Update the table above with "verified" once that happens.
+### yt-dlp
 
-## instaloader: already cross-platform (no code change needed)
+`ytdlpAssetName(platform)` in `backend/src/managers/ytdlp/ytdlpBinary.ts` picks the asset from the pinned release (`YTDLP_VERSION`, `2026.03.17`), or from the latest release on update. Each asset is one standalone file, so nothing is extracted. The local name is `yt-dlp.exe` on Windows and `yt-dlp` elsewhere, and `markExecutable()` sets `chmod 755` off Windows. Any other platform throws `NotSupportedError`.
 
-Earlier investigation of this codebase assumed instaloader was Windows-only because `backend/utils/instaloaderManager.js` used to manage a standalone `instaloader.exe` download. That code path turned out to be **dead code**: the actual Instagram login/profile/download flows in `backend/routes/instagram.js` (`detectPython()`, `loginWithPython()`, the `PROFILE_HELPER`/`LOGIN_HELPER` Python scripts) already go through `python3 -m pip install instaloader` and the `instaloader` Python module - which is identical, unbranched code on Windows, macOS, and Linux. The frontend's `InstagramLoginModal.jsx` only ever called the pip-based setup routes (`/api/instagram/setup/python/check`, `/api/instagram/setup/instaloader`); the `.exe`-based routes and manager functions (`ensureInstaloader`, `getInstaloaderPath`, `isInstaloaderReady`, `/api/instagram/setup`, `/api/instagram/setup/check`) were unreachable from the UI and have been removed (see `DECISIONS.md`).
+When yt-dlp's release list was last checked (2026-07-26), it described `yt-dlp_macos` as a universal build. It described `yt-dlp_linux` as an x86_64 glibc build. `yt-dlp_linux_aarch64` exists upstream but is not used; the Linux installer is x64 only, so this matches what ships.
 
-**Remaining platform dependency:** Python 3.9+ must be installed and on `PATH`, on all three platforms - the app already detects this (`/api/instagram/setup/python/check`) and surfaces install instructions in `InstagramLoginModal.jsx` when it's missing.
+All yt-dlp release binaries are PyInstaller "onefile" builds. Each one is a launcher that starts the real worker as a child process. `killProcessTree()` (`backend/src/lib/processTree.ts`) stops the whole tree: `taskkill /t /f` on Windows, a process group `SIGTERM` elsewhere, with every child spawned `detached: true` off Windows (ADR-021). The Windows path was confirmed by reproduction. The POSIX path follows the same reasoning and has not been confirmed on real hardware.
 
-## yt-dlp: implemented for all three platforms
+### FFmpeg
 
-`backend/utils/ytdlpManager.js` now resolves the release asset and local binary name per `process.platform`:
+`ffmpegDownloadInfo(platform)` in `backend/src/managers/ffmpeg/ffmpegBinary.ts` picks the same static builds the `ffmpeg-static` npm package uses (ADR-011):
 
-| Platform | Release asset | Local binary name |
+| Platform | URL | Extraction |
 |---|---|---|
-| win32 | `yt-dlp.exe` | `yt-dlp.exe` |
-| darwin | `yt-dlp_macos` (universal) | `yt-dlp` |
-| linux | `yt-dlp_linux` (glibc x86_64) | `yt-dlp` |
+| Windows | `https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip` | the `ffmpeg.exe` entry inside `bin/` |
+| macOS | `https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip` | the entry named `ffmpeg` |
+| Linux | `https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz` | `tar -xJf` into a temp folder, then a search for `ffmpeg` |
 
-All three are raw standalone binaries on the same pinned GitHub release (no zip extraction needed). On macOS/Linux, the binary is `chmod 755`'d after download. Source: yt-dlp's own release files table (`https://github.com/yt-dlp/yt-dlp/releases`, cross-checked via PyPI's release-files listing, 2026-07-26).
+The macOS URL always redirects to the current release. evermeet.cx does not build for Apple Silicon, so arm64 Macs run the x64 build through Rosetta 2. The Apple Silicon builds that exist elsewhere have no stable URL, so they were not used.
 
-**Known narrower scope:** only x86_64 Linux is targeted (matching the Windows build's implicit x64-only assumption); `yt-dlp_linux_aarch64` exists upstream but is not wired up.
+### whisper.cpp
 
-**Stopping a running yt-dlp process requires killing its whole tree, not just the spawned PID.** All three platform builds are PyInstaller "onefile" binaries: the process Node's `spawn()` gets a handle to is a launcher that unpacks itself and execs a second, separate process to do the real work, then waits on it. A plain `proc.kill()` only ends the launcher, leaving the real download running orphaned - confirmed on Windows by reproduction (see `DECISIONS.md` ADR-021). `backend/utils/processTree.js`'s `killProcessTree()` is the fix: `taskkill /pid <pid> /t /f` on Windows, a POSIX process-group kill (`process.kill(-pid, 'SIGTERM')` against a process spawned with `detached: true`) elsewhere. The POSIX path is implemented on the same reasoning that the Windows bug applies there too, but - like the rest of this table - is not yet hardware-verified on real macOS/Linux.
+ggml-org publishes a prebuilt CLI for Windows only (ADR-012).
 
-## ffmpeg: implemented for all three platforms
+- Windows: `installWhisperFromZip()` downloads `whisper-blas-bin-x64.zip` from the `v1.8.4` release and extracts every `.exe` and `.dll` into the downloads folder.
+- macOS and Linux: `buildWhisperFromSource()` checks for `git` and `cmake`, clones tag `v1.8.4` into a temp folder, runs `cmake -B build -S .` and `cmake --build build --config Release -j`, then copies `whisper-cli` and the `.so` and `.dylib` files beside it into the downloads folder.
 
-`backend/utils/ytdlpManager.js`'s `getFfmpegDownloadInfo(platform)` selects the source used by the same community-standard sources the popular `ffmpeg-static` npm package (1,300+ stars) relies on:
+`findWhisperBinary()` looks for `whisper-cli` first and the older name `main` second, with `.exe` on Windows only. Models come from Hugging Face and are the same files on every platform.
 
-| Platform | Source | Format | Extraction |
+### instaloader
+
+instaloader is a pip package, so the code is the same on every platform. `createPythonDetector()` in `backend/src/managers/instaloader/pythonDetector.ts` tries the Python commands in this order:
+
+- Windows: `python`, then `python3`.
+- macOS and Linux: `python3`, then `python`.
+
+The first command that answers `--version` is used for `python -m pip install instaloader` and for the helper scripts in `backend/python/`. Both helpers set UTF-8 output, because Windows defaults to cp1252. Python 3 must be installed on every platform; the setup status reports `missingRequirement: 'python'` when it is not.
+
+## Remaining gaps
+
+| Gap | Platforms | Effect | Status |
 |---|---|---|---|
-| win32 | gyan.dev "essentials" build (unchanged) | zip | Match `bin/ffmpeg.exe` inside the zip |
-| darwin | `https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip` - a stable redirect that always resolves to the current release, maintained by Helmut K. C. Tessarek | zip | Match a bare `ffmpeg` entry anywhere in the zip |
-| linux | `https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz` - static x86_64 build, maintained by John Van Sickle | tar.xz | Shell out to the system `tar` binary (`tar -xJf`), then locate `ffmpeg` recursively in the extracted tree |
+| No end-to-end run on real hardware | macOS, Linux | yt-dlp, FFmpeg, whisper.cpp installs and the POSIX process-tree kill are implemented from documentation and unit tested, but not run | open; tracked in `ROADMAP.md` |
+| FFmpeg is an x64 build | macOS on Apple Silicon | needs Rosetta 2; the first run may prompt to install it | accepted (ADR-011) |
+| No arm64 builds for yt-dlp and FFmpeg | Linux | an arm64 Linux machine gets x86_64 binaries that will not run | matches the x64-only AppImage target |
+| whisper.cpp source build needs a C/C++ compiler | macOS, Linux | the preflight checks `git` and `cmake` only; a missing compiler shows up as a failed `cmake` step with the compiler's own error in the log | open; tracked in `ROADMAP.md` |
+| FFmpeg extraction needs the system `tar` with xz support | Linux | if `tar` cannot run, the install fails with "Install tar and xz-utils, then try again." | accepted |
+| pip install into the system Python | Linux, macOS | Some systems mark their Python as externally managed (PEP 668), for example recent Debian and Ubuntu releases and Homebrew Python. pip then refuses the install, and setup fails with "pip couldn't install instaloader". | not handled; not tested in KineTube |
+| `POST /api/v1/folders/pick` uses PowerShell | macOS, Linux | answers 501 `NOT_SUPPORTED` | no effect on the app: the desktop app always uses Electron's `dialog` through `window.electronAPI.openFolderDialog()` (`frontend/src/lib/folderPicker.ts`); the route only serves the frontend in a plain browser |
+| Path examples in error messages | macOS, Linux | `folderValidators.ts` and `transcriptionValidators.ts` give Windows examples (`C:\Users\you\Videos`) on every platform | cosmetic |
+| Packaging filter only knew Windows file names | macOS, Linux build machines | Fixed: the `extraResources` filter and `.gitignore` now also leave out the extensionless `yt-dlp`, `ffmpeg`, `whisper-cli` and `main`, the `.so` and `.dylib` libraries, the `.tar.xz` archive and an unfinished `.download` file. | fixed |
+| Instagram downloads run logged out | all | yt-dlp cannot read instaloader's session file (a Python pickle). Post lookups and downloads never use the saved login, so private posts fail. Profile listings still use the session through instaloader. | open; a cookie export is on `ROADMAP.md` (ADR-030) |
 
-Both non-Windows binaries are `chmod 755`'d after extraction.
+## Review checklist for manager changes
 
-**Deliberate scope decisions (see `DECISIONS.md` for the full ADR):**
-- **macOS is x64-only.** evermeet.cx explicitly does not build for Apple Silicon ARM. Rather than depend on osxexperts.net's Apple Silicon builds - which have no stable, version-agnostic download URL (filenames embed a version number, e.g. `ffmpeg81arm.zip`, that changes every release) - this app ships the x64 build for all Macs and relies on Rosetta 2 to run it on Apple Silicon. This trades a one-time Rosetta 2 install prompt for eliminating a URL that would silently go stale.
-- **Linux static build extraction depends on the system `tar` command being present.** This is a safe assumption (`tar` and `xz-utils` ship with virtually every Linux distribution), but it is an assumption, not a bundled dependency - if `tar` is missing, setup fails with a clear, actionable error message rather than a cryptic one.
+Use this for any change in `backend/src/managers/`, `backend/src/lib/processTree.ts`, `backend/src/lib/runProcess.ts` or the packaging config.
 
-## whisper.cpp: implemented via build-from-source for macOS/Linux
+- [ ] A new `.exe` suffix, Windows-only URL or `win32` branch has matching macOS and Linux branches, or the other platforms fail with a clear `NotSupportedError`.
+- [ ] Every platform choice is made in a pure function that takes `platform` as an argument, with a unit test per platform.
+- [ ] New binaries are passed to `markExecutable()`.
+- [ ] Every new process is spawned with `TREE_SPAWN_OPTIONS` and stopped with `killProcessTree()`.
+- [ ] Every writable path is under the data folder from `createAppPaths()` or the system temp folder, and is joined with `path.join()`.
+- [ ] Every system command the change needs (`tar`, `git`, `cmake`, Python) is checked first, with an error that names it and says how to install it.
+- [ ] The packaging filter still leaves out every downloaded binary and library on every platform.
+- [ ] This document still says exactly what works where. Partial progress is recorded as partial, and "not yet run on real hardware" stays until someone has run it.
 
-ggml-org's official whisper.cpp releases (`https://github.com/ggml-org/whisper.cpp/releases`, checked 2026-07-26) publish prebuilt binaries only for Windows (`whisper-blas-bin-x64.zip` and similar) plus WASM/xcframework artifacts - there is no official prebuilt macOS or Linux CLI binary to download. A handful of unofficial third-party projects publish cross-platform prebuilt binaries, but they are new, unaudited, single-maintainer GitHub repositories; downloading and executing a binary from an unverified low-trust source is a supply-chain risk this project declines to take (see `DECISIONS.md`).
-
-Instead, `backend/utils/whisperManager.js` builds whisper.cpp from source on macOS/Linux:
-
-1. Verify `git` and `cmake` are on `PATH` (fails fast with an actionable error naming exactly what's missing and how to install it, e.g. `xcode-select --install` on macOS or `sudo apt install git cmake build-essential` on Debian/Ubuntu, if not)
-2. `git clone --depth 1 --branch v${WHISPER_VERSION}` into a temp directory (same pinned version as the Windows zip, for consistency)
-3. `cmake -B build -S .` then `cmake --build build --config Release -j`
-4. Copy the resulting `whisper-cli` binary (plus any `.so`/`.dylib` it was dynamically linked against) into the managed downloads directory, `chmod 755`
-
-**This is the heaviest-weight of the four tools to get working on a fresh macOS/Linux machine** - it additionally requires a working C/C++ toolchain (a full compiler, not just `cmake` and `git`), which the preflight check does not itself verify (a missing compiler surfaces as a `cmake`/build failure with the compiler's own error text, not a friendlier message). This is a known, accepted rough edge - improving it further (e.g. detecting a missing compiler specifically) is tracked in `ROADMAP.md`.
-
-## Related, smaller finding: `/api/dialog/folder` is Windows-only
-
-`backend/routes/info.js`'s `GET /api/dialog/folder` shells out to PowerShell to show a native folder picker. This is **not** Windows-only in the way that matters for the packaged app: the renderer always prefers `window.electronAPI.openFolderDialog()` (Electron's own cross-platform `dialog.showOpenDialog`, wired up in `electron/main.js`) and only falls back to this HTTP route when running the frontend outside Electron (e.g. `vite preview` in a plain browser during development). The PowerShell-only fallback therefore only affects a dev-only scenario, not the shipped app on any platform. Not fixed in this pass since it doesn't affect real users; noted here so it isn't mistaken for a fourth core-feature gap.
-
-## Guidance for Anyone Touching a Manager
-
-- Do not add a new hardcoded `.exe` suffix or Windows-only URL without checking whether the platform-aware pattern already established in `ytdlpManager.js`/`whisperManager.js` should be extended instead.
-- If you get real macOS or Linux hardware access, run the setup flow for each tool and update the verification table at the top of this file - that is the single most valuable update this document can currently receive.
-- Do not advertise macOS/Linux support as fully verified in `README.md` or release notes until the table above shows "verified," not just "implemented," for all four tools.
-
-## Sources Consulted (2026-07-26)
-
-- yt-dlp release assets: `https://github.com/yt-dlp/yt-dlp/releases`, `https://pypi.org/project/yt-dlp` (release files table)
-- ffmpeg static builds: `https://johnvansickle.com/ffmpeg/`, `https://evermeet.cx/ffmpeg/` and `https://evermeet.cx/projects` (documented API URLs), `https://github.com/eugeneware/ffmpeg-static` (industry-standard reference implementation of this exact multi-platform download pattern)
-- whisper.cpp releases: `https://github.com/ggml-org/whisper.cpp/releases`
-- instaloader installation: `https://github.com/instaloader/instaloader`, `https://pypi.org/project/instaloader`
+On a real Mac or Linux machine, run the setup screen, a YouTube download with merging, a pause and resume, a transcription and an Instagram login. Then update the per-platform table above. That is the most useful update this document can get.

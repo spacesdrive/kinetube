@@ -4,6 +4,8 @@ Planned features, improvements, and known gaps. Items within each section are ro
 
 Update this file whenever a feature ships (move to `CHANGELOG.md`) or when priorities change.
 
+Entries marked as shipped before 2026-10-17 name the 1.x JavaScript files and routes. The TypeScript rewrite moved them; `docs/architecture/backend/ROUTES.md` maps each old route to its new one.
+
 ---
 
 ## In Progress
@@ -27,15 +29,17 @@ Update this file whenever a feature ships (move to `CHANGELOG.md`) or when prior
 
 ### Express route integration tests
 
-**Shipped 2026-07-26** for the non-streaming routes that don't require a real network call or working tool binary (`GET /health`, `GET /api/ytdlp-status`, `POST /api/info` validation, `GET /api/validate-path`, `GET /api/transcribe/setup/check`, `GET /api/transcribe/models`, `GET /api/instagram/accounts`, `GET /api/proxy/img`) - see `backend/test/routes.test.js` and `docs/workflows/TESTING.md`. `backend/server.js` now exports its `app` for this purpose (ADR-013).
-
-**Remaining work:** SSE routes (`/api/download`, `/api/setup`, `/api/transcribe/setup`, `/api/instagram/*download*`) are still manual-only, since they depend on the same real tool execution noted above.
+**Shipped 2026-10-17 for every route.** `backend/tests/routes/apiRoutes.test.ts` drives the whole `/api/v1` API with supertest against fake tool managers (`backend/tests/fixtures/fakeManagers.ts`), including the streaming routes, which 1.x could only check by hand. A real yt-dlp, FFmpeg or whisper.cpp run is still a manual check (`docs/workflows/TESTING.md`).
 
 ### React component tests
 
-**Shipped 2026-07-26** for `ProgressModal.jsx` (null render, single/bulk download states, done/failure/transcribe-button rendering) and the extracted `lib/urlCleaners.js` pure functions - see `docs/workflows/TESTING.md`.
+**Shipped 2026-10-17.** Vitest and Testing Library cover the progress modal, the resume banner, the stream reader, the request client, the download and transcription reducers and the URL cleaners (`frontend/tests/`).
 
-**Remaining work:** extend coverage to other components as they're touched for other reasons - `VideoView.jsx`, `SettingsPage.jsx`, `InstagramLoginModal.jsx` are the next highest-value candidates (each has meaningful conditional rendering and state).
+**Remaining work:** cover `SettingsPage`, the Instagram login dialog and the media views as they change for other reasons.
+
+### Log in to Instagram for post downloads again
+
+yt-dlp cannot read instaloader's session file, so post lookups and downloads run logged out (`DECISIONS.md` ADR-030). Private posts and posts Instagram hides from logged-out visitors fail. A small Python helper could export the session's cookies to a Netscape cookie file for yt-dlp.
 
 ---
 
@@ -45,9 +49,9 @@ Update this file whenever a feature ships (move to `CHANGELOG.md`) or when prior
 
 **Shipped 2026-07-27.** `backend/utils/ytdlpManager.js` and `backend/utils/whisperManager.js` now both import a single implementation from `backend/utils/download.js`, unifying two copies that had already drifted (whisper's was more robust - `http:` redirect support, a `settled` guard, response-error cleanup - and is now what both managers get). See `DECISIONS.md` ADR-015 and `backend/test/download.test.js`.
 
-### Centralized frontend `api.js`
+### One frontend API client
 
-**Shipped 2026-07-27.** Added `frontend/src/lib/api.js` and migrated every plain (non-SSE, non-streaming) `fetch()` call site to it - roughly 20 call sites across 6 components, well past the "grows substantially" trigger ADR-006 named for revisiting this. SSE consumption stays colocated with its component, per ADR-006's still-valid reasoning. See `DECISIONS.md` ADR-016 and `frontend/src/lib/__tests__/api.test.js`.
+**Shipped 2026-07-27, finished 2026-10-17.** Every request, including streams, now goes through `frontend/src/services/api.ts` (`DECISIONS.md` ADR-027).
 
 ### Resume a download interrupted by the app closing
 
@@ -56,7 +60,7 @@ Update this file whenever a feature ships (move to `CHANGELOG.md`) or when prior
 **Live Pause/Resume, shipped 2026-07-27.** `ProgressModal.jsx` now has a Pause button during an active single-video download (`POST /api/download/:id/pause`) and a Resume button once paused - same kill-and-continue mechanism as the crash-recovery resume above, just triggered explicitly instead of by the app closing. See `DECISIONS.md` ADR-020.
 
 **Remaining work:**
-- Bulk/sequential downloads and Instagram downloads are not tracked by this registry yet, and have no Pause button - resuming/pausing mid-batch is a bigger feature (needs to persist queue position and per-item state, not just one request)
+- Instagram downloads can be paused and resumed since 2026-10-17 (ADR-031). Batches still cannot: resuming one needs the queue position and the state of each item, not just one request
 - No verification yet that yt-dlp's resume actually re-attaches to a `.part` file compared to just re-downloading from 0% - added to the manual checklist in `docs/workflows/TESTING.md`, but not yet confirmed on a real large download
 - If the user changes their download folder in Settings between the interrupted attempt and clicking Resume, the resume still targets the *original* folder (correct for the underlying `.part` file, but potentially surprising) - consider surfacing the target folder in the banner
 
@@ -74,33 +78,27 @@ The current `dmg` target is unsigned. Before wide distribution, macOS builds nee
 
 ### Playlist-aware batch download
 
-`BatchResultsView.jsx` currently handles a manually pasted mixed queue of YouTube/Instagram URLs. A full playlist URL (`youtube.com/playlist?list=...`) is not yet a first-class input type distinct from a channel's `/videos` tab.
+`frontend/src/features/batch/BatchResultsView.tsx` currently handles a manually pasted mixed queue of YouTube/Instagram URLs. A full playlist URL (`youtube.com/playlist?list=...`) is not yet a first-class input type distinct from a channel's `/videos` tab.
 
-### Pause/Resume support for bulk and Instagram downloads
+### Pause and resume for batches
 
-Follow-on to the single-video resume and pause features above. Would need the pending-download registry to track a whole batch's queue position and per-item state, not just one request - scoped out of the initial feature deliberately (see `DECISIONS.md` ADR-017 and ADR-020's trade-offs).
+Single YouTube and Instagram downloads can be paused. A batch cannot, because the pending-download records track one request each, not a queue position and the state of each item (`DECISIONS.md` ADR-017 and ADR-020).
 
 ### CI check for release-asset name consistency
 
 **Added 2026-07-26**, following the v1.3.0 auto-update 404 (`DECISIONS.md` ADR-014). The fix (pinning `nsis.artifactName`) is in place, but nothing in CI would catch a future regression - e.g. a new Windows target whose `artifactName` reintroduces a space. Add a post-build CI step that parses each uploaded `latest*.yml` and confirms its referenced filename(s) exactly match the filenames actually present in the release assets, failing the workflow if not, instead of relying on the manual check in `docs/workflows/RELEASE.md`'s "Cutting a Release" checklist.
 
-### Remove the unused `axios` dependency
-
-`frontend/package.json` lists `axios` as a dependency, but nothing in `frontend/src` imports it - every request goes through native `fetch` (now via `lib/api.js`, see above). Confirm it's genuinely dead, then remove it and update `docs/architecture/frontend/REACT_ARCHITECTURE.md`'s stack table, which still lists it.
-
 ---
 
 ## Known Issues / Tech Debt
 
-- **Tool managers' macOS/Linux paths are implemented but not yet verified on real hardware** - see `docs/philosophy/CROSS_PLATFORM.md`'s verification table. This is now the single largest remaining gap in the project (down from "not implemented at all").
-- whisper.cpp's source-build path on macOS/Linux requires a full C/C++ toolchain the app cannot itself verify ahead of time - see `DECISIONS.md` ADR-012.
-- ffmpeg's Linux extraction shells out to the system `tar` binary rather than a bundled library - a safe assumption on virtually every Linux distro, but not a guarantee (see `DECISIONS.md` ADR-011).
+- **Tool managers' macOS/Linux paths are implemented but not yet verified on real hardware.** See the verification table in `docs/philosophy/CROSS_PLATFORM.md`. This is now the single largest remaining gap in the project (down from "not implemented at all").
+- whisper.cpp's source-build path on macOS/Linux requires a full C/C++ toolchain the app cannot itself verify ahead of time. See `DECISIONS.md` ADR-012.
+- ffmpeg's Linux extraction shells out to the system `tar` binary rather than a bundled library. That is a safe assumption on almost every Linux distribution, but not a guarantee (see `DECISIONS.md` ADR-011).
 - macOS ffmpeg is x64-only; Apple Silicon runs it under Rosetta 2 rather than a native arm64 binary (deliberate trade-off, see `DECISIONS.md` ADR-011).
 - yt-dlp and ffmpeg's Linux builds target x86_64 only; arm64 Linux is not wired up.
-- `GET /api/dialog/folder` (backend/routes/info.js) shells out to PowerShell and is Windows-only, but only matters for the dev-only fallback path used when the frontend runs outside Electron - see `docs/philosophy/CROSS_PLATFORM.md`.
-- Most React components other than `ProgressModal.jsx` and `ResumeDownloadsBanner.jsx` have no test coverage yet - see `docs/workflows/TESTING.md`.
-- SSE (streaming) routes have no automated coverage - see `docs/workflows/TESTING.md`.
-- `console.log` startup banner in `backend/server.js` uses emoji markers, predating the writing standards in `docs/WRITING_STANDARDS.md`. Low priority cleanup - replace opportunistically when that file is next touched for another reason, not as a standalone change.
-- `frontend/package.json` lists an unused `axios` dependency - see "Remove the unused `axios` dependency" above.
-- The pending-downloads registry (`backend/utils/pendingDownloads.js`) never prunes a record whose original output folder has since been deleted - a stale "Resume" entry would fail on click rather than being filtered out proactively. Low priority: the failure is a normal, visible SSE `error` event, not a silent one.
-- yt-dlp's pinned version (`YTDLP_VERSION` in `ytdlpManager.js`) was deliberately left unchanged in this pass to avoid destabilizing the verified-working Windows path while adding platform branching - bumping it to the current upstream release is a separate, routine maintenance task. **Update, 2026-07-27:** a user no longer has to wait on that maintenance to get current - Settings' About card can check yt-dlp's latest GitHub release live and download it in place (`DECISIONS.md` ADR-022). `YTDLP_VERSION` itself is still the pinned baseline used for the initial install and for the (now version-aware) "outdated" warning, and remains unbumped here.
+- `POST /api/v1/folders/pick` opens a PowerShell dialog and works on Windows only; elsewhere it answers 501 and the person types the path. Only the dev fallback outside Electron uses it. See `docs/philosophy/CROSS_PLATFORM.md`.
+- Several larger components (`SettingsPage`, the Instagram login dialog, the media views) have no tests yet. See `docs/workflows/TESTING.md`.
+- The pending-download store (`backend/src/stores/pendingDownloadStore.ts`) never prunes a record whose output folder has since been deleted. A stale "Resume" entry fails when clicked instead of being filtered out first. Low priority: the failure shows up as a normal, visible error.
+- yt-dlp's pinned version (`YTDLP_VERSION` in `backend/src/managers/ytdlp/ytdlpBinary.ts`) is still unbumped. It is the release used for the first install and for the "outdated" warning. A person does not have to wait for a bump: Settings can check yt-dlp's latest GitHub release and install it in place (`DECISIONS.md` ADR-022). Bumping the pin is routine maintenance.
+- The vendored shadcn `frontend/src/components/ui/sidebar.tsx` is about 680 lines. It is upstream code, so it was converted to TypeScript but not split.

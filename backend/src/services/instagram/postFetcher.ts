@@ -15,7 +15,6 @@ import type { ParsedPostUrl } from '../../platforms/instagram/instagramMetadata.
 export interface PostFetchInput {
   ytdlp: YtdlpManager;
   post: ParsedPostUrl;
-  cookiesPath: string | null;
   ffmpegDir: string | null;
 }
 
@@ -33,8 +32,9 @@ async function runWithRetry(ytdlp: YtdlpManager, args: string[]): Promise<Proces
   return ytdlp.runMetadata(args, POST_TIMEOUT_MS);
 }
 
-export async function fetchInstagramPost({ ytdlp, post, cookiesPath, ffmpegDir }: PostFetchInput): Promise<InstagramPost> {
-  const args = buildMetadataArgs({ url: post.cleanUrl, isPlaylist: false, ffmpegDir, cookiesPath });
+// instaloader saves sessions as a Python pickle, which yt-dlp cannot read as a cookie file, so posts are read logged out
+export async function fetchInstagramPost({ ytdlp, post, ffmpegDir }: PostFetchInput): Promise<InstagramPost> {
+  const args = buildMetadataArgs({ url: post.cleanUrl, isPlaylist: false, ffmpegDir, cookiesPath: null });
   const result = await runWithRetry(ytdlp, args);
 
   if (result.isTimedOut) throw new UpstreamTimeoutError('Instagram took too long to answer. Try again in a moment.');

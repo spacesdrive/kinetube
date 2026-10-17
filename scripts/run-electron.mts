@@ -1,31 +1,19 @@
-/**
- * Launches Electron with a clean environment.
- *
- * Electron-based editors and terminals (VS Code, Cursor, etc.) commonly leak
- * ELECTRON_RUN_AS_NODE=1 into child shells - it tells any Electron binary to
- * behave as a plain Node.js process instead of launching the Electron
- * runtime. If that variable is inherited here, `electron.app` never exists,
- * and electron-updater's app-version lookup crashes at startup before any
- * window opens (see DECISIONS.md). Spawning through this wrapper strips it
- * so `npm run dev`/`dist:*` work regardless of the parent terminal.
- */
+// starts Electron without the ELECTRON_RUN_AS_NODE that editor terminals leak, which breaks electron-updater (ADR-018)
 
-'use strict';
+import { spawn } from 'node:child_process';
+import { createRequire } from 'node:module';
+import path from 'node:path';
 
-const { spawn } = require('child_process');
-const path = require('path');
-const electronPath = require('electron');
+// the electron package's main export is the path to its binary
+const electronPath = createRequire(import.meta.url)('electron') as string;
 
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 
-const child = spawn(electronPath, ['--no-deprecation', path.join(__dirname, '..')], {
-  stdio: 'inherit',
-  env,
-});
+const child = spawn(electronPath, ['--no-deprecation', path.join(import.meta.dirname, '..')], { stdio: 'inherit', env });
 
-child.on('exit', (code) => process.exit(code ?? 0));
-child.on('error', (err) => {
-  console.error('Failed to launch Electron:', err.message);
+child.on('exit', (exitCode) => process.exit(exitCode ?? 0));
+child.on('error', (error) => {
+  console.error(`Couldn't start Electron: ${error.message}`);
   process.exit(1);
 });

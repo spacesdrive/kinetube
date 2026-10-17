@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install root dependencies
@@ -42,8 +42,12 @@ jobs:
       - name: Install frontend dependencies
         run: cd frontend && npm install
 
+      # the backend keeps its dev dependencies until build:backend has compiled it, then prunes them
       - name: Install backend dependencies
-        run: cd backend && npm install --omit=dev
+        run: cd backend && npm install
+
+      - name: Type check and test
+        run: npm run typecheck && npm test
 
       - name: Build and package
         run: npm run ${{ matrix.script }}

@@ -43,9 +43,8 @@ export function createInstagramMediaService(deps: InstagramMediaDeps): Instagram
   }
 
   async function lookUp(parsed: ParsedInstagramUrl, account: string | null, send: MediaProgressSink, signal?: AbortSignal): Promise<InstagramMedia> {
-    const sessionUsername = pickSessionAccount(accounts, account);
-
     if (isProfileUrl(parsed)) {
+      const sessionUsername = pickSessionAccount(accounts, account);
       const helper = await instaloader.startHelper('profile');
       signal?.addEventListener('abort', () => helper.kill(), { once: true });
       try {
@@ -59,7 +58,6 @@ export function createInstagramMediaService(deps: InstagramMediaDeps): Instagram
     return fetchInstagramPost({
       ytdlp,
       post: { urlType: parsed.urlType, cleanUrl: parsed.cleanUrl, shortcode },
-      cookiesPath: sessionUsername ? accounts.sessionPath(sessionUsername) : null,
       ffmpegDir: ffmpeg.isInstalled() ? ffmpeg.binaryDir : null,
     });
   }

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, test } from 'node:test';
 
 import { createDownloadService } from '../../src/services/downloadService.ts';
-import { createInstagramAccountStore } from '../../src/stores/instagramAccountStore.ts';
 import { createPendingDownloadStore } from '../../src/stores/pendingDownloadStore.ts';
 import { createFakeFfmpeg, createFakeYtdlp } from '../fixtures/fakeManagers.ts';
 import { makeTempPaths, removeDir } from '../fixtures/tempDir.ts';
@@ -45,7 +44,7 @@ describe('downloadService', () => {
     root = paths.root;
     ytdlp = createFakeYtdlp();
     store = createPendingDownloadStore(paths.pendingDownloadsFile);
-    const environment = { ffmpeg: createFakeFfmpeg(), accounts: createInstagramAccountStore(paths), defaultDir: paths.downloadsDir };
+    const environment = { ffmpeg: createFakeFfmpeg(), defaultDir: paths.downloadsDir };
     service = createDownloadService({ ytdlp, store, environment });
   });
   afterEach(() => removeDir(root));

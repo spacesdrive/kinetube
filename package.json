@@ -2,19 +2,22 @@
   "name": "kinetube",
   "version": "1.6.0",
   "description": "Local YouTube & Instagram downloader",
-  "main": "electron/main.js",
+  "main": "electron/dist/main.js",
   "scripts": {
-    "dev": "concurrently -n backend,frontend,electron -c cyan,magenta,yellow \"cd backend && node --no-deprecation server.js\" \"cd frontend && npx vite\" \"wait-on http://localhost:3001/health http://localhost:5173 && node scripts/run-electron.js\"",
+    "dev": "npm run build:electron && concurrently -n backend,frontend,electron -c cyan,magenta,yellow \"cd backend && node --watch src/server.ts\" \"cd frontend && npx vite\" \"wait-on http://127.0.0.1:3001/health http://localhost:5173 && node scripts/run-electron.mts\"",
+    "typecheck": "tsc -b shared electron && cd backend && npm run typecheck && cd ../frontend && npm run typecheck",
     "test": "npm run test:backend && npm run test:frontend",
     "test:backend": "cd backend && npm test",
     "test:frontend": "cd frontend && npm test",
-    "build:frontend": "cd frontend && npx vite build",
-    "build:backend": "cd backend && npm install --omit=dev",
-    "postinstall": "node scripts/patch-7zip.js",
-    "dist": "npm run build:frontend && npm run build:backend && npx electron-builder --publish never",
-    "dist:win": "npm run build:frontend && npm run build:backend && npx electron-builder --win --publish never",
-    "dist:mac": "npm run build:frontend && npm run build:backend && npx electron-builder --mac --publish never",
-    "dist:linux": "npm run build:frontend && npm run build:backend && npx electron-builder --linux --publish never"
+    "build:electron": "tsc -b electron",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build && npm prune --omit=dev",
+    "build": "npm run build:electron && npm run build:frontend && npm run build:backend",
+    "postinstall": "node scripts/patch-7zip.mts",
+    "dist": "npm run build && npx electron-builder --publish never",
+    "dist:win": "npm run build && npx electron-builder --win --publish never",
+    "dist:mac": "npm run build && npx electron-builder --mac --publish never",
+    "dist:linux": "npm run build && npx electron-builder --linux --publish never"
   },
   "build": {
     "appId": "com.kinetube.app",
@@ -28,7 +31,8 @@
       "releaseType": "release"
     },
     "files": [
-      "electron/**/*"
+      "electron/dist/**/*",
+      "electron/loading.html"
     ],
     "extraResources": [
       {
@@ -37,7 +41,13 @@
         "filter": [
           "**/*",
           "!.env",
+          "!src/**",
+          "!tests/**",
+          "!tsconfig*.json",
+          "!*.tsbuildinfo",
+          "!python/__pycache__/**",
           "!pending-downloads.json",
+          "!sessions/**",
           "!downloads/*.exe",
           "!downloads/*.dll",
           "!downloads/*.zip",
@@ -112,5 +122,8 @@
   "dependencies": {
     "electron-updater": "^6.8.9",
     "unzipper": "^0.12.3"
+  },
+  "engines": {
+    "node": ">=22.18"
   }
 }

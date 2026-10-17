@@ -54,7 +54,7 @@ export interface Container {
 export function createServices(managers: ToolManagers, paths: AppPaths): Services {
   const { ytdlp, ffmpeg, whisper, instaloader } = managers;
   const accounts = createInstagramAccountStore(paths);
-  const environment = { ffmpeg, accounts, defaultDir: paths.downloadsDir };
+  const environment = { ffmpeg, defaultDir: paths.downloadsDir };
 
   return {
     tools: createToolService(managers),

@@ -4,15 +4,12 @@ import path from 'node:path';
 import { buildDownloadArgs } from '../../managers/ytdlp/ytdlpArgs.ts';
 import { buildFileNameTemplate } from '../../managers/ytdlp/ytdlpFileNames.ts';
 import { qualityNeedsMerge } from '../../managers/ytdlp/ytdlpFormats.ts';
-import { pickSessionAccount } from '../instagram/sessionAccount.ts';
 
 import type { DownloadOptions, Platform } from '@shared/downloads.ts';
 import type { FfmpegManager } from '../../managers/ffmpeg/ffmpegManager.ts';
-import type { InstagramAccountStore } from '../../stores/instagramAccountStore.ts';
 
 export interface DownloadEnvironment {
   ffmpeg: FfmpegManager;
-  accounts: InstagramAccountStore;
   defaultDir: string;
 }
 
@@ -47,8 +44,8 @@ function ffmpegWarning(options: DownloadOptions): string | null {
 }
 
 export function prepareDownload(environment: DownloadEnvironment, plan: DownloadPlan): PreparedDownload {
-  const { ffmpeg, accounts, defaultDir } = environment;
-  const { url, platform, options, sleepSeconds } = plan;
+  const { ffmpeg, defaultDir } = environment;
+  const { url, options, sleepSeconds } = plan;
   const warnings: string[] = [];
 
   const outputDir = chooseOutputDir(options.outputDir, defaultDir, warnings);
@@ -56,14 +53,14 @@ export function prepareDownload(environment: DownloadEnvironment, plan: Download
   const missingFfmpegWarning = isFfmpegReady ? null : ffmpegWarning(options);
   if (missingFfmpegWarning) warnings.push(missingFfmpegWarning);
 
-  const sessionUsername = platform === 'instagram' ? pickSessionAccount(accounts, options.account) : null;
   const args = buildDownloadArgs({
     url,
     outputTemplate: path.join(outputDir, buildFileNameTemplate(options.fileName)),
     quality: options.quality,
     isAudioOnly: options.isAudioOnly,
     ffmpegDir: isFfmpegReady ? ffmpeg.binaryDir : null,
-    cookiesPath: sessionUsername ? accounts.sessionPath(sessionUsername) : null,
+    // instaloader sessions are not cookie files yt-dlp can read, so downloads run logged out (ROADMAP.md)
+    cookiesPath: null,
     sleepSeconds,
   });
 

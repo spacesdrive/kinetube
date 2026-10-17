@@ -10,11 +10,11 @@
 <p>kinetube is a free, open-source desktop app. It downloads videos, Shorts, playlists, channels, posts and reels,<br/>and transcribes them with Whisper. No account, no subscription, no telemetry.</p>
 
 <p>
-  <a href="https://github.com/spacesdrive/kinetube/releases/latest"><img src="https://img.shields.io/github/v/release/spacesdrive/kinetube?label=release&color=e4572e" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/spacesdrive/kinetube?color=2d292d" alt="MIT license"></a>
-  <a href="https://github.com/spacesdrive/kinetube"><img src="https://img.shields.io/github/stars/spacesdrive/kinetube?color=2d292d" alt="GitHub stars"></a>
-  <a href="https://github.com/spacesdrive/kinetube/commits/main"><img src="https://img.shields.io/github/last-commit/spacesdrive/kinetube?color=2d292d" alt="Last commit"></a>
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-2d292d" alt="Windows, macOS and Linux">
+  <a href="https://github.com/spacesdrive/kinetube/releases/latest"><img src="https://badgen.net/github/tag/spacesdrive/kinetube?label=release&color=e4572e" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://badgen.net/github/license/spacesdrive/kinetube?color=2d292d" alt="MIT license"></a>
+  <a href="https://github.com/spacesdrive/kinetube"><img src="https://badgen.net/github/stars/spacesdrive/kinetube?color=2d292d" alt="GitHub stars"></a>
+  <a href="https://github.com/spacesdrive/kinetube/commits/main"><img src="https://badgen.net/github/last-commit/spacesdrive/kinetube/main?color=2d292d" alt="Last commit"></a>
+  <img src="https://badgen.net/badge/platform/Windows%20%7C%20macOS%20%7C%20Linux/2d292d" alt="Windows, macOS and Linux">
 </p>
 
 <p>

@@ -9,6 +9,10 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-10-27
+
+Transcripts in bulk downloads, and the bulk download window. The macOS and Linux installers are still untested on real hardware.
+
 ### Fixed
 - Transcribe after download works in bulk downloads: the Batch page, picked videos from a YouTube playlist or channel, and Instagram profiles. Each file is transcribed right after it downloads, before the next one starts, in every format chosen under Settings > Transcript files. The progress window shows which file is being transcribed and how far it is, counts the transcripts, marks each saved one, and only finishes when the last transcript is written. A missing Whisper or model is shown instead of failing without a word. Before, the transcripts ran unseen after the window said it was done, and their errors were dropped (issue #25, ADR-043).
 - A single download's window stays open while its transcript is made, shows the progress, and offers Stop transcribing instead of Close (issue #25).

@@ -32,8 +32,8 @@ Tool binaries are written to `downloadsDir` (`downloads/` in the data folder). W
 | `ytdlpRelease.ts` | `fetchLatestYtdlpTag()`: GitHub's `releases/latest` API, 8 second timeout, `null` on any failure |
 | `ytdlpArgs.ts` | `buildDownloadArgs()` and `buildMetadataArgs()`; both end with `--` and the link. Neither passes `--no-check-certificates`, so yt-dlp always checks TLS certificates. `buildMetadataArgs()` with `isPlaylist` lists a channel tab or a playlist with `--flat-playlist --dump-single-json`; a video uses `-J`. |
 | `ytdlpFormats.ts` | `VIDEO_QUALITIES`, the format selectors, `qualityNeedsMerge()` |
-| `ytdlpFileNames.ts` | the output file name template, title and final path helpers |
-| `ytdlpOutput.ts` | `parseYtdlpLine()` turns a stdout line into progress, destination, post-processing or info; `summarizeErrorOutput()` |
+| `ytdlpFileNames.ts` | the output file name template, title and final path helpers. `finalFilePath()` is only a fallback guess: a stream's format id is not always a number (`.f299.` on YouTube, `.fdash-1321893019914509v.` on Instagram) |
+| `ytdlpOutput.ts` | `parseYtdlpLine()` turns a stdout line into progress, destination, the final file, post-processing or info; `summarizeErrorOutput()`. The final file comes from `[Merger] Merging formats into "..."` or `[ExtractAudio] Destination: ...`, and the download tracker reports it as the saved file, so a transcript reads the merged file and never a deleted stream |
 | `ytdlpProcess.ts` | `startYtdlp()`: spawns yt-dlp for a download and returns `{ stop(), finished }` |
 
 The `YtdlpManager` interface:

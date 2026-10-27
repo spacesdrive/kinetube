@@ -2,6 +2,8 @@ export type YtdlpLine =
   | { kind: 'progress'; percent: number; speed: string; eta: string }
   | { kind: 'destination'; filePath: string }
   | { kind: 'alreadyDownloaded'; message: string }
+  // the file that remains after the merge or the mp3 conversion, as yt-dlp names it
+  | { kind: 'finalFile'; filePath: string }
   | { kind: 'postProcessing' }
   | { kind: 'info'; message: string }
   | { kind: 'other' };
@@ -13,6 +15,10 @@ const PROGRESS_PATTERN = /^\[download\]\s+([\d.]+)%\s+of\s+~?[\d.]+\s*\S+\s+at\s
 const PERCENT_PATTERN = /^\[download\]\s+([\d.]+)%/;
 
 const DESTINATION_PATTERN = /^\[download\] Destination: (.+)/;
+
+// '[Merger] Merging formats into "C:\out\Title.mp4"' and "[ExtractAudio] Destination: C:\out\Title.mp3"
+const MERGED_PATTERN = /^\[Merger\] Merging formats into "(.+)"\s*$/;
+const CONVERTED_PATTERN = /^\[ExtractAudio\] Destination: (.+)/;
 
 // the merge, the mp3 conversion and other FFmpeg steps that run after the download itself
 const POST_PROCESSING_PREFIXES = ['[Merger]', '[ffmpeg]', '[ExtractAudio]'];
@@ -37,6 +43,9 @@ export function parseYtdlpLine(line: string): YtdlpLine {
 
   const percentMatch = line.match(PERCENT_PATTERN);
   if (percentMatch) return { kind: 'progress', percent: readPercent(percentMatch[1]), speed: '', eta: '' };
+
+  const finalMatch = line.match(MERGED_PATTERN) ?? line.match(CONVERTED_PATTERN);
+  if (finalMatch?.[1]) return { kind: 'finalFile', filePath: finalMatch[1].trim() };
 
   if (POST_PROCESSING_PREFIXES.some((prefix) => line.startsWith(prefix))) return { kind: 'postProcessing' };
   if (line.startsWith('[')) return { kind: 'info', message: line };

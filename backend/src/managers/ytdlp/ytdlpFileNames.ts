@@ -33,11 +33,15 @@ export function buildFileNameTemplate(options: FileNameOptions): string {
   return `${parts.join(' ')}.%(ext)s`;
 }
 
+// yt-dlp names each stream of a two-stream download after its format id, which is not always a number:
+// "Title.f299.webm" on YouTube, "Title.fdash-1321893019914509v.mp4" on Instagram
+const STREAM_FILE_PATTERN = /^(.+)\.f[\w-]+\.[^.\\/]+$/;
+
 // "My_Title [abc123XYZ].f140.m4a" -> "My Title"
 export function titleFromPath(filePath: string): string {
   return path
     .basename(filePath)
-    .replace(/\.f\d+\.\w+$/, '')
+    .replace(/\.f[\w-]+\.\w+$/, '')
     .replace(/\.\w{2,4}$/, '')
     .replace(/\s*\[[\w-]{6,}\]\s*$/, '')
     .replace(/_/g, ' ')
@@ -49,7 +53,6 @@ export function finalFilePath(firstDestination: string, isMultiFile: boolean, is
   if (isAudioOnly) return firstDestination.replace(/\.[^.]+$/, '.mp3');
   if (!isMultiFile) return firstDestination;
 
-  const formatMatch = firstDestination.match(/^(.+?)\.f\d+\.[^.]+$/);
-  const basePath = formatMatch?.[1] ?? firstDestination.replace(/\.[^.]+$/, '');
+  const basePath = firstDestination.match(STREAM_FILE_PATTERN)?.[1] ?? firstDestination.replace(/\.[^.]+$/, '');
   return `${basePath}.mp4`;
 }

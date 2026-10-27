@@ -25,6 +25,8 @@ const ALREADY_DOWNLOADED_PATTERN = /^\[download\] (.+) has already been download
 export function createDownloadTracker(isAudioOnly: boolean, send: EventSink<TrackerEvents>, onTitle: (title: string) => void): DownloadTracker {
   let phase: DownloadPhase = isAudioOnly ? 'audio' : 'video';
   let firstDestination = '';
+  // yt-dlp's own name for the merged or converted file; the guess from firstDestination is only a fallback
+  let reportedFinalPath = '';
   let title = '';
   let isMultiFile = false;
 
@@ -58,6 +60,9 @@ export function createDownloadTracker(isAudioOnly: boolean, send: EventSink<Trac
         const existingPath = line.message.match(ALREADY_DOWNLOADED_PATTERN)?.[1];
         if (existingPath && !firstDestination) recordDestination(existingPath);
         send('log', { message: line.message, level: 'info' });
+      } else if (line.kind === 'finalFile') {
+        reportedFinalPath = line.filePath;
+        changePhase('merging');
       } else if (line.kind === 'postProcessing') {
         changePhase('merging');
       } else if (line.kind === 'info') {
@@ -65,6 +70,6 @@ export function createDownloadTracker(isAudioOnly: boolean, send: EventSink<Trac
       }
     },
     title: () => title,
-    filePath: () => (firstDestination ? finalFilePath(firstDestination, isMultiFile, isAudioOnly) : ''),
+    filePath: () => reportedFinalPath || (firstDestination ? finalFilePath(firstDestination, isMultiFile, isAudioOnly) : ''),
   };
 }

@@ -20,8 +20,9 @@ describe('parseYtdlpLine', () => {
   test('destination, already downloaded, post-processing and other log lines are told apart', () => {
     assert.deepEqual(parseYtdlpLine('[download] Destination: /out/Title [id].f137.mp4'), { kind: 'destination', filePath: '/out/Title [id].f137.mp4' });
     assert.equal(parseYtdlpLine('[download] /out/x.mp4 has already been downloaded').kind, 'alreadyDownloaded');
-    assert.equal(parseYtdlpLine('[Merger] Merging formats into "x.mp4"').kind, 'postProcessing');
-    assert.equal(parseYtdlpLine('[ExtractAudio] Destination: x.mp3').kind, 'postProcessing');
+    assert.deepEqual(parseYtdlpLine('[Merger] Merging formats into "C:/out/01 - video [abc].mp4"'), { kind: 'finalFile', filePath: 'C:/out/01 - video [abc].mp4' });
+    assert.deepEqual(parseYtdlpLine('[ExtractAudio] Destination: /out/x.mp3'), { kind: 'finalFile', filePath: '/out/x.mp3' });
+    assert.equal(parseYtdlpLine('[Merger] Deleting original file /out/x.f137.mp4').kind, 'postProcessing');
     assert.equal(parseYtdlpLine('[youtube] abc: Downloading webpage').kind, 'info');
     assert.equal(parseYtdlpLine('plain text').kind, 'other');
   });

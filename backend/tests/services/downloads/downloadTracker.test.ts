@@ -37,10 +37,20 @@ describe('createDownloadTracker', () => {
   });
 
   test('an audio-only download starts in the audio phase and is labelled as an MP3 conversion', () => {
-    const { tracker, events } = track(true, ['[download] Destination: /out/Song [abc123XYZ].webm', '[ExtractAudio] Destination: /out/Song.mp3']);
+    const { tracker, events } = track(true, ['[download] Destination: /out/Song [abc123XYZ].webm', '[ExtractAudio] Destination: /out/Song [abc123XYZ].mp3']);
     const merging = events.find(([event, data]) => event === 'phase' && 'label' in data);
     assert.equal(merging?.[1] && 'label' in merging[1] ? merging[1].label : null, 'Converting to MP3...');
     assert.equal(tracker.filePath(), '/out/Song [abc123XYZ].mp3');
+  });
+
+  test('an Instagram download reports the merged file yt-dlp names, not the video-only stream it deletes', () => {
+    const { tracker, titles } = track(false, [
+      '[download] Destination: C:/out/01 - video.fdash-1321893019914509v.mp4',
+      '[download] Destination: C:/out/01 - video.fdash-1321893019914509a.m4a',
+      '[Merger] Merging formats into "C:/out/01 - video.mp4"',
+    ]);
+    assert.deepEqual(titles, ['01 - video']);
+    assert.equal(tracker.filePath(), 'C:/out/01 - video.mp4');
   });
 
   test('a file that was already downloaded still reports its title and path', () => {

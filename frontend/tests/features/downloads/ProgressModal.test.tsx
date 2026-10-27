@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createBulkDownload } from '@/features/downloads/bulkDownloadState';
@@ -59,6 +59,14 @@ describe('ProgressModal for one download', () => {
     expect(screen.getAllByRole('button', { name: 'Close' }).length).toBeGreaterThanOrEqual(1);
     fireEvent.click(screen.getByRole('button', { name: 'Transcribe this file' }));
     expect(onTranscribe).toHaveBeenCalledWith('C:/videos/clip.mp4');
+  });
+
+  it('shows the step while the video and audio come in, and drops it once the download is done', () => {
+    renderModal({ download: single({ isMultiFile: true, phase: 'video' }) });
+    expect(screen.getByText(/Step/).textContent).toBe('Step 1 of 2');
+    cleanup();
+    renderModal({ download: single({ isMultiFile: true, phase: 'video', status: 'done', isSuccess: true, message: 'Download complete' }) });
+    expect(screen.queryByText(/Step/)).toBeNull();
   });
 
   it('shows the failure message when the download fails', () => {

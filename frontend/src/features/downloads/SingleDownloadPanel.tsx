@@ -37,8 +37,10 @@ function iconBackground({ status, isSuccess }: SingleDownloadState): string {
 }
 
 function Header({ download }: { download: SingleDownloadState }) {
-  const { title, isAudioOnly, quality, isMultiFile, phase } = download;
+  const { title, isAudioOnly, quality, isMultiFile, phase, status } = download;
   const step = phase === 'video' ? 1 : 2;
+  // the steps only mean something while the files are still coming in
+  const isStepShown = isMultiFile && phase !== 'merging' && status !== 'done';
 
   return (
     <div className="flex items-start gap-3 pr-8">
@@ -48,7 +50,7 @@ function Header({ download }: { download: SingleDownloadState }) {
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="line-clamp-2 text-[15px] leading-6 font-semibold text-ink">{title || 'Preparing the download...'}</p>
-          {isMultiFile && phase !== 'merging' && <StatusBadge>Step {step} of 2</StatusBadge>}
+          {isStepShown && <StatusBadge>Step {step} of 2</StatusBadge>}
         </div>
         <p className="mt-0.5 text-xs text-ink-muted">{isAudioOnly ? 'Audio only (MP3)' : `Video, ${QUALITY_LABELS[quality]}`}</p>
       </div>

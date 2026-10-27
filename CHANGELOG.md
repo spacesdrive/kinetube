@@ -12,6 +12,7 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 ### Fixed
 - Transcribe after download works in bulk downloads: the Batch page, picked videos from a YouTube playlist or channel, and Instagram profiles. Each file is transcribed right after it downloads, before the next one starts, in every format chosen under Settings > Transcript files. The progress window shows which file is being transcribed and how far it is, counts the transcripts, marks each saved one, and only finishes when the last transcript is written. A missing Whisper or model is shown instead of failing without a word. Before, the transcripts ran unseen after the window said it was done, and their errors were dropped (issue #25, ADR-043).
 - A single download's window stays open while its transcript is made, shows the progress, and offers Stop transcribing instead of Close (issue #25).
+- A finished download that merged video and audio no longer keeps its "Step 1 of 2" badge (issue #26).
 - The bulk download dialog stays inside its edges and inside the window. A long title is cut short with an ellipsis instead of widening the dialog, and a long queue scrolls instead of running off the bottom of the screen (issue #24).
 
 ## [2.1.0] - 2026-10-18

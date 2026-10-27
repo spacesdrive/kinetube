@@ -9,6 +9,9 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
+### Fixed
+- The bulk download dialog stays inside its edges and inside the window. A long title is cut short with an ellipsis instead of widening the dialog, and a long queue scrolls instead of running off the bottom of the screen (issue #24).
+
 ## [2.1.0] - 2026-10-18
 
 The website, transcripts in seven formats and direct installer downloads. The macOS and Linux installers are still untested on real hardware.

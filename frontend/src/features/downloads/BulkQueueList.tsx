@@ -20,7 +20,8 @@ function ItemIcon({ item }: { item: BulkItemState }) {
 
 export default function BulkQueueList({ items }: BulkQueueListProps) {
   return (
-    <ScrollArea className="max-h-48">
+    // the cap sits on the viewport: the root has no height of its own, so a cap there never makes the list scroll
+    <ScrollArea className="[&>[data-slot=scroll-area-viewport]]:max-h-56">
       <ul className="space-y-0.5 pr-2">
         {items.map((item) => (
           <li key={item.key} title={item.message ?? undefined} className={cn('flex items-center gap-2.5 rounded-row px-2.5 py-1.5 text-[13px]', item.status === 'running' && 'bg-spin-soft')}>

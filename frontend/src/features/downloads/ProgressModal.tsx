@@ -33,7 +33,8 @@ export default function ProgressModal(props: ProgressModalProps) {
         if (!isOpen && canDismiss) onClose();
       }}
     >
-      <DialogContent className="max-w-lg" showCloseButton={canDismiss}>
+      {/* the dialog never outgrows the window; a long queue scrolls inside it */}
+      <DialogContent className="max-h-[calc(100dvh-2rem)] grid-cols-[minmax(0,1fr)] overflow-y-auto sm:max-w-lg" showCloseButton={canDismiss}>
         <DialogTitle className="sr-only">Download progress</DialogTitle>
         {download.kind === 'bulk' ? (
           <BulkDownloadPanel download={download} onClose={onClose} onCancel={onCancel} />

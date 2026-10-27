@@ -9,6 +9,13 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-10-27
+
+A fix for transcribing Instagram downloads. The macOS and Linux installers are still untested on real hardware.
+
+### Fixed
+- Transcription after an Instagram download no longer fails with "FFmpeg couldn't read the audio ... No such file or directory". When video and audio download separately, the app guessed the merged file's name and only knew YouTube's numeric format ids, so it pointed Whisper at Instagram's video-only stream (`.fdash-...v.mp4`), which yt-dlp deletes after merging. The app now takes the merged file's name from yt-dlp itself, and the fallback understands any format id (issue #27).
+
 ## [2.1.1] - 2026-10-27
 
 Transcripts in bulk downloads, and the bulk download window. The macOS and Linux installers are still untested on real hardware.

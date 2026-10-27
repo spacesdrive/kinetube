@@ -134,7 +134,7 @@ A second workflow builds and deploys the website in `site/`. It runs when `site/
 
 ## Versioning and tagging
 
-The version in the root `package.json` is the app version and the tag name. The current version is 2.1.1, tagged `v2.1.1` on 2026-10-27. Its release notes label the macOS and Linux installers untested, as every release should until `docs/philosophy/CROSS_PLATFORM.md` records them as verified.
+The version in the root `package.json` is the app version and the tag name. The current version is 2.1.2, tagged `v2.1.2` on 2026-10-27. Its release notes label the macOS and Linux installers untested, as every release should until `docs/philosophy/CROSS_PLATFORM.md` records them as verified.
 
 The root version reaches the person in three places:
 

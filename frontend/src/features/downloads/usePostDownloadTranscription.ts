@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
-import { loadSettings } from '@/lib/settings';
+import { loadSettings, toTranscriptionOptions } from '@/lib/settings';
 import { api } from '@/services/api';
 
-import type { CreateTranscriptionRequest, TranscriptFiles } from '@shared/transcriptions.ts';
+import type { TranscriptFiles } from '@shared/transcriptions.ts';
+import type { StreamHandle } from '@/services/eventStream';
 
 export type TranscriptOutcome =
   | { kind: 'text'; text: string; transcripts: TranscriptFiles; outputPaths: string[] }
@@ -11,36 +12,41 @@ export type TranscriptOutcome =
 
 export type PostDownloadTranscription = ReturnType<typeof usePostDownloadTranscription>;
 
-function transcriptionRequest(filePath: string): CreateTranscriptionRequest {
-  const { defaultModel, defaultLanguage, fileFormats } = loadSettings().transcription;
-  return { filePath, modelId: defaultModel, language: defaultLanguage, formats: fileFormats };
-}
-
 // transcribes a file that was just downloaded, with the model, language and files chosen in Settings
 export function usePostDownloadTranscription() {
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const [percent, setPercent] = useState(0);
   const [outcome, setOutcome] = useState<TranscriptOutcome | null>(null);
+  const streamRef = useRef<StreamHandle | null>(null);
+
+  // closing the stream stops whisper.cpp on the backend
+  const stop = useCallback(() => {
+    streamRef.current?.close();
+    streamRef.current = null;
+    setIsTranscribing(false);
+    setPercent(0);
+  }, []);
 
   const transcribe = useCallback((filePath: string) => {
+    streamRef.current?.close();
     setIsTranscribing(true);
+    setPercent(0);
     setOutcome(null);
-    api.transcribeFile(transcriptionRequest(filePath), (...[event, data]) => {
+    const request = { filePath, ...toTranscriptionOptions(loadSettings().transcription) };
+    streamRef.current = api.transcribeFile(request, (...[event, data]) => {
+      if (event === 'progress') setPercent(data.percent);
       if (event !== 'done') return;
+      streamRef.current = null;
       setIsTranscribing(false);
       if (data.success) setOutcome({ kind: 'text', text: data.text, transcripts: data.transcripts, outputPaths: data.outputPaths });
       else setOutcome({ kind: 'error', message: `Couldn't transcribe the file. ${data.message}` });
     });
   }, []);
 
-  // a bulk download transcribes each file in the background and only saves the files beside it
-  const transcribeQuietly = useCallback((filePath: string) => {
-    api.transcribeFile(transcriptionRequest(filePath), () => {});
-  }, []);
-
   const reset = useCallback(() => {
-    setIsTranscribing(false);
+    stop();
     setOutcome(null);
-  }, []);
+  }, [stop]);
 
-  return { isTranscribing, outcome, transcribe, transcribeQuietly, reset };
+  return { isTranscribing, percent, outcome, transcribe, stop, reset };
 }

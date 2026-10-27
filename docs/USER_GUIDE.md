@@ -17,7 +17,7 @@ Whisper models are downloaded from Hugging Face when you pick one, from Tiny (ab
 
 ## Where files go
 
-- **Downloads and transcripts** go to your download folder. When none is set, kinetube uses a `downloads` folder inside its own data folder. A transcript is saved next to the file it came from, as a `.txt` file unless Settings picks other formats.
+- **Downloads and transcripts** go to your download folder. When none is set, kinetube uses a `downloads` folder inside its own data folder. A transcript is saved next to the file it came from, as a `.txt` file unless Settings picks other formats. In a bulk download each file is transcribed right after it downloads, and the progress window stays open until the last transcript is saved.
 - **Tools, models, Instagram sessions and unfinished downloads** live in the app's data folder (Electron's `userData`), so an update never touches them.
 - **Settings** are saved in the app itself and survive restarts and updates.
 

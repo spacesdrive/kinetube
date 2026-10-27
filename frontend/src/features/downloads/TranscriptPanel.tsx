@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import Notice from '@/components/patterns/Notice';
 import SaveTranscriptMenu from '@/components/SaveTranscriptMenu';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Spinner } from '@/components/ui/spinner';
 import { countWords } from '@/lib/format';
 import { saveTextFile, transcriptFileName } from '@/lib/saveTextFile';
@@ -15,6 +16,7 @@ import type { TranscriptOutcome } from './usePostDownloadTranscription';
 export interface TranscriptPanelProps {
   filePath: string;
   isTranscribing: boolean;
+  percent: number;
   outcome: TranscriptOutcome | null;
   onTranscribe(filePath: string): void;
 }
@@ -52,11 +54,16 @@ function TranscriptText({ filePath, text, transcripts, outputPaths }: Transcript
   );
 }
 
-export default function TranscriptPanel({ filePath, isTranscribing, outcome, onTranscribe }: TranscriptPanelProps) {
+export default function TranscriptPanel({ filePath, isTranscribing, percent, outcome, onTranscribe }: TranscriptPanelProps) {
   return (
     <div className="space-y-3 border-t border-divider pt-4">
       <p className="text-label text-ink-faint">Transcription</p>
-      {isTranscribing && <p className="flex items-center gap-2 text-sm text-ink-muted"><Spinner className="size-3.5" /> Transcribing...</p>}
+      {isTranscribing && (
+        <div className="space-y-2" aria-live="polite">
+          <Progress value={percent} aria-label="Transcription progress" />
+          <p className="flex items-center gap-2 text-xs text-ink-muted"><Spinner className="size-3" /> Transcribing with Whisper. The files are saved beside the download when it finishes.</p>
+        </div>
+      )}
       {!isTranscribing && !outcome && (
         <Button type="button" variant="secondary" className="w-full" onClick={() => onTranscribe(filePath)}>Transcribe this file</Button>
       )}

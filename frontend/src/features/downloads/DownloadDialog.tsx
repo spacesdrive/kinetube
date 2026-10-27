@@ -14,12 +14,14 @@ export default function DownloadDialog({ session }: DownloadDialogProps) {
     <ProgressModal
       download={downloads.active}
       isTranscribing={transcription.isTranscribing}
+      transcribePercent={transcription.percent}
       transcript={transcription.outcome}
       onClose={closeDialog}
       onCancel={closeDialog}
       onPause={downloads.pause}
       onResume={downloads.resumePaused}
       onTranscribe={transcription.transcribe}
+      onStopTranscribing={transcription.stop}
     />
   );
 }

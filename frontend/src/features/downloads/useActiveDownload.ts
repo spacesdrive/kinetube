@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { toFileNameOptions } from '@/lib/settings';
+import { loadSettings, toFileNameOptions, toTranscriptionOptions } from '@/lib/settings';
 import { api } from '@/services/api';
 import { applyBatchEvent, createBulkDownload } from './bulkDownloadState';
 import { applyDownloadEvent, createSingleDownload } from './singleDownloadState';
@@ -31,7 +31,8 @@ export interface BulkDownloadRequest {
 
 export interface ActiveDownloadDeps {
   settings: DownloadSettings;
-  onFileSaved(filePath: string, isBulk: boolean): void;
+  // a single download asked for a transcript; a bulk download's items are transcribed by the backend
+  onFileSaved(filePath: string): void;
 }
 
 export type ActiveDownloadControls = ReturnType<typeof useActiveDownload>;
@@ -57,7 +58,7 @@ export function useActiveDownload({ settings, onFileSaved }: ActiveDownloadDeps)
     replaceStream(open((...event) => {
       // side effects stay outside the state updater, which StrictMode runs twice
       const [name, data] = event;
-      if (name === 'done' && data.success && data.filePath && shouldTranscribe) onFileSavedRef.current(data.filePath, false);
+      if (name === 'done' && data.success && data.filePath && shouldTranscribe) onFileSavedRef.current(data.filePath);
       setActive((previous) => (previous?.kind === 'single' ? applyDownloadEvent(previous, ...event) : previous));
     }));
   }, [replaceStream]);
@@ -91,14 +92,19 @@ export function useActiveDownload({ settings, onFileSaved }: ActiveDownloadDeps)
     });
   }, [active]);
 
+  // each item is downloaded, then transcribed if it asks for it, before the next one starts
   const startBulk = useCallback(({ items, quality, isAudioOnly, account }: BulkDownloadRequest) => {
     setActive(createBulkDownload(items));
-    const fileName = toFileNameOptions(settings);
-    const body = { items: items.map(({ url, title }) => ({ url, title })), quality, isAudioOnly, account, outputDir: settings.outputDir || null, fileName };
+    const body = {
+      items: items.map(({ url, title, shouldTranscribe }) => ({ url, title, shouldTranscribe })),
+      quality,
+      isAudioOnly,
+      account,
+      outputDir: settings.outputDir || null,
+      fileName: toFileNameOptions(settings),
+      transcription: toTranscriptionOptions(loadSettings().transcription),
+    };
     replaceStream(api.createDownloadBatch(body, (...event) => {
-      const [name, data] = event;
-      const item = name === 'itemDone' ? items[data.index] : undefined;
-      if (name === 'itemDone' && data.isSuccess && data.filePath && item?.shouldTranscribe) onFileSavedRef.current(data.filePath, true);
       setActive((previous) => (previous?.kind === 'bulk' ? applyBatchEvent(previous, ...event) : previous));
     }));
   }, [settings, replaceStream]);

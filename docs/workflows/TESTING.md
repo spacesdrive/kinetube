@@ -91,7 +91,7 @@ Counted on 2026-10-17 from `cd backend && npm test` and `cd frontend && npx vite
 | `platforms/youtube/youtubeEntries.test.ts` | Entry status (upcoming, live, unavailable from `availability` or a `[Private video]` title), clean watch and Shorts links for entries, playlist entries of a channel playlists tab |
 | `platforms/youtube/youtubeMetadata.test.ts` | Video and audio format lists, channel avatar choice, mapping yt-dlp JSON to videos (with `playlistUrl`), channel tabs (streams and playlists) and playlists |
 | `platforms/youtube/youtubeUrl.test.ts` | Every supported YouTube link shape and rejected input: playlists, watch and youtu.be links with a list, each channel tab, malformed list ids, other channel pages |
-| `routes/apiRoutes.test.ts` | The origin guard (foreign Origin, foreign Host, Vite origin), the error shape, invalid JSON, `/health`, tools, YouTube media (videos, playlists, a channel playlists tab), downloads (a playlist link refused) and batches, Instagram accounts, Whisper models and transcriptions (the formats asked for reach whisper once each), folders and images |
+| `routes/apiRoutes.test.ts` | The origin guard (foreign Origin, foreign Host, Vite origin), the error shape, invalid JSON, `/health`, tools, YouTube media (videos, playlists, a channel playlists tab), downloads (a playlist link refused) and batches, Instagram accounts, Whisper models and transcriptions (the formats asked for reach whisper once each), batch transcription (an item is transcribed before the next one starts, a missing model is a warning), folders and images |
 | `services/downloadService.test.ts` | Finished, duplicate, paused, resumed, interrupted, cancelled and failed downloads, and yt-dlp missing |
 | `services/folderService.test.ts` | The folder picker on each platform with a fake process runner: a chosen folder, a closed dialog, a timeout, a missing tool (PowerShell, zenity and kdialog), a failing tool, an unsupported platform |
 | `services/downloads/downloadTracker.test.ts` | Tracking which downloads are running |
@@ -202,7 +202,10 @@ Run this before you ship any change the automated tests do not fully cover. Use 
 - [ ] In Settings, pick SRT and VTT under Transcript files and press Save, then transcribe a local file: `.srt` and `.vtt` files are saved next to it, the item says "saved beside the file as SRT and VTT", and a video player shows the `.srt` as subtitles
 - [ ] Open Save on a finished item and on the after-download transcript: every format is listed, and each saves a file named after the media file
 - [ ] Turn off every chip but one under Transcript files: the last one stays on
-- [ ] Turn on "Transcribe after download", then download a video: the transcript appears when the download finishes and is saved next to the video in the formats chosen in Settings
+- [ ] Turn on "Transcribe after download", then download a video: the transcript appears when the download finishes and is saved next to the video in the formats chosen in Settings. While it runs the dialog shows its progress, has no Close, and Stop transcribing ends whisper.cpp
+- [ ] Pick TXT and SRT under Transcript files, then on the Batch page read two videos, turn on Transcribe and download: each item shows Transcribing after its download and before the next one starts, the count stays below the total until the last transcript, Transcribed counts both, and each video has a `.txt` and an `.srt` beside it
+- [ ] Repeat with a model that is not downloaded: the batch warns once, both videos download, and each row's mark says why it has no transcript
+- [ ] Queue a playlist with 20 or more videos and long titles: the bulk dialog stays inside the window at 960 px, titles end in an ellipsis and the queue scrolls
 - [ ] Copy a transcript: a "Transcript copied" toast appears
 - [ ] Open the language selector: the list opens below or above the field, not on top of it, and fades in. The quality select and the selects in Settings do the same
 - [ ] With a finished queue, "Hold to clear" empties it only after a full hold. A click does nothing

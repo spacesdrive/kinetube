@@ -1,4 +1,4 @@
-import { CheckCircle2, Download, Music, Pause, RotateCcw, XCircle } from 'lucide-react';
+import { CheckCircle2, Download, Music, Pause, RotateCcw, Square, XCircle } from 'lucide-react';
 
 import Notice from '@/components/patterns/Notice';
 import StatusBadge from '@/components/patterns/StatusBadge';
@@ -14,12 +14,14 @@ import type { TranscriptOutcome } from './usePostDownloadTranscription';
 export interface SingleDownloadPanelProps {
   download: SingleDownloadState;
   isTranscribing: boolean;
+  transcribePercent: number;
   transcript: TranscriptOutcome | null;
   onClose(): void;
   onCancel(): void;
   onPause(): void;
   onResume(): void;
   onTranscribe(filePath: string): void;
+  onStopTranscribing(): void;
 }
 
 function StatusIcon({ download }: { download: SingleDownloadState }) {
@@ -54,7 +56,9 @@ function Header({ download }: { download: SingleDownloadState }) {
   );
 }
 
-function Actions({ download, onClose, onCancel, onPause, onResume }: SingleDownloadPanelProps) {
+function Actions({ download, isTranscribing, onClose, onCancel, onPause, onResume, onStopTranscribing }: SingleDownloadPanelProps) {
+  // the transcript is part of the download the person asked for, so the dialog stays until it is written or stopped
+  if (download.status === 'done' && isTranscribing) return <Button type="button" variant="destructive" className="w-full" onClick={onStopTranscribing}><Square /> Stop transcribing</Button>;
   if (download.status === 'done') return <Button type="button" variant="inverse" className="w-full" onClick={onClose}>Close</Button>;
 
   return (
@@ -70,7 +74,7 @@ function Actions({ download, onClose, onCancel, onPause, onResume }: SingleDownl
 }
 
 export default function SingleDownloadPanel(props: SingleDownloadPanelProps) {
-  const { download, isTranscribing, transcript, onTranscribe } = props;
+  const { download, isTranscribing, transcribePercent, transcript, onTranscribe } = props;
   const { status, isSuccess, message, warning, filePath } = download;
 
   return (
@@ -80,7 +84,7 @@ export default function SingleDownloadPanel(props: SingleDownloadPanelProps) {
       {status !== 'done' && <SingleDownloadStatus download={download} />}
       {status === 'done' && <Notice tone={isSuccess ? 'success' : 'error'}>{message}</Notice>}
       {status === 'done' && isSuccess && filePath && (
-        <TranscriptPanel filePath={filePath} isTranscribing={isTranscribing} outcome={transcript} onTranscribe={onTranscribe} />
+        <TranscriptPanel filePath={filePath} isTranscribing={isTranscribing} percent={transcribePercent} outcome={transcript} onTranscribe={onTranscribe} />
       )}
       <Actions {...props} />
     </div>

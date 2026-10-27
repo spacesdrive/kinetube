@@ -3,9 +3,10 @@ import { Progress } from '@/components/ui/progress';
 export interface DownloadProgressBarProps {
   percent: number;
   isMerging: boolean;
+  label?: string;
 }
 
-export default function DownloadProgressBar({ percent, isMerging }: DownloadProgressBarProps) {
+export default function DownloadProgressBar({ percent, isMerging, label = 'Download progress' }: DownloadProgressBarProps) {
   const width = Math.min(100, Math.max(0, percent));
 
   return (
@@ -14,7 +15,7 @@ export default function DownloadProgressBar({ percent, isMerging }: DownloadProg
       {isMerging ? (
         <div className="relative h-1.5 w-full overflow-hidden rounded-full bg-surface-selected"><div className="absolute inset-y-0 w-1/3 animate-shimmer rounded-full bg-spin" /></div>
       ) : (
-        <Progress value={width} aria-label="Download progress" />
+        <Progress value={width} aria-label={label} />
       )}
     </div>
   );

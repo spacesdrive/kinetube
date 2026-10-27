@@ -6,13 +6,16 @@ import type { TranscriptFormat, TranscriptionEvents, WhisperModelId } from '@sha
 import type { WhisperManager } from '../managers/whisper/whisperManager.ts';
 import type { StreamJob } from './streamJob.ts';
 
-export interface TranscriptionInput {
-  filePath: string;
+// the model, the language and the files written beside the input
+export interface TranscriptionChoices {
   modelId: WhisperModelId;
   language: string;
-  // written beside filePath; an upload gets none, since its folder is a temporary one
   formats: TranscriptFormat[];
-  // an uploaded file is a temporary copy, deleted once the transcription ends
+}
+
+export interface TranscriptionInput extends TranscriptionChoices {
+  filePath: string;
+  // an uploaded file is a temporary copy, deleted once the transcription ends, so its formats list is empty
   isUpload: boolean;
 }
 

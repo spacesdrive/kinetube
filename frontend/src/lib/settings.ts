@@ -2,7 +2,7 @@ import { isVideoQuality } from './qualities';
 import { cleanFormats } from './transcriptFormats';
 
 import type { FileNameOptions, VideoQuality } from '@shared/downloads.ts';
-import type { TranscriptFormat, WhisperModelId } from '@shared/transcriptions.ts';
+import type { TranscriptFormat, TranscriptionOptions, WhisperModelId } from '@shared/transcriptions.ts';
 
 export interface DownloadPreferences {
   outputDir: string;
@@ -86,4 +86,9 @@ export function toFileNameOptions(settings: DownloadSettings): FileNameOptions {
     template: settings.useCustomFilename ? settings.customFilenameTemplate : '',
     sequenceNumber: settings.useNumbering ? settings.startNumber : null,
   };
+}
+
+// the model, language and files from Settings, as a transcription request names them
+export function toTranscriptionOptions({ defaultModel, defaultLanguage, fileFormats }: TranscriptionPreferences): TranscriptionOptions {
+  return { modelId: defaultModel, language: defaultLanguage, formats: fileFormats };
 }

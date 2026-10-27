@@ -12,14 +12,8 @@ import type { MediaBulkRequest, MediaDownloadRequest } from './downloadRequests'
 export function useDownloadSession(settings: DownloadSettings, account: string | null) {
   const transcription = usePostDownloadTranscription();
   const resumable = useResumableDownloads();
-  const { transcribe, transcribeQuietly, reset } = transcription;
-
-  const handleFileSaved = useCallback((filePath: string, isBulk: boolean) => {
-    if (isBulk) transcribeQuietly(filePath);
-    else transcribe(filePath);
-  }, [transcribe, transcribeQuietly]);
-
-  const downloads = useActiveDownload({ settings, onFileSaved: handleFileSaved });
+  const { transcribe, reset } = transcription;
+  const downloads = useActiveDownload({ settings, onFileSaved: transcribe });
   const { startSingle, startBulk, resumeRecorded, close } = downloads;
 
   const download = useCallback((request: MediaDownloadRequest) => {

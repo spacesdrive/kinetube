@@ -4,6 +4,7 @@ import { parseDownloadTarget } from '../platforms/mediaUrl.ts';
 import { parseYouTubeUrl } from '../platforms/youtube/youtubeUrl.ts';
 import { DOWNLOAD_ID_PATTERN } from '../services/downloads/downloadIds.ts';
 import { parseOptionalUsername } from './instagramValidators.ts';
+import { parseTranscriptionChoices } from './transcriptionValidators.ts';
 import { oneOf, optionalBoolean, optionalInteger, optionalOneOf, optionalString, queryValue, readObject, requiredString } from './fields.ts';
 
 import type { DownloadOptions, DownloadStatus, FileNameOptions } from '@shared/downloads.ts';
@@ -66,9 +67,13 @@ export function parseCreateBatch(body: unknown): CreateBatchInput {
   const items = fields.items.map((rawItem: unknown, index: number) => {
     const item = readObject(rawItem, `items[${index}]`);
     const target = parseTarget(item.url, `items[${index}].url`);
-    return { target, title: optionalString(item.title, `items[${index}].title`, MAX_TEMPLATE_LENGTH) ?? target.cleanUrl };
+    return {
+      target,
+      title: optionalString(item.title, `items[${index}].title`, MAX_TEMPLATE_LENGTH) ?? target.cleanUrl,
+      shouldTranscribe: optionalBoolean(item.shouldTranscribe, `items[${index}].shouldTranscribe`, false),
+    };
   });
-  return { items, options: parseOptions(fields) };
+  return { items, options: parseOptions(fields), transcription: parseTranscriptionChoices(fields.transcription) };
 }
 
 export function parseDownloadId(value: unknown): string {

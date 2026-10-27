@@ -1,4 +1,5 @@
 import type { LogEvent, StreamDone, WarningEvent } from './api.ts';
+import type { TranscriptionOptions } from './transcriptions.ts';
 
 export type Platform = 'youtube' | 'instagram';
 
@@ -74,6 +75,8 @@ export interface DownloadEvents {
 export interface BatchItem {
   url: string;
   title?: string;
+  // transcribed right after it downloads, before the next item starts
+  shouldTranscribe?: boolean;
 }
 
 export interface CreateDownloadBatchRequest {
@@ -83,13 +86,18 @@ export interface CreateDownloadBatchRequest {
   outputDir?: string | null;
   fileName?: Partial<FileNameOptions>;
   account?: string | null;
+  // used for the items with shouldTranscribe
+  transcription?: TranscriptionOptions;
 }
 
 export interface DownloadBatchEvents {
   start: { total: number };
   itemStart: { index: number; url: string; title: string };
   itemProgress: { index: number; percent: number };
-  itemDone: { index: number; isSuccess: boolean; filePath: string | null; message: string | null };
+  itemTranscribing: { index: number };
+  itemTranscribeProgress: { index: number; percent: number };
+  // sent once the item's transcript is written too; transcriptError says why a downloaded file has none
+  itemDone: { index: number; isSuccess: boolean; filePath: string | null; message: string | null; transcriptPaths: string[]; transcriptError: string | null };
   warning: WarningEvent;
   done: StreamDone<{ succeededCount: number; failedCount: number }>;
 }

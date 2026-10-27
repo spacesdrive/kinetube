@@ -25,8 +25,8 @@ function single(changes: Partial<SingleDownloadState> = {}): SingleDownloadState
 }
 
 function renderModal(props: Partial<ProgressModalProps> & Pick<ProgressModalProps, 'download'>) {
-  const handlers = { onClose: vi.fn(), onCancel: vi.fn(), onPause: vi.fn(), onResume: vi.fn(), onTranscribe: vi.fn() };
-  render(<ProgressModal isTranscribing={false} transcript={null} {...handlers} {...props} />);
+  const handlers = { onClose: vi.fn(), onCancel: vi.fn(), onPause: vi.fn(), onResume: vi.fn(), onTranscribe: vi.fn(), onStopTranscribing: vi.fn() };
+  render(<ProgressModal isTranscribing={false} transcribePercent={0} transcript={null} {...handlers} {...props} />);
   return handlers;
 }
 
@@ -74,6 +74,18 @@ describe('ProgressModal for one download', () => {
     expect(screen.getByText('3 words, saved beside the video as TXT and SRT')).toBeTruthy();
     expect(screen.getByRole('button', { name: /Save a copy/ })).toBeTruthy();
   });
+
+  it('stays open while the transcript is made, offering only to stop it', () => {
+    const { onStopTranscribing } = renderModal({
+      download: single({ status: 'done', isSuccess: true, message: 'Download complete', filePath: '/a.mp4' }),
+      isTranscribing: true,
+      transcribePercent: 35,
+    });
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(screen.getByRole('progressbar', { name: 'Transcription progress' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Stop transcribing' }));
+    expect(onStopTranscribing).toHaveBeenCalled();
+  });
 });
 
 describe('ProgressModal for a bulk download', () => {
@@ -90,6 +102,24 @@ describe('ProgressModal for a bulk download', () => {
     expect(screen.getByText('Saved').nextElementSibling?.textContent).toBe('1');
     expect(screen.getByText('Failed').nextElementSibling?.textContent).toBe('1');
     expect(screen.getAllByText('Video C').length).toBe(2);
+  });
+
+  it('shows the item being transcribed, counts transcripts and marks the saved formats', () => {
+    const created = createBulkDownload(items.map((item) => ({ ...item, shouldTranscribe: true })));
+    const download = {
+      ...created,
+      items: created.items.map((item, index) => {
+        if (index === 0) return { ...item, status: 'done' as const, isSuccess: true, transcriptPaths: ['/A.txt', '/A.srt'] };
+        if (index === 1) return { ...item, status: 'transcribing' as const, percent: 20 };
+        return item;
+      }),
+    };
+    renderModal({ download });
+
+    expect(screen.getByText('Now transcribing')).toBeTruthy();
+    expect(screen.getByText('Transcribed').nextElementSibling?.textContent).toBe('1');
+    expect(screen.getByRole('img', { name: 'Transcript saved as TXT and SRT' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Cancel downloads' })).toBeTruthy();
   });
 
   it('offers Close instead of Cancel once every item is done', () => {

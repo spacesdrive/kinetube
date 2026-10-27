@@ -62,7 +62,7 @@ export function createServices(managers: ToolManagers, paths: AppPaths): Service
     instagramMedia: createInstagramMediaService({ ytdlp, ffmpeg, instaloader, accounts, sessionsDir: paths.sessionsDir }),
     instagramAccounts: createInstagramAccountService({ accounts, instaloader, sessionsDir: paths.sessionsDir }),
     downloads: createDownloadService({ ytdlp, store: createPendingDownloadStore(paths.pendingDownloadsFile), environment }),
-    downloadBatches: createDownloadBatchService({ ytdlp, environment }),
+    downloadBatches: createDownloadBatchService({ ytdlp, whisper, environment }),
     whisperModels: createWhisperModelService(whisper),
     transcriptions: createTranscriptionService(whisper),
     folders: createFolderService(),

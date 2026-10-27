@@ -4,7 +4,7 @@ import { parseYtdlpLine } from '../../src/managers/ytdlp/ytdlpOutput.ts';
 import type { ProcessResult } from '../../src/lib/runProcess.ts';
 import type { FfmpegManager } from '../../src/managers/ffmpeg/ffmpegManager.ts';
 import type { InstaloaderManager } from '../../src/managers/instaloader/instaloaderManager.ts';
-import type { WhisperManager } from '../../src/managers/whisper/whisperManager.ts';
+import type { TranscribeInput, WhisperManager } from '../../src/managers/whisper/whisperManager.ts';
 import type { YtdlpHandlers } from '../../src/managers/ytdlp/ytdlpProcess.ts';
 import type { YtdlpManager } from '../../src/managers/ytdlp/ytdlpManager.ts';
 import type { ToolManagers } from '../../src/services/tools/toolStatus.ts';
@@ -81,20 +81,30 @@ export function createFakeFfmpeg(isInstalled = true): FfmpegManager {
   };
 }
 
-export function createFakeWhisper(): WhisperManager {
-  return {
+export interface FakeWhisper extends WhisperManager {
+  transcribeCalls: TranscribeInput[];
+}
+
+export function createFakeWhisper(): FakeWhisper {
+  const fake: FakeWhisper = {
+    transcribeCalls: [],
     isInstalled: () => true,
     install: async () => {},
     listModels: () => [{ id: 'base', label: 'Base (~142 MB)', sizeMb: 142, isDownloaded: true }],
     isModelDownloaded: (modelId) => modelId === 'base',
     downloadModel: async () => {},
     // names the files it would write, so a test can see which formats reached the manager
-    transcribe: async ({ inputPath, formats }) => ({
-      text: 'hello there',
-      transcripts: renderTranscripts([{ startMs: 0, endMs: 1500, text: 'hello there' }], 'hello there'),
-      outputPaths: formats.map((format) => inputPath.replace(/\.[^.]+$/, `.${format}`)),
-    }),
+    transcribe: async (input) => {
+      fake.transcribeCalls.push(input);
+      input.send('progress', { percent: 50 });
+      return {
+        text: 'hello there',
+        transcripts: renderTranscripts([{ startMs: 0, endMs: 1500, text: 'hello there' }], 'hello there'),
+        outputPaths: input.formats.map((format) => input.inputPath.replace(/\.[^.]+$/, `.${format}`)),
+      };
+    },
   };
+  return fake;
 }
 
 export function createFakeInstaloader(): InstaloaderManager {
@@ -107,6 +117,6 @@ export function createFakeInstaloader(): InstaloaderManager {
   };
 }
 
-export function createFakeManagers(ytdlp: FakeYtdlp = createFakeYtdlp()): ToolManagers & { ytdlp: FakeYtdlp } {
+export function createFakeManagers(ytdlp: FakeYtdlp = createFakeYtdlp()): ToolManagers & { ytdlp: FakeYtdlp; whisper: FakeWhisper } {
   return { ytdlp, ffmpeg: createFakeFfmpeg(), whisper: createFakeWhisper(), instaloader: createFakeInstaloader() };
 }

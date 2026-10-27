@@ -136,7 +136,7 @@ There is no global store and no React context of kinetube's own. The providers a
 | `useDownloadSession` | `features/downloads/` | Joins the three hooks below and adds the chosen Instagram account to every request. |
 | `useActiveDownload` | `features/downloads/` | The one download shown in the progress dialog, and its stream. |
 | `useResumableDownloads` | `features/downloads/` | Paused and interrupted downloads for the resume banner, and the undo toast when one is dismissed. |
-| `usePostDownloadTranscription` | `features/downloads/` | The transcript made after a download finishes. |
+| `usePostDownloadTranscription` | `features/downloads/` | The transcript made after a single download finishes, with its percent. `stop()` closes the stream, which stops whisper.cpp. |
 | `useToolSetup` | `features/setup/` | Install progress for yt-dlp and FFmpeg on the setup screen. |
 | `useTranscribeQueue`, `useWhisperModels`, `useWhisperSetup` | `features/transcribe/` | The file queue, the model list and downloads, the whisper.cpp install. |
 | `useInstagramLogin`, `useInstaloaderSetup` | `features/instagram/` | Login with two-factor codes, and the Python and instaloader check. |
@@ -300,6 +300,8 @@ Each stream has a pure reducer in a `*State.ts` file. A reducer takes the curren
 |---|---|---|
 | `features/downloads/singleDownloadState.ts` | `applyDownloadEvent` | `useActiveDownload` |
 | `features/downloads/bulkDownloadState.ts` | `applyBatchEvent` | `useActiveDownload` |
+
+A bulk download sends each item's `shouldTranscribe` and the Settings transcription choices (`toTranscriptionOptions` in `lib/settings.ts`) with the batch, and the backend transcribes each item before the next one starts (ADR-043). `applyBatchEvent` moves an item from `running` to `transcribing` on `itemTranscribing` and keeps it there until `itemDone`, so the overall count, the current item and the dialog's Close button all wait for the transcript. `BulkQueueList` marks a saved transcript with its formats and a failed one with its reason. A single download still transcribes from the frontend once its `done` event arrives, and `ProgressModal` cannot be dismissed while that runs: its only button is Stop transcribing.
 | `features/setup/toolSetupState.ts` | `applyToolEvent` | `useToolSetup` |
 | `features/transcribe/transcribeQueueState.ts` | `applyTranscriptionEvent` | `useTranscribeQueue` |
 

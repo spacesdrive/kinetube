@@ -420,11 +420,16 @@ paths:
         - `start` (BatchStartEvent): first, with the item count.
         - `itemStart` (BatchItemStartEvent).
         - `itemProgress` (BatchItemProgressEvent).
-        - `itemDone` (BatchItemDoneEvent): one per item, successful or not.
-        - `warning` (WarningEvent): sent once per distinct warning.
+        - `itemTranscribing` (BatchItemTranscribingEvent): an item with shouldTranscribe downloaded and its transcription started.
+        - `itemTranscribeProgress` (BatchItemProgressEvent): whisper.cpp's percent for that item.
+        - `itemDone` (BatchItemDoneEvent): one per item, successful or not, after its transcript files are written.
+        - `warning` (WarningEvent): sent once per distinct warning, such as a missing whisper.cpp or model.
         - `done` (DownloadBatchDone): last. A cancelled batch has code CANCELLED.
 
-        Closing the stream stops the current item and skips the rest.
+        An item with shouldTranscribe is transcribed right after it downloads, before the next item starts, with
+        `transcription` (the model, the language and the files written beside it). A missing whisper.cpp or model never
+        stops the downloads: the batch sends a warning and each such item's itemDone carries it as transcriptError.
+        Closing the stream stops the current item, its transcription included, and skips the rest.
       requestBody:
         required: true
         content:
@@ -1621,6 +1626,10 @@ components:
         title:
           type: string
           maxLength: 200
+        shouldTranscribe:
+          type: boolean
+          default: false
+          description: Transcribe the file right after it downloads, before the next item starts.
     CreateDownloadBatchRequest:
       type: object
       required: [items]
@@ -1644,6 +1653,22 @@ components:
           oneOf:
             - $ref: '#/components/schemas/InstagramUsername'
             - type: 'null'
+        transcription:
+          type: object
+          description: How the items with shouldTranscribe are transcribed. Each field takes its default when left out.
+          properties:
+            modelId:
+              allOf:
+                - $ref: '#/components/schemas/WhisperModelId'
+              default: base
+            language:
+              $ref: '#/components/schemas/TranscriptionLanguage'
+            formats:
+              type: array
+              minItems: 1
+              items:
+                $ref: '#/components/schemas/TranscriptFormat'
+              default: [txt]
     BatchStartEvent:
       type: object
       required: [total]
@@ -1668,9 +1693,15 @@ components:
           type: integer
         percent:
           type: number
+    BatchItemTranscribingEvent:
+      type: object
+      required: [index]
+      properties:
+        index:
+          type: integer
     BatchItemDoneEvent:
       type: object
-      required: [index, isSuccess, filePath, message]
+      required: [index, isSuccess, filePath, message, transcriptPaths, transcriptError]
       properties:
         index:
           type: integer
@@ -1680,6 +1711,14 @@ components:
           type: [string, 'null']
         message:
           type: [string, 'null']
+        transcriptPaths:
+          type: array
+          items:
+            type: string
+          description: The transcript files written beside the download, in the order of transcription.formats. Empty when none was asked for or it failed.
+        transcriptError:
+          type: [string, 'null']
+          description: Why a downloaded file that asked for a transcript has none.
     DownloadBatchDone:
       oneOf:
         - type: object

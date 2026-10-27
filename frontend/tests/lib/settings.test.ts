@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { DEFAULT_SETTINGS, loadSettings, saveSettings, toDownloadSettings, toFileNameOptions } from '@/lib/settings';
+import { DEFAULT_SETTINGS, loadSettings, saveSettings, toDownloadSettings, toFileNameOptions, toTranscriptionOptions } from '@/lib/settings';
 
 afterEach(() => localStorage.clear());
 
@@ -49,5 +49,12 @@ describe('toFileNameOptions', () => {
 
     const custom = { ...settings, useCustomFilename: true, customFilenameTemplate: '%(id)s', useNumbering: true };
     expect(toFileNameOptions(custom)).toEqual({ prefix: '', suffix: '', template: '%(id)s', sequenceNumber: 5 });
+  });
+});
+
+describe('toTranscriptionOptions', () => {
+  it('names the model, language and files the way a transcription request does', () => {
+    const preferences = { defaultModel: 'small' as const, defaultLanguage: 'en', fileFormats: ['txt' as const, 'srt' as const] };
+    expect(toTranscriptionOptions(preferences)).toEqual({ modelId: 'small', language: 'en', formats: ['txt', 'srt'] });
   });
 });

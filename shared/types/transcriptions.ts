@@ -31,6 +31,9 @@ export interface CreateTranscriptionRequest {
   formats?: TranscriptFormat[];
 }
 
+// how a bulk download transcribes the items that ask for it; the same defaults as a single transcription
+export type TranscriptionOptions = Omit<CreateTranscriptionRequest, 'filePath'>;
+
 export interface TranscriptionEvents {
   phase: { phase: 'extracting' | 'transcribing'; message: string };
   progress: { percent: number };

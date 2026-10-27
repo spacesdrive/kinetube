@@ -14,7 +14,7 @@ import { makeTempPaths, removeDir } from '../fixtures/tempDir.ts';
 import { CHANNEL_PLAYLISTS_SAMPLE, PLAYLIST_SAMPLE } from '../fixtures/youtubeSamples.ts';
 
 import type { Express } from 'express';
-import type { FakeYtdlp } from '../fixtures/fakeManagers.ts';
+import type { FakeWhisper, FakeYtdlp } from '../fixtures/fakeManagers.ts';
 
 const PORT = 3001;
 const HOST = `localhost:${PORT}`;
@@ -24,6 +24,7 @@ describe('/api/v1', () => {
   let root = '';
   let app: Express;
   let ytdlp: FakeYtdlp;
+  let whisper: FakeWhisper;
 
   // supertest picks its own port, so every request names the Host the origin guard expects
   const api = {
@@ -37,6 +38,7 @@ describe('/api/v1', () => {
     root = paths.root;
     const managers = createFakeManagers();
     ytdlp = managers.ytdlp;
+    whisper = managers.whisper;
     const silentLogger = createLogger(() => {});
     app = createApp({ config: { port: PORT, frontendDist: null }, services: createServices(managers, paths), logger: silentLogger });
   });
@@ -186,6 +188,55 @@ describe('/api/v1', () => {
     test('a batch with an invalid item is refused as a whole', async () => {
       const res = await api.post('/api/v1/download-batches').send({ items: [{ url: 'https://youtu.be/dQw4w9WgXcQ' }, { url: '--exec=calc' }] });
       assert.equal(res.status, 400);
+    });
+
+    test('a batch with a bad shouldTranscribe or an unknown transcript format is refused with 400', async () => {
+      const item = { url: 'https://youtu.be/dQw4w9WgXcQ' };
+      assert.equal((await api.post('/api/v1/download-batches').send({ items: [{ ...item, shouldTranscribe: 'yes' }] })).status, 400);
+      assert.equal((await api.post('/api/v1/download-batches').send({ items: [item], transcription: { formats: ['docx'] } })).status, 400);
+    });
+
+    test('an item is transcribed in the chosen formats after it downloads, before the next item starts', async () => {
+      ytdlp.runs.length = 0;
+      whisper.transcribeCalls.length = 0;
+      const items = [{ url: 'https://youtu.be/dQw4w9WgXcQ', shouldTranscribe: true }, { url: 'https://youtu.be/aqz-KE-bpKQ' }];
+      const responsePromise = api.post('/api/v1/download-batches').send({ items, quality: '360p', transcription: { formats: ['txt', 'srt'] } }).buffer(true).then((res) => res);
+
+      await waitFor(() => ytdlp.runs.length === 1);
+      ytdlp.runs[0]?.emit(`[download] Destination: ${path.join(root, 'first.mp4')}`);
+      ytdlp.runs[0]?.exit(0);
+      await waitFor(() => ytdlp.runs.length === 2);
+      assert.equal(whisper.transcribeCalls.length, 1);
+      ytdlp.runs[1]?.emit(`[download] Destination: ${path.join(root, 'second.mp4')}`);
+      ytdlp.runs[1]?.exit(0);
+
+      const events = parseSseBody((await responsePromise).text).filter((event) => event.event !== 'warning' && event.event !== 'itemProgress');
+      assert.deepEqual(events.map((event) => event.event), ['start', 'itemStart', 'itemTranscribing', 'itemTranscribeProgress', 'itemDone', 'itemStart', 'itemDone', 'done']);
+      const [first, second] = events.filter((event) => event.event === 'itemDone').map((event) => event.data as { filePath: string; transcriptPaths: string[]; transcriptError: string | null });
+      assert.deepEqual(first?.transcriptPaths, [path.join(root, 'first.txt'), path.join(root, 'first.srt')]);
+      assert.equal(first?.transcriptError, null);
+      assert.deepEqual(second?.transcriptPaths, []);
+
+      const call = whisper.transcribeCalls[0];
+      assert.equal(call?.inputPath, first?.filePath);
+      assert.deepEqual([call?.modelId, call?.language, call?.formats], ['base', 'auto', ['txt', 'srt']]);
+    });
+
+    test('a missing model is a warning, and the files are saved without transcripts', async () => {
+      ytdlp.runs.length = 0;
+      whisper.transcribeCalls.length = 0;
+      const body = { items: [{ url: 'https://youtu.be/dQw4w9WgXcQ', shouldTranscribe: true }], quality: '360p', transcription: { modelId: 'small' } };
+      const responsePromise = api.post('/api/v1/download-batches').send(body).buffer(true).then((res) => res);
+      await waitFor(() => ytdlp.runs.length === 1);
+      ytdlp.runs[0]?.emit(`[download] Destination: ${path.join(root, 'third.mp4')}`);
+      ytdlp.runs[0]?.exit(0);
+
+      const events = parseSseBody((await responsePromise).text);
+      assert.ok(events.some((event) => event.event === 'warning' && /small model isn't downloaded/.test((event.data as { message: string }).message)));
+      const itemDone = events.find((event) => event.event === 'itemDone')?.data as { isSuccess: boolean; transcriptError: string | null };
+      assert.equal(itemDone.isSuccess, true);
+      assert.match(itemDone.transcriptError ?? '', /small model isn't downloaded/);
+      assert.equal(whisper.transcribeCalls.length, 0);
     });
   });
 

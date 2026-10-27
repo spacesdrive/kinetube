@@ -15,17 +15,18 @@ export interface BulkDownloadPanelProps {
 }
 
 function CurrentItem({ item }: { item: BulkItemState }) {
+  const isTranscribing = item.status === 'transcribing';
   return (
-    <div className="space-y-2 rounded-control bg-app p-4">
-      <p className="text-label text-ink-faint">Now downloading</p>
+    <div className="space-y-2 rounded-control bg-app p-4" aria-live="polite">
+      <p className="text-label text-ink-faint">{isTranscribing ? 'Now transcribing' : 'Now downloading'}</p>
       <p className="line-clamp-1 text-sm font-medium text-ink">{item.title}</p>
-      <DownloadProgressBar percent={item.percent} isMerging={false} />
+      <DownloadProgressBar percent={item.percent} isMerging={false} label={isTranscribing ? 'Transcription progress' : 'Download progress'} />
     </div>
   );
 }
 
 export default function BulkDownloadPanel({ download, onClose, onCancel }: BulkDownloadPanelProps) {
-  const { total, doneCount, succeededCount, failedCount, current } = summarizeBulk(download);
+  const { total, doneCount, succeededCount, failedCount, transcribedCount, hasTranscripts, current } = summarizeBulk(download);
   const overallPercent = total > 0 ? (doneCount / total) * 100 : 0;
   const isAllDone = download.isFinished || doneCount === total;
 
@@ -38,8 +39,9 @@ export default function BulkDownloadPanel({ download, onClose, onCancel }: BulkD
         </div>
         <Progress value={overallPercent} aria-label="Overall progress" />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <div className={hasTranscripts ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-2 gap-2'}>
         <MetricBox label="Saved" value={succeededCount} tone="success" />
+        {hasTranscripts && <MetricBox label="Transcribed" value={transcribedCount} tone="success" />}
         <MetricBox label="Failed" value={failedCount} tone={failedCount > 0 ? 'error' : 'neutral'} />
       </div>
       {download.warning && <Notice tone="warning">{download.warning}</Notice>}

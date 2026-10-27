@@ -7,7 +7,7 @@ import { oneOf, optionalOneOf, optionalString, readObject, requiredString } from
 import { exampleFilePath } from './pathExamples.ts';
 
 import type { TranscriptFormat, WhisperModelId } from '@shared/transcriptions.ts';
-import type { TranscriptionInput } from '../services/transcriptionService.ts';
+import type { TranscriptionChoices, TranscriptionInput } from '../services/transcriptionService.ts';
 
 // auto detection, or an ISO 639 language code such as en or yue
 const LANGUAGE_PATTERN = /^(auto|[a-z]{2,3})$/;
@@ -29,6 +29,16 @@ export function parseFormats(value: unknown): TranscriptFormat[] {
   if (value === undefined || value === null) return ['txt'];
   if (!Array.isArray(value) || value.length === 0) throw new ValidationError(`"formats" must be a list with at least one of: ${TRANSCRIPT_FORMATS.join(', ')}.`);
   return [...new Set(value.map((format) => oneOf(format, 'formats', TRANSCRIPT_FORMATS)))];
+}
+
+// a bulk download's transcription settings; left out, each one takes its default
+export function parseTranscriptionChoices(value: unknown): TranscriptionChoices {
+  const fields = value === undefined || value === null ? {} : readObject(value, '"transcription"');
+  return {
+    modelId: optionalOneOf(fields.modelId, 'transcription.modelId', WHISPER_MODEL_IDS, 'base'),
+    language: parseLanguage(fields.language),
+    formats: parseFormats(fields.formats),
+  };
 }
 
 export function parseCreateTranscription(body: unknown): TranscriptionInput {

@@ -61,9 +61,23 @@ describe('bulk downloads', () => {
     state = applyBatchEvent(state, 'itemStart', { index: 0, url: 'https://youtu.be/a', title: 'A' });
     expect(summarizeBulk(state).current?.key).toBe('a');
 
-    state = applyBatchEvent(state, 'itemDone', { index: 0, isSuccess: true, filePath: '/a.mp4', message: null });
-    state = applyBatchEvent(state, 'itemDone', { index: 1, isSuccess: false, filePath: null, message: 'Private video' });
+    state = applyBatchEvent(state, 'itemDone', { index: 0, isSuccess: true, filePath: '/a.mp4', message: null, transcriptPaths: [], transcriptError: null });
+    state = applyBatchEvent(state, 'itemDone', { index: 1, isSuccess: false, filePath: null, message: 'Private video', transcriptPaths: [], transcriptError: null });
     expect(summarizeBulk(state)).toMatchObject({ total: 2, doneCount: 2, succeededCount: 1, failedCount: 1, current: null });
+  });
+
+  it('an item stays current while it transcribes, and only counts as done once its transcript is written', () => {
+    let state = createBulkDownload(items);
+    state = applyBatchEvent(state, 'itemStart', { index: 1, url: 'https://youtu.be/b', title: 'B' });
+    state = applyBatchEvent(state, 'itemProgress', { index: 1, percent: 100 });
+    state = applyBatchEvent(state, 'itemTranscribing', { index: 1 });
+    state = applyBatchEvent(state, 'itemTranscribeProgress', { index: 1, percent: 40 });
+    expect(summarizeBulk(state)).toMatchObject({ doneCount: 0, transcribedCount: 0, hasTranscripts: true });
+    expect(summarizeBulk(state).current).toMatchObject({ key: 'b', status: 'transcribing', percent: 40 });
+
+    state = applyBatchEvent(state, 'itemDone', { index: 1, isSuccess: true, filePath: '/b.mp4', message: null, transcriptPaths: ['/b.txt', '/b.srt'], transcriptError: null });
+    expect(summarizeBulk(state)).toMatchObject({ doneCount: 1, transcribedCount: 1, current: null });
+    expect(state.items[1]?.transcriptPaths).toEqual(['/b.txt', '/b.srt']);
   });
 
   it('a done event marks the whole batch finished, cancelled or not', () => {

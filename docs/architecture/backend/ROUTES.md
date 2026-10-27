@@ -47,7 +47,7 @@ Long work answers with a stream of server-sent events (SSE, a long-lived HTTP re
 | Stream | Closing it |
 |---|---|
 | `POST /downloads`, `POST /downloads/:downloadId/resume` | cancels the download and deletes its pending record (the partial file stays) |
-| `POST /download-batches` | stops the current item and skips the rest |
+| `POST /download-batches` | stops the current item, its transcription included, and skips the rest |
 | `POST /transcriptions` | stops FFmpeg and whisper.cpp |
 | `GET /instagram/media` (stream form) | stops the instaloader profile helper |
 | `POST /tools/:toolId/install`, `POST /tools/:toolId/update` | nothing: the install keeps running, and a later request finds the tool ready |
@@ -59,7 +59,7 @@ Events per stream:
 |---|---|---|
 | Tool install and update | `phase`, `progress`, `log` (any order, repeated), then `done` | `tool` (a `Tool`) |
 | Download and resume | `start`, then `warning`, `title`, `phase`, `progress`, `log` (repeated), then `paused` or `done` | `title`, `filePath` |
-| Download batch | `start`, then per item `itemStart`, `itemProgress`, `itemDone`, with `warning` as needed, then `done` | `succeededCount`, `failedCount` |
+| Download batch | `start`, then per item `itemStart`, `itemProgress`, `itemTranscribing` and `itemTranscribeProgress` for an item that asks for a transcript, `itemDone`, with `warning` as needed, then `done` | `succeededCount`, `failedCount` |
 | Whisper model download | `phase`, `progress`, then `done` | `model` (a `WhisperModel`) |
 | Transcription | `phase` (`extracting`, then `transcribing`), `progress`, `chunk`, then `done` | `text`, `transcripts`, `outputPaths` |
 | Instagram media | `profile`, `progress` (one per post), then `done` | `media` (an `InstagramMedia`) |
@@ -130,6 +130,8 @@ A download is one YouTube video or Shorts link, or one Instagram post, reel or s
 | POST | `/api/v1/download-batches` | Downloads a list of YouTube and Instagram links one after another. Body: `CreateDownloadBatchRequest` with 1 to 1000 `items`, each one a single video link such as a picked `VideoEntry.url`. | 200 stream, `DownloadBatchEvents` | 400 bad body or any link that cannot be downloaded, 503 yt-dlp not installed | yes |
 
 Batch items have no pending record and cannot be paused. Instagram items are paced: yt-dlp waits 2 seconds between its own requests (`--sleep-requests 2`), and the batch waits 2.5 seconds between Instagram items. When `fileName.sequenceNumber` is set, each item counts up from it. A warning that applies to every item is sent once. One failed item does not stop the batch; its `itemDone` has `isSuccess: false` and a `message`. A cancelled batch ends with `done` code `CANCELLED`.
+
+An item with `shouldTranscribe: true` is transcribed right after it downloads and before the next item starts (ADR-043). The request's `transcription` names the model, the language and the formats (the same fields and defaults as `CreateTranscriptionRequest` without `filePath`), and the files are written beside the download. The item sends `itemTranscribing`, then `itemTranscribeProgress` with whisper.cpp's percent, and its `itemDone` comes only after the transcript, with `transcriptPaths` and `transcriptError`. A transcription failure never fails the download: `isSuccess` stays `true` and `transcriptError` says what went wrong. When whisper.cpp or the model is missing, the batch sends one `warning` at the start, downloads everything, and gives each such item that message as its `transcriptError`. The services live in `services/downloadBatchService.ts` and `services/downloads/batchTranscript.ts`.
 
 ## Whisper models (`src/routes/transcriptionRoutes.ts`)
 

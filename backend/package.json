@@ -1,6 +1,6 @@
 {
   "name": "kinetube-backend",
-  "version": "2.1.2",
+  "version": "2.1.3",
   "private": true,
   "description": "Local Express API for KineTube: downloads, transcription and tool setup",
   "type": "module",

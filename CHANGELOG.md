@@ -9,6 +9,10 @@ Released versions below are reconstructed from `git log`/tag history as of 2026-
 
 ## [Unreleased]
 
+## [2.1.3] - 2026-11-03
+
+kinetube starts when another program uses port 3001. The macOS and Linux installers are still untested on real hardware.
+
 ### Fixed
 - kinetube no longer says "The kinetube backend didn't start" when another program, such as a Next.js dev server, uses port 3001 on IPv6. Electron's start-up check kept reusing a connection that had reached the other program before kinetube's backend was ready, and the window would also have loaded from the other program. Each check now opens a new connection, the window connects to kinetube's own backend, and the log names the conflict if another program still answers (issue #28, ADR-044).
 

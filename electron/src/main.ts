@@ -51,6 +51,10 @@ function openWindow(): void {
   loadPackagedApp(window).catch((error: unknown) => writeLog(`[main] could not open the app: ${String(error)}\n`));
 }
 
+// the backend listens on 127.0.0.1 only; Chromium tries IPv6 first for "localhost", where another program such as
+// a dev server on [::]:3001 would answer instead (issue #28); the origin stays localhost, so saved settings stay put
+if (!isDev) app.commandLine.appendSwitch('host-resolver-rules', 'MAP localhost 127.0.0.1');
+
 // the app has its own sidebar, so the native File / Edit / View menu is removed
 Menu.setApplicationMenu(null);
 registerIpcHandlers(getWindow);

@@ -221,6 +221,7 @@ Run this before you ship any change the automated tests do not fully cover. Use 
 
 - [ ] Change the download folder, the file name options and the default quality, then press Save: a "Settings saved" toast appears. Restart the app: the settings are still there
 - [ ] About shows the app version from the root `package.json` (2.1.2), in the desktop app and in a plain browser
+- [ ] With another program on `[::]:3001` (a Next.js dev server, or `node -e "require('http').createServer((q, s) => s.end('other')).listen(3001, '::')"`), start the packaged app: it opens normally, and the page comes from kinetube, not the other program
 - [ ] Settings shows the installed yt-dlp version. "Check for updates" says it is up to date or offers the newer release
 - [ ] Update yt-dlp: a progress bar runs and the new version shows afterwards. `yt-dlp --version` in a terminal shows the same version
 - [ ] With the network off, the yt-dlp check says GitHub could not be reached instead of saying it is up to date

@@ -774,3 +774,14 @@ New packages, all in `site/` only: `motion` (the scroll story and product pictur
 **Decision:** `POST /api/v1/download-batches` takes `shouldTranscribe` on each item and the transcription choices (model, language, formats) for the batch. The batch service downloads an item, transcribes it with the whisper manager when it asks for it, writes the transcript files beside it, and only then sends `itemDone` and starts the next item. It reports `itemTranscribing` and `itemTranscribeProgress` on the way. A missing whisper.cpp or model is one warning at the start, and the downloads go ahead without transcripts. A single download still transcribes from the frontend after its `done` event, and its dialog stays open until the transcript is written or stopped.
 
 **Reasoning:** the frontend used to start one transcription request per finished item and drop its result (issue #25). The dialog said the batch was done while whisper.cpp was still running, closing it did not stop anything, errors such as a missing model vanished, and several transcriptions could run at once on top of the download. Moving the step into the batch makes the batch stream the one record of the work: the dialog's progress, the Cancel button and the end of the batch all include the transcripts, and only one whisper.cpp runs at a time, which already takes half the CPU cores. A single download keeps its own transcription step because it can be paused and resumed and its transcript is shown in the dialog with Copy and Save, so the frontend owns that flow; ProgressModal now waits for it.
+
+---
+
+## ADR-044: The packaged window maps localhost to 127.0.0.1
+
+**Date:** 2026-11-03
+**Status:** Accepted
+
+**Decision:** The packaged app appends Chromium's `--host-resolver-rules=MAP localhost 127.0.0.1`, and Electron's health check opens a new connection for each try. The window still loads `http://localhost:3001`, and the backend still listens on 127.0.0.1 only.
+
+**Reasoning:** another program on `[::]:3001`, such as a Next.js dev server, made kinetube report that its backend did not start (issue #28). The backend could bind 127.0.0.1:3001 beside it, but the health check reused a kept-alive connection that reached the other program first, and Chromium tries IPv6 first for `localhost`, so the page would have come from the other program too. Loading `http://127.0.0.1:3001` instead would change the page's origin and lose every saved setting, which lives in that origin's localStorage. Listening on `::1` as well would widen what the backend listens on, which the security rules forbid without a review. The resolver rule changes only where `localhost` connects inside kinetube's own window, so the origin, the settings and the 127.0.0.1-only rule all stay as they are. Development skips it because Vite may listen on `::1`.
